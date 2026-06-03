@@ -1,2 +1,5 @@
 .vscode
 *.json
+*.pyc
+__pycache__/
+settings.ini

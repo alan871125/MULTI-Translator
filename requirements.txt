@@ -4,3 +4,4 @@ pyqt5-sip==12.17.0
 pyqt5-stubs==5.15.6.0
 pytest==9.0.3
 pandas
+deep-translator==1.11.4
