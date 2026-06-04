@@ -3,3 +3,6 @@
 *.pyc
 __pycache__/
 settings.ini
+
+# Exclude translations from being ignored
+!src/app/.translations/*.json

@@ -1,0 +1,36 @@
+{
+    "SOURCE_LANG": "Source Language",
+    "TARGET_LANG": "Target Language",
+    "API": "Translation API",
+    "custom_api": "Custom API",
+    "API_KEY": "API Key (if required)",
+    "API_URL": "API URL",
+    "dark_mode": "Dark Mode",
+    "language": "Language",
+
+    "menu.settings": "Settings",
+    "menu.file": "File",
+    "menu.file.saveTranslation": "Save Translation",
+    "menu.file.loadTranslation": "Load Translation",
+    "menu.file.saveGameFile": "Save Game Data (*.json)",
+    "menu.file.loadGameFile": "Load Game Data (*.json)",
+    "menu.file.recentFiles": "Recent Files",
+    "menu.edit": "Edit",
+    "menu.view": "View",
+    "menu.help": "Help",
+
+    "rightClick.translateWithAPI": "Translate with API",
+    "rightClick.editTranslation": "Edit Translation",
+    "rightClick.resetTranslation": "Reset Translation",
+    "rightClick.copyOriginal": "Copy Original Text",
+
+    "id": "ID"
+
+
+
+
+
+
+
+
+}
