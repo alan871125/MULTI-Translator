@@ -21,10 +21,12 @@ class LanguagePack:
     @classmethod
     def __getitem__(cls, key)->str:
         # fallback order: current language -> English -> key itself
-        return cls.lang_data[cls.LANGUAGE].get(key, None) or cls.lang_data.get("en", {}).get(key, key)
+        return cls.lang_data[cls.LANGUAGE].get(key, None) or cls.lang_data.get("en", {}).get(key, key.capitalize())
 
     @classmethod
-    def load_translations(cls, lang):
+    def load_translations(cls, lang, force=False):
+        if not force and lang in cls.lang_data:
+            return
         with open(Path(__file__).parent/f".translations/{lang}.json", "r", encoding="utf-8") as f:
             cls.lang_data[lang] = json.load(f)
     

@@ -9,13 +9,18 @@ from PyQt5.QtWidgets import (
     QCheckBox, QSpinBox, QLineEdit, QPushButton, QFileDialog, QDialogButtonBox, QTabWidget, QWidget
 )
 from utils import JSONWithCommentsDecoder
+# from engines import supported_engines
 from .language import LanguagePack
 
 logger = logging.getLogger(__name__)
 L = LanguagePack()
-    
+
+
 @dataclass
 class Settings:
+    # Engine
+    engine: str = "RPG Maker MV"
+    
     # Translation
     SOURCE_LANG: str = "auto"
     TARGET_LANG: str = "en"
@@ -27,6 +32,7 @@ class Settings:
     # Theme and UI
     language: str = "eng"
     dark_mode: bool = False
+    theme: str = "default"
         
     def asdict(self) -> dict:
         return asdict(self)
@@ -96,20 +102,20 @@ class SettingsDialog(QDialog):
         
         # Translation Settings Tab
         translation_tab = QWidget()
-        widgets = {"Translator": {}, "Translator": {}}
+        widgets = {"translator": {}, "UI": {}}
         layouts = {}
         ## dropdown Menus
-        layouts["Translator"] = QFormLayout(translation_tab)
-        widgets["Translator"]["SOURCE_LANG"] = QComboBox()
-        widgets["Translator"]["SOURCE_LANG"].addItems(['auto']+languages)
-        widgets["Translator"]["TARGET_LANG"] = QComboBox()
-        widgets["Translator"]["TARGET_LANG"].addItems(languages)
-        widgets["Translator"]["API"] = QComboBox()
-        widgets["Translator"]["API"].addItems(["Google", L["custom_api"]])
+        layouts["translator"] = QFormLayout(translation_tab)
+        widgets["translator"]["SOURCE_LANG"] = QComboBox()
+        widgets["translator"]["SOURCE_LANG"].addItems(['auto']+languages)
+        widgets["translator"]["TARGET_LANG"] = QComboBox()
+        widgets["translator"]["TARGET_LANG"].addItems(languages)
+        widgets["translator"]["API"] = QComboBox()
+        widgets["translator"]["API"].addItems(["Google", L["custom_api"]])
         ## Line Edits
-        widgets["Translator"]["API_KEY"] = QLineEdit(self.settings.API_KEY)
-        widgets["Translator"]["API_URL"] = QLineEdit(self.settings.API_URL)
-        tabs.addTab(translation_tab, L["Translator"])
+        widgets["translator"]["API_KEY"] = QLineEdit(self.settings.API_KEY)
+        widgets["translator"]["API_URL"] = QLineEdit(self.settings.API_URL)
+        tabs.addTab(translation_tab, L["translator"])
         
         # UI Settings Tab
         ui_tab = QWidget()

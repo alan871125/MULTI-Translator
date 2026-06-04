@@ -1,0 +1,49 @@
+QScrollBar:vertical {
+    background: $BACKGROUND_COLOR;
+    width: 16px;
+    margin: 16px 2px 16px 2px;
+    border: 1px solid $BORDER_COLOR;
+    border-radius: 8px;
+}
+
+QScrollBar::handle:vertical {
+    background: $SCROLLBAR_HANDLE_COLOR;
+    min-height: 24px;
+    border-radius: 4px;
+    border: 2px solid $BORDER_COLOR;
+}
+QScrollBar:horizontal {
+    background: $BACKGROUND_COLOR;
+    height: 16px;
+    margin: 2px 16px 2px 16px;
+    border: 1px solid $BORDER_COLOR;
+    border-radius: 8px;
+}
+
+QScrollBar::handle:horizontal {
+    background: $SCROLLBAR_HANDLE_COLOR;
+    min-width: 24px;
+    border-radius: 4px;
+    border: 2px solid $BORDER_COLOR;
+}
+
+QScrollBar::handle:horizontal:hover, 
+QScrollBar::handle:vertical:hover {
+    background: $HOVER_COLOR;
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal,
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal,
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+    border: none;
+}
+
+
+
+
+
