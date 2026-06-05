@@ -107,59 +107,87 @@ class SettingsDialog(QDialog):
         self.setWindowTitle(L["Settings"])
         self.setMinimumSize(700, 270)        
         self.init_ui()
-        
+
+    def update_lang_combobox(self, combo_box: QComboBox, current_lang:str, has_auto:bool=True):
+        # prevent updating before the combo boxes are initialized
+        api_lang = self.widgets["translator"]["API"].currentText()
+        supported_langs = ['auto'] if has_auto else []
+        if api_lang == "DeepL":            
+            from deep_translator.constants import DEEPL_LANGUAGE_TO_CODE
+            supported_langs +=list(map(str.capitalize,DEEPL_LANGUAGE_TO_CODE.keys()))
+        elif api_lang == "Google":
+            from deep_translator.constants import GOOGLE_LANGUAGES_TO_CODES
+            supported_langs += list(map(str.capitalize, GOOGLE_LANGUAGES_TO_CODES.keys()))
+        else:
+            supported_langs += ["en", "cht", "chs", "jp", "kor", "fra", "deu", "ru"]
+        combo_box.clear()
+        combo_box.addItems(supported_langs)
+        if current_lang in supported_langs: 
+            combo_box.setCurrentText(current_lang)
+        else:
+            combo_box.setCurrentText("auto")
+            
+    def on_api_changed(self, api_name:str):
+        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.SOURCE_LANG)
+        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.TARGET_LANG, has_auto=False)
+
     def init_ui(self):
         """Initialize the settings UI"""
-        languages = ["en", "cht", "chs", "jp", "kor", "fra", "deu", "ru"]
-        layout = QVBoxLayout(self)
-        tabs = QTabWidget()
-        layout.addWidget(tabs)
+        self.settings_layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        self.settings_layout.addWidget(self.tabs)
+        self.widgets = {"translator": {}, "UI": {}}
+        self.layouts = {}        
+        self.init_translator_settings_tab()
+        self.init_ui_settings_tab()
         
-        # Translation Settings Tab
-        translation_tab = QWidget()
-        widgets = {"translator": {}, "UI": {}}
-        layouts = {}
-        ## dropdown Menus
-        layouts["translator"] = QFormLayout(translation_tab)
-        widgets["translator"]["SOURCE_LANG"] = QComboBox()
-        widgets["translator"]["SOURCE_LANG"].addItems(['auto']+languages)
-        widgets["translator"]["SOURCE_LANG"].setCurrentText(self.settings.SOURCE_LANG)
-        widgets["translator"]["TARGET_LANG"] = QComboBox()
-        widgets["translator"]["TARGET_LANG"].addItems(languages)
-        widgets["translator"]["TARGET_LANG"].setCurrentText(self.settings.TARGET_LANG)
-        widgets["translator"]["API"] = QComboBox()
-        widgets["translator"]["API"].addItems(["Google", "DeepL", L["customAPI"]])
-        widgets["translator"]["API"].setCurrentText(self.settings.API)
-        
-        ## Line Edits
-        widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.DEEPL_API_KEY)
-        widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.CUSTOM_API_KEY)
-        widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.CUSTOM_API_URL)
-        widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["DEEPL_API_KEY.hint"])
-        widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["CUSTOM_API_KEY.hint"])
-        tabs.addTab(translation_tab, L["translator"])
-        
-        # UI Settings Tab
-        ui_tab = QWidget()
-        layouts["UI"] = QFormLayout(ui_tab)
-        widgets["UI"]["language"] = QComboBox()
-        widgets["UI"]["language"].addItems(languages)
-        widgets["UI"]["language"].setCurrentText(self.settings.language)
-        widgets["UI"]["dark_mode"] = QCheckBox()
-        widgets["UI"]["dark_mode"].setChecked(self.settings.dark_mode)
-        tabs.addTab(ui_tab, L["UI"])
-        for layout_key, form_layout in layouts.items():
-            for k, widget in widgets[layout_key].items():
-                form_layout.addRow(L[k], widget)
-        self.layouts = layouts
-        self.widgets = widgets
-        
-        layout.addStretch()
+        self.settings_layout.addStretch()
         # Dialog buttons (OK/Cancel)
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        self.settings_layout.addWidget(button_box)
+        
+    def init_translator_settings_tab(self):
+        # Translation Settings Tab
+        translation_tab = QWidget()
+        ## dropdown Menus
+        self.layouts["translator"] = QFormLayout(translation_tab)
+        self.widgets["translator"]["SOURCE_LANG"] = QComboBox()
+        self.widgets["translator"]["TARGET_LANG"] = QComboBox()
+        self.widgets["translator"]["API"] = QComboBox()
+        self.widgets["translator"]["API"].addItems(["Google", "DeepL", L["customAPI"]])
+        self.widgets["translator"]["API"].setCurrentText(self.settings.API)
+        self.widgets["translator"]["API"].currentTextChanged.connect(self.on_api_changed)
+        # Update language combo boxes based on the current API setting
+        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.SOURCE_LANG)
+        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.TARGET_LANG, has_auto=False)
+        
+        ## Line Edits
+        self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.DEEPL_API_KEY)
+        self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.CUSTOM_API_KEY)
+        self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.CUSTOM_API_URL)
+        self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["DEEPL_API_KEY.hint"])
+        self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["CUSTOM_API_KEY.hint"])
+        self.tabs.addTab(translation_tab, L["translator"])
+        
+    def init_ui_settings_tab(self):        
+        languages = ["en", "cht", "chs", "jp", "kor", "fra", "deu", "ru"]
+        # UI Settings Tab
+        ui_tab = QWidget()
+        self.layouts["UI"] = QFormLayout(ui_tab)
+        self.widgets["UI"]["language"] = QComboBox()
+        self.widgets["UI"]["language"].addItems(languages)
+        self.widgets["UI"]["language"].setCurrentText(self.settings.language)
+        self.widgets["UI"]["fontSize"] = QSpinBox()
+        self.widgets["UI"]["fontSize"].setRange(8, 24)
+        self.widgets["UI"]["fontSize"].setValue(14)
+        self.widgets["UI"]["dark_mode"] = QCheckBox()
+        self.widgets["UI"]["dark_mode"].setChecked(self.settings.dark_mode)
+        self.tabs.addTab(ui_tab, L["UI"])
+        for layout_key, form_layout in self.layouts.items():
+            for k, widget in self.widgets[layout_key].items():
+                form_layout.addRow(L[k], widget)
         
     def save_settings(self):
         """Update settings from the dialog inputs"""

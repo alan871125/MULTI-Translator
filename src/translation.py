@@ -4,8 +4,6 @@ import os
 from typing import Iterable, Sequence
 import opencc
 from deep_translator import GoogleTranslator, DeeplTranslator
-from deep_translator.constants import GOOGLE_LANGUAGES_TO_CODES, DEEPL_LANGUAGE_TO_CODE
-
 
 from app.settings import Settings
 
@@ -42,8 +40,19 @@ def translate(source:str, source_lang:str="auto", target_lang:str="en", provider
         provider (str): the translation provider to use, either 'google' or 'deepl', default is 'google'
         api_key (str): the API key for the translation provider, required for some providers like Deepl
     """
-    if provider.lower() == 'deepl' and not api_key:
-        api_key = os.getenv("DEEPL_API_KEY")
+    # Map language names to codes based on the provider's supported languages
+    # Safe if the input is already a code.
+    if provider.lower() == 'deepl':
+        if not api_key:
+            api_key = os.getenv("DEEPL_API_KEY")
+        from deep_translator.constants import DEEPL_LANGUAGE_TO_CODE as supported_languages
+    elif provider.lower() == 'google':
+        from deep_translator.constants import GOOGLE_LANGUAGES_TO_CODES as supported_languages
+    else:
+        supported_languages = {}
+    source_lang = supported_languages.get(source_lang.lower(), source_lang)
+    target_lang = supported_languages.get(target_lang.lower(), target_lang)
+    
     if not source or not source.strip():
         return None
     # Call translation API (e.g. Google Translate) and update translation

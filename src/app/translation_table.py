@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 
 from app.settings import Settings
 from core.text_unit import TextUnit
-from translation.translation import Translator, batch_chinese_convertion
+from translation import Translator, batch_chinese_convertion
 from .language import LanguagePack
 from .gui.theme import ThemeManager
 L = LanguagePack()
