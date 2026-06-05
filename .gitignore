@@ -1,9 +1,11 @@
 .vscode
 .env
 *.json
+
+# Cache/Compiled files
 *.pyc
 __pycache__/
-settings.ini
+resources_rc.py
 
 # Exclude translations from being ignored
 !src/app/.translations/*.json

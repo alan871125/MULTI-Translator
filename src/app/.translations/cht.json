@@ -7,6 +7,7 @@
     "CUSTOM_API_KEY": "Custom API 金鑰",
     "DEEPL_API_KEY.hint": "若選擇 DeepL API 則必填",
     "CUSTOM_API_KEY.hint": "若選擇 自定義API 則必填",
+    "CUSTOM_API_URL": "自定義API連結",
     "dark_mode": "深色模式",
     "language": "語言",
     

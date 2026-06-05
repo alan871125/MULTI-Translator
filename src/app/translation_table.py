@@ -94,10 +94,11 @@ class TranslationTableModel(QAbstractTableModel):
                 return None
             row = self.filtered_data.iloc[r]
             original = row.original
-            translation = row.translation
+            # translation = row.translation
             level = self.translation_levels.get(original, None)
             if level is None:
-                level = "UNTRANSLATED" if not str(translation).strip() else "VERIFIED"
+                # level = "UNTRANSLATED" if not str(translation).strip() else "VERIFIED"
+                level = "UNTRANSLATED"
             return QColor(ThemeManager.theme.get_level_color(level))
         
         if role == Qt.DisplayRole:

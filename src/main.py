@@ -1,9 +1,11 @@
 import os
 import sys
 import shutil
-import PyQt5.QtWidgets as qt
 from dotenv import load_dotenv
 import logging
+
+import resources_rc
+import PyQt5.QtWidgets as qt
 from app.settings import Settings
 from app.gui.main_window import TranslationApp
 
