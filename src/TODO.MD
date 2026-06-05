@@ -16,7 +16,7 @@ Some of the functionalities may be higly related, the order is therefore not nec
 
 ## API Support
 1. [X] Google Translate
-2. [ ] DEEPL
+2. [X] DEEPL
 3. [ ] Add Custom LLM API Support (Open Router).
    1. Write a Translation Prompt
    2. Should use API URL for easier support accross different APIs (ex: Claude, OpenAI .etc)
@@ -41,7 +41,7 @@ Some of the functionalities may be higly related, the order is therefore not nec
        - %: Dictionary
        - Note: Might want to use other signs for easier implementations, and prevent hard to fix conflicts with regex.
    - 
-2. [ ] Chinese Simplified <-> Chinese Traditional Convertions
+2. [X] Chinese Simplified <-> Chinese Traditional Convertions
 
 ## Translation Level and Highlighting
 - [ ] Multi level translation for quality and progress tracking (Inspired by xTranslate). 

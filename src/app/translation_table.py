@@ -2,9 +2,14 @@ import pandas as pd
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QDropEvent, QCursor, QIcon, QColor
-from PyQt5.QtWidgets import QTableWidget, QDialogButtonBox
+from PyQt5.QtWidgets import (
+    QTableView, QAbstractItemView, 
+    QInputDialog, QMenu, QApplication
+)
 
+from app.settings import Settings
 from core.text_unit import TextUnit
+from translation.translation import Translator, batch_chinese_convertion
 from .language import LanguagePack
 from .gui.theme import ThemeManager
 L = LanguagePack()
@@ -187,3 +192,95 @@ class TranslationTableModel(QAbstractTableModel):
         self._filtered_data = None
         self.dataChanged.emit(index, index)
         return True
+    
+    def chs2cht(self):
+        """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
+        filtered = self.filtered_data
+        if filtered.empty:
+            return 
+        filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='tw')
+        
+    def cht2chs(self):
+        """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
+        filtered = self.filtered_data
+        if filtered.empty:
+            return
+        filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='s')
+        
+        
+    
+class TranslationTableView(QTableView):
+    # TODO: AI GENERATED: NEED REVIEW
+    def __init__(self, parent=None, settings=None):
+        super().__init__(parent)
+        # Use row selection and single selection so a row is selected at a time
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # self.setAlternatingRowColors(True)
+        # enable custom context menu
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+        # allow inline editing via double-click or edit key
+        self.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed | QAbstractItemView.SelectedClicked)
+        if settings is None:
+            settings = Settings()
+        self.translator = Translator(settings)
+        
+    def edit_translation_row(self, row: int, model: TranslationTableModel) -> None:
+        current = model.data(model.index(row, model._columns.index("translation")), Qt.DisplayRole)
+        text, ok = QInputDialog.getText(self, "Edit Translation", "Translation:", text=str(current))
+        if ok:
+            model.set_translation(row, text, level="VERIFIED")
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key in (Qt.Key_Return, Qt.Key_Enter):
+            # edit the selected row using the same dialog as the context menu
+            sel = self.selectionModel().selectedRows()
+            if not sel:
+                return
+            row = sel[0].row()
+            model = self.model()
+            if not isinstance(model, TranslationTableModel):
+                return
+            self.edit_translation_row(row, model)
+            return
+        super().keyPressEvent(event)
+
+    def show_context_menu(self, pos):
+        idx = self.indexAt(pos)
+        if not idx.isValid():
+            return
+        row = idx.row()
+        model = self.model()
+        if not isinstance(model, TranslationTableModel):
+            return
+        menu = QMenu(self)
+        
+        api_action =   menu.addAction(L['rightClick.translateWithAPI'])
+        edit_action =  menu.addAction(L['rightClick.editTranslation'])
+        reset_action = menu.addAction(L['rightClick.resetTranslation'])
+        copy_action =  menu.addAction(L['rightClick.copyOriginal'])
+
+        action = menu.exec_(self.viewport().mapToGlobal(pos))
+        if action is None:
+            return
+        if action == api_action:
+            for sel in self.selectionModel().selectedRows():
+                row = sel.row()
+                original = model.data(model.index(row, model._columns.index("original")), Qt.DisplayRole)
+                if not isinstance(original, str):
+                    return
+                if (translated:=self.translator.translate(original)) is not None:
+                    model.set_translation(row, translated, level="API")
+            
+        elif action == edit_action:
+            self.edit_translation_row(row, model)
+        elif action == reset_action:
+            # clear translation for this original
+            original = model.data(model.index(row, model._columns.index("original")), Qt.DisplayRole)
+            if original is not None:
+                model.set_translation(row, "", level="UNTRANSLATED")
+        elif action == copy_action:
+            original = model.data(model.index(row, model._columns.index("original")), Qt.DisplayRole)
+            QApplication.clipboard().setText(str(original))

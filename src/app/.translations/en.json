@@ -2,12 +2,16 @@
     "SOURCE_LANG": "Source Language",
     "TARGET_LANG": "Target Language",
     "API": "Translation API",
-    "custom_api": "Custom API",
-    "API_KEY": "API Key (if required)",
+    "customAPI": "Custom API",
+    "DEEPL_API_KEY": "DeepL API Key",
+    "CUSTOM_API_KEY": "Custom API Key",
+    "DEEPL_API_KEY.hint": "Required if DeepL API is selected",
+    "CUSTOM_API_KEY.hint": "Required if Custom API is selected",
     "API_URL": "API URL",
     "dark_mode": "Dark Mode",
     "language": "Language",
-
+    
+    "settings": "Settings",
     "menu.settings": "Settings",
     "menu.file": "File",
     "menu.file.saveTranslation": "Save Translation",
@@ -16,21 +20,31 @@
     "menu.file.loadGameFile": "Load Game Data (*.json)",
     "menu.file.recentFiles": "Recent Files",
     "menu.edit": "Edit",
+    "menu.edit.undo": "Undo (Ctrl+Z)",
+    "menu.edit.redo": "Redo (Ctrl+Y)",
     "menu.view": "View",
     "menu.help": "Help",
+    "menu.tools": "Tools",
+    "menu.tools.chineseConversion": "Chinese Conversion(CHS ⇌ CHT)",
+    "menu.tools.chineseConversion.chs2cht": "Simplified to Traditional",
+    "menu.tools.chineseConversion.cht2chs": "Traditional to Simplified",
 
     "rightClick.translateWithAPI": "Translate with API",
     "rightClick.editTranslation": "Edit Translation",
     "rightClick.resetTranslation": "Reset Translation",
     "rightClick.copyOriginal": "Copy Original Text",
+    
+    "translator": "Translator",
+    "UI": "UI",
 
-    "id": "ID"
-
-
-
-
-
-
-
-
+    "file": "File",
+    "id": "ID",
+    "attribute": "Attribute",
+    "original": "Original",
+    "translation": "Translation",
+    "filter": "Filter",
+    "searchAndReplace": "Search and Replace",
+    "search": "Search",
+    "replace": "Replace",
+    "replaceAll": "Replace All"
 }

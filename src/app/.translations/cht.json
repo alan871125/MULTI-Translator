@@ -2,12 +2,15 @@
     "SOURCE_LANG": "原文語言",
     "TARGET_LANG": "目標語言",
     "API": "翻譯器API",
-    "custom_api": "自定義API",
-    "API_KEY": "API密鑰(可選)",
-    "API_URL": "API網址(可選)",
+    "customAPI": "自定義API",
+    "DEEPL_API_KEY": "DeepL API 金鑰",
+    "CUSTOM_API_KEY": "Custom API 金鑰",
+    "DEEPL_API_KEY.hint": "若選擇 DeepL API 則必填",
+    "CUSTOM_API_KEY.hint": "若選擇 自定義API 則必填",
     "dark_mode": "深色模式",
     "language": "語言",
     
+    "settings": "設置",
     "menu.settings": "設置",
     "menu.file": "文件",
     "menu.file.saveTranslation": "保存翻譯",
@@ -16,8 +19,14 @@
     "menu.file.loadGameFile": "加載遊戲數據 (*.json)",
     "menu.file.recentFiles": "最近使用的文件",
     "menu.edit": "編輯",
+    "menu.edit.undo": "復原 (Ctrl+Z)",
+    "menu.edit.redo": "取消復原 (Ctrl+Y)",
     "menu.view": "檢視",
     "menu.help": "幫助",
+    "menu.tools": "工具",
+    "menu.tools.chineseConversion": "簡繁轉換 (CHS ⇌ CHT)",
+    "menu.tools.chineseConversion.chs2cht": "簡 ⇒ 繁",
+    "menu.tools.chineseConversion.cht2chs": "繁 ⇒ 簡",
 
     "rightClick.translateWithAPI": "翻譯：使用API",
     "rightClick.editTranslation": "翻譯：編輯",
@@ -26,11 +35,15 @@
     
     "translator": "翻譯器",
     "UI": "使用者介面",
+
+    "file": "檔案",
+    "id": "ID",
+    "attribute": "屬性",
     "original": "原文",
     "translation": "譯文",
-
-    "Search and Replace": "搜尋與替換",
-    "Search": "搜尋",
-    "Replace": "替換"
-
+    "filter": "過濾器",
+    "searchAndReplace": "搜尋與替換",
+    "search": "搜尋",
+    "replace": "替換",
+    "replaceAll": "全部替換"
 }

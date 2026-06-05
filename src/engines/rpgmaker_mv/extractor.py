@@ -30,6 +30,7 @@ class RPGMakerMVExtractor:
                         id=str(item.get("id", "")),
                         attribute=field,
                         original=text,
+                        translation=text, # Initialize translation with original text for easier editing in the table
                         json_path=[i, field]
                     ))
         return out
@@ -79,6 +80,7 @@ class RPGMakerMVExtractor:
                             id=str(item.get("id", "")),
                             attribute=f"CMD:{cmd_type}",
                             original=param,
+                            translation=param, # Initialize translation with original text for easier editing in the table
                             json_path=json_path + current_path
                         ))
         return out

@@ -4,4 +4,6 @@ pyqt5-sip==12.17.0
 pyqt5-stubs==5.15.6.0
 pytest==9.0.3
 pandas
+opencc
+dotenv
 deep-translator @ git+https://github.com/alan871125/deep-translator.git@master
