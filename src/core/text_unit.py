@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict
 from typing import Any
-
+from .translation_level import TranslationLevel
 @dataclass
 class TextUnit:
     """ A class representing a single text unit that needs to be translated.
@@ -19,7 +19,7 @@ class TextUnit:
     original: str
     translation: str = ""
     json_path: list = field(default_factory=list)
-    
+    level: TranslationLevel = TranslationLevel.UNTRANSLATED
     def update_translation(self, new_translation: str):
         # TODO: Implement
         self.translation = new_translation

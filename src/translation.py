@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Iterable, Sequence
 import opencc
+from deep_translator.base import BaseTranslator
 from deep_translator import GoogleTranslator, DeeplTranslator
 
 from app.settings import Settings
@@ -22,24 +23,24 @@ class Translator:
     settings: Settings
     def __init__(self, settings: Settings):
         self.settings = settings
-    def translate(self, source: str):
+    def _translate(self, source: str):
         return translate(
             source,
             source_lang=self.settings.SOURCE_LANG,
             target_lang=self.settings.TARGET_LANG,
             provider=self.settings.API
         )
+    def batch_translate(self, sources: list[str]) -> Sequence[str|None]:
+        return batch_translate(
+            sources,
+            source_lang=self.settings.SOURCE_LANG,
+            target_lang=self.settings.TARGET_LANG,
+            provider=self.settings.API
+        )
 
-def translate(source:str, source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None)-> str|None:
-    """Translate the source text from source_lang to target_lang using the specified provider and API key.
-    
-    Arguments:
-        source (str): the text to be translated
-        source_lang (str): the language code of the source text, default is "auto" for auto-detection
-        target_lang (str): the language code to translate to, default is "en" for English
-        provider (str): the translation provider to use, either 'google' or 'deepl', default is 'google'
-        api_key (str): the API key for the translation provider, required for some providers like Deepl
-    """
+def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> BaseTranslator|None:
+    """Helper function to get translation settings, 
+    including mapping language names to codes based on the provider's supported languages."""
     # Map language names to codes based on the provider's supported languages
     # Safe if the input is already a code.
     if provider.lower() == 'deepl':
@@ -52,21 +53,49 @@ def translate(source:str, source_lang:str="auto", target_lang:str="en", provider
         supported_languages = {}
     source_lang = supported_languages.get(source_lang.lower(), source_lang)
     target_lang = supported_languages.get(target_lang.lower(), target_lang)
-    
-    if not source or not source.strip():
-        return None
-    # Call translation API (e.g. Google Translate) and update translation
     if (translator_class := providers.get(provider.lower())) is None:
         logger.error(f"Unsupported translation provider: {provider}")
         return None
     translator = translator_class(
         source_lang, target_lang, api_key=api_key
     )
+    return translator
+
+def translate(source:str, source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None)-> str|None:
+    """Translate the source text from source_lang to target_lang using the specified provider and API key.
+    
+    Arguments:
+        source (str): the text to be translated
+        source_lang (str): the language code of the source text, default is "auto" for auto-detection
+        target_lang (str): the language code to translate to, default is "en" for English
+        provider (str): the translation provider to use, either 'google' or 'deepl', default is 'google'
+        api_key (str): the API key for the translation provider, required for some providers like Deepl
+    """
+    if not source or not source.strip():
+        return None
     try:
+        translator = get_translator(source_lang, target_lang, provider, api_key)
+        if not translator:
+            return None
         translated = translator.translate(source)
     except Exception as e:
         logger.error(f"Translation API error: {e}")
         return None
+    return translated
+
+def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None) -> Sequence[str|None]:
+    """Batch translate a sequence of source texts from source_lang to target_lang using the specified provider and API key.
+    """
+    if not sources:
+        return []
+    try:
+        translator = get_translator(source_lang, target_lang, provider, api_key)
+        if not translator:
+            return []
+        translated = translator._translate_batch(sources)
+    except Exception as e:
+        logger.error(f"Translation API error: {e}")
+        return []
     return translated
 
 def batch_chinese_convertion(texts: Iterable[str], target:str='tw')-> Sequence[str]:

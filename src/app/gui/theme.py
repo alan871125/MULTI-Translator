@@ -3,6 +3,8 @@ import PyQt5.QtWidgets as qt
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import cast
+from core.translation_level import TranslationLevel
+
 logger = logging.getLogger(__name__)
 BASE_THEME = Path(__file__).parent / "styles" / "base.qss"
 
@@ -37,8 +39,8 @@ class Theme:
             self.LV_UNTRANSLATED = self.MAIN_CONTENT_COLOR
     def asdict(self)->dict:
         return asdict(self)
-    def get_level_color(self, level:str):
-        return getattr(self, f"LV_{level.upper()}", self.LV_UNTRANSLATED)
+    def get_level_color(self, level: TranslationLevel):
+        return getattr(self, f"LV_{level.name}", self.LV_UNTRANSLATED)
 
 LIGHT = Theme()
 DARK = Theme(
