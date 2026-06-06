@@ -38,6 +38,9 @@ class Settings:
     def asdict(self) -> dict:
         return asdict(self)
     
+    def get(self, key:str, default:Any=None):
+        return getattr(self, key, default)
+    
     @staticmethod    
     def load(path: str|Path):
         try:

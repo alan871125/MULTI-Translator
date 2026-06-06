@@ -2,7 +2,6 @@ import json
 import logging
 from pathlib import Path
 from dataclasses import dataclass, asdict, field
-from typing import Callable
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -70,7 +69,7 @@ class TranslationApp(QMainWindow):
         functions_layout.addWidget(widgets['filter_button'])
         functions_layout.addWidget(widgets['engine_select'])
         
-        self.table = TranslationTableView(self, self.settings)
+        self.table = TranslationTableView(self)
         self.model = TranslationTableModel([])
         self.debug()  # Load test data # Remove this line in production #TODO
         self.table.setModel(self.model)
@@ -117,8 +116,8 @@ class TranslationApp(QMainWindow):
     
     
     def debug(self):
-        with open("test/dictionary.json", "r", encoding="utf-8") as f:
-            self.model.translated_mapping = json.load(f)
+        # with open("test/dictionary.json", "r", encoding="utf-8") as f:
+        #     self.model.translated_mapping = json.load(f)
         # from engines.rpgmaker_mv.extractor import RPGMakerMVExtractor
         extractor = engines.extractors[self.settings.engine]()
         # self.model.load_units(extractor.extract_file("test/Actors.json"))

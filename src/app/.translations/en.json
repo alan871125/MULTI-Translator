@@ -46,5 +46,8 @@
     "searchAndReplace": "Search and Replace",
     "search": "Search",
     "replace": "Replace",
-    "replaceAll": "Replace All"
+    "replaceAll": "Replace All",
+
+    "confirmationMessage.shareTranslation": "Do you want to replace other identical entries with this translation?",
+    "confirmationMessage.dontAskAgain": "Don't show this again"
 }

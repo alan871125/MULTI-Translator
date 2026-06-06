@@ -46,5 +46,8 @@
     "searchAndReplace": "搜尋與替換",
     "search": "搜尋",
     "replace": "替換",
-    "replaceAll": "全部替換"
+    "replaceAll": "全部替換",
+
+    "confirmationMessage.shareTranslation": "是否使用此翻譯覆蓋其他相同條目？",
+    "confirmationMessage.dontAskAgain": "不再顯示此訊息"
 }

@@ -1,5 +1,5 @@
-from enum import Enum, auto
-class TranslationLevel(Enum):
+from enum import IntEnum, auto
+class TranslationLevel(IntEnum):
     UNTRANSLATED = auto()
     HEURISTIC = auto()
     PARTIAL = auto()

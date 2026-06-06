@@ -6,7 +6,7 @@ import logging
 
 import resources_rc
 import PyQt5.QtWidgets as qt
-from app.settings import Settings
+from config import settings
 from app.gui.main_window import TranslationApp
 
 logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
@@ -21,8 +21,6 @@ def load_dotenv_example():
 
 def main():
     load_dotenv_example()  # Load environment variables from .env file
-    settings = Settings.load("settings.json")
-    
     launch_args = sys.argv
     if (darkmode := int(settings.dark_mode)):
         # let the dark mode setting take effect on Win11's TitleBar

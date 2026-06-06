@@ -6,7 +6,7 @@ import opencc
 from deep_translator.base import BaseTranslator
 from deep_translator import GoogleTranslator, DeeplTranslator
 
-from app.settings import Settings
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,22 +20,19 @@ class Translator:
     """A wrapper class to unify the interface of different translation providers.
     And also links the translation settings from the app's Settings for easier use in the GUI and other parts of the app.
     """
-    settings: Settings
-    def __init__(self, settings: Settings):
-        self.settings = settings
     def _translate(self, source: str):
         return translate(
             source,
-            source_lang=self.settings.SOURCE_LANG,
-            target_lang=self.settings.TARGET_LANG,
-            provider=self.settings.API
+            source_lang=settings.SOURCE_LANG,
+            target_lang=settings.TARGET_LANG,
+            provider=settings.API
         )
     def batch_translate(self, sources: list[str]) -> Sequence[str|None]:
         return batch_translate(
             sources,
-            source_lang=self.settings.SOURCE_LANG,
-            target_lang=self.settings.TARGET_LANG,
-            provider=self.settings.API
+            source_lang=settings.SOURCE_LANG,
+            target_lang=settings.TARGET_LANG,
+            provider=settings.API
         )
 
 def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> BaseTranslator|None:

@@ -1,16 +1,15 @@
 import pandas as pd
 import logging
-from collections import deque
 from typing import Iterable, Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
 from PyQt5.QtWidgets import (
-    QMessageBox, QTableView, QAbstractItemView, 
+    QMessageBox, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QUndoCommand, QUndoStack
 )
 
-from app.settings import Settings
+from config import settings
 from core.text_unit import TextUnit
 from core.translation_level import TranslationLevel
 from translation import Translator, batch_chinese_convertion
@@ -27,8 +26,8 @@ class TranslationTableModel(QAbstractTableModel):
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
     def __init__(self, data):
         super().__init__()
-        self._data:pd.DataFrame = pd.DataFrame(data, columns=self._columns+self._HIDDEN_COLUMNS)
-        self._filtered_data = None
+        self.df:pd.DataFrame = pd.DataFrame(data, columns=self._columns+self._HIDDEN_COLUMNS)
+        self._filtered_df = None
         self.filters = {}
         self._mask_indexes = None
         # self._ensure_level_defaults()
@@ -52,7 +51,7 @@ class TranslationTableModel(QAbstractTableModel):
         """Load a list of TextUnit objects(dataclass), and convert them into the internal DataFrame format for the model."""
         data = pd.DataFrame(units, columns=self._columns+self._HIDDEN_COLUMNS)
         
-        self._data = pd.concat([self._data, data], ignore_index=True)
+        self.df = pd.concat([self.df, data], ignore_index=True)
         self.set_filters(self.filters)  # Re-apply filters to include new data
 
     def set_filters(self, filters):
@@ -63,32 +62,32 @@ class TranslationTableModel(QAbstractTableModel):
         self.layoutChanged.emit()
 
     def rowCount(self, parent=QModelIndex()):
-        return len(self.filtered_data)
+        return len(self.filtered_df)
     
     def columnCount(self, parent=QModelIndex()):
         return len(self._columns)
 
     def build_mask(self, filters):
         # Build boolean mask for all filters (case-insensitive substring match)
-        mask = pd.Series([True] * len(self._data), index=self._data.index)
-        for col, filter_data in filters.items():
-            if col not in self._data.columns:
+        mask = pd.Series([True] * len(self.df), index=self.df.index)
+        for col, filterdf in filters.items():
+            if col not in self.df.columns:
                 continue
-            text = filter_data.get("text", "")
-            is_regex = filter_data.get("is_regex", False)
+            text = filterdf.get("text", "")
+            is_regex = filterdf.get("is_regex", False)
             # ensure strings and perform case-insensitive substring match
-            mask &= self._data[col].astype(str).str.contains(text, case=False, regex=is_regex, na=False)
+            mask &= self.df[col].astype(str).str.contains(text, case=False, regex=is_regex, na=False)
         self._mask_indexes = mask[mask].index
         return mask
         
     @property
-    def filtered_data(self):
+    def filtered_df(self):
         if not self.filters:
-            return self._data
+            return self.df
         if self._mask_indexes is not None:
-            return self._data.loc[self._mask_indexes].reset_index(drop=True)
+            return self.df.loc[self._mask_indexes].reset_index(drop=True)
         mask = self.build_mask(self.filters)
-        return self._data[mask].reset_index(drop=True)
+        return self.df[mask].reset_index(drop=True)
 
     def data(self, index, role=Qt.DisplayRole):
         theme = ThemeManager.theme
@@ -100,18 +99,18 @@ class TranslationTableModel(QAbstractTableModel):
         
         if ((role == Qt.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
             (role == Qt.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
-            if r < 0 or r >= len(self.filtered_data):
+            if r < 0 or r >= len(self.filtered_df):
                 return None
-            row = self.filtered_data.iloc[r]
+            row = self.filtered_df.iloc[r]
             level = self._level_from_value(row.level)
             return QColor(ThemeManager.theme.get_level_color(level))
         
         if role == Qt.DisplayRole:
-            if r < 0 or r >= len(self.filtered_data):
+            if r < 0 or r >= len(self.filtered_df):
                 return None
             if c < 0 or c >= len(self._columns):
                 return None
-            row = self.filtered_data.iloc[r]
+            row = self.filtered_df.iloc[r]
             col = self._columns[c]
             return row.get(col, "")
         return None
@@ -133,11 +132,10 @@ class TranslationTableModel(QAbstractTableModel):
         """Convert filtered row indexes to true indexes in the original data. 
         This is necessary because the view operates on the filtered data, but updates need to be applied to the original data.
         """
+        indexes = pd.Index(indexes)
         if self._mask_indexes is None:
-            return pd.Index(indexes)
-        mask_indexes = self._mask_indexes
-        true_indexes = mask_indexes[mask_indexes.isin(indexes)]
-        return true_indexes
+            return indexes
+        return pd.Index(self._mask_indexes[indexes])
 
     def set_translation(self, idxs: int, text: str, level: TranslationLevel = TranslationLevel.VERIFIED):
         return self.set_translations([idxs], [text], level)
@@ -173,13 +171,13 @@ class TranslationTableModel(QAbstractTableModel):
         
         if isinstance(translations, Iterable) and not isinstance(translations, str):
             translations = pd.Series(list(translations), index=idxs)
-        self._data.loc[idxs, "translation"] = translations  
+        self.df.loc[idxs, "translation"] = translations  
         if levels is None:
             return True
         elif isinstance(levels, TranslationLevel):
-            self._data.loc[idxs, "level"] = levels.value
+            self.df.loc[idxs, "level"] = levels
         elif isinstance(levels, Iterable):
-            self._data.loc[idxs, "level"] = pd.Series([l.value for l in levels], index=idxs)
+            self.df.loc[idxs, "level"] = pd.Series(levels, index=idxs)
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return True
         
@@ -189,17 +187,17 @@ class TranslationTableModel(QAbstractTableModel):
         Replace_text is a regex pattern or plain text to replace with. Column specifies which column to apply the search and replace on (default "original").
         Returns the number of replacements made.
         """
-        if column not in self._data.columns:
+        if column not in self.df.columns:
             return 0
         mask = self.build_mask(filters)
         if not mask.any():
             return 0
-        self._data.loc[mask, "translation"] = self._data.loc[mask, column].str.replace(
+        self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
             filters[column]["text"], replace_text, regex=filters[column].get("is_regex", False),
         )
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return mask.sum()
-    
+        
     def setData(self, index, value, role=Qt.EditRole):
         # Support inline editing from the view for the Translation column
         if role != Qt.EditRole or not index.isValid():
@@ -214,31 +212,66 @@ class TranslationTableModel(QAbstractTableModel):
             return False
         text = str(value)
         # locate original value from filtered data
-        if row < 0 or row >= len(self.filtered_data):
+        if row < 0 or row >= len(self.filtered_df):
             return False
-        original = self.filtered_data.iloc[row].get("original")
+        original = self.filtered_df.iloc[row].get("original")
         if original is None:
             return False
-        self.set_translation(row, text, level=TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED)
+        idx = self.get_true_indexes([row])
+        self.set_translations(idx, [text], levels=TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED)
         
         return True
     
     def chs2cht(self):
         """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
-        filtered = self.filtered_data
+        filtered = self.filtered_df
         if filtered.empty:
             return 
         filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='tw')
         
     def cht2chs(self):
         """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
-        filtered = self.filtered_data
+        filtered = self.filtered_df
         if filtered.empty:
             return
         filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='s')
+    
+    def is_same_original_exists(self, idxes: pd.Index|list[int]|int, is_filtered: bool = True) -> bool:
+        """Checks if there are any other text units with the same original text as the given indexes. 
+        This is used to determine whether to show the share translation confirmation dialog."""
+        if isinstance(idxes, int):
+            idxes = [idxes]
+        df = self.filtered_df if is_filtered else self.df
+        originals = df.iloc[idxes]["original"] if is_filtered else df.loc[idxes, "original"]
+        for original in originals:
+            if (self.df["original"] == original).sum() > 1:
+                return True
+        return False
+    
+    def get_idxs_same_original(
+        self, idx: int, is_filtered: bool = True, 
+        max_level: TranslationLevel = TranslationLevel.UNTRANSLATED) -> pd.Index:
+        """Get all indexes of text units that have the same original text as the given index."""
+        if is_filtered:
+            original = self.filtered_df.iloc[idx]["original"]
+        else:
+            original = self.df.iloc[idx]["original"]
+        same_original_mask = (self.df["original"] == original) & (self.df["level"] <= max_level)
+        return self.df[same_original_mask].index
+    
+    def get_first_unique_original_idxs(self, indexes: pd.Index|list[int]|int, is_filtered: bool = True) -> pd.Index:
+        """Get the first unique index for each original text among the given indexes. 
+        This can be used to optimize batch operations by only applying changes to one representative text unit for each unique original text."""
+        if isinstance(indexes, int):
+            indexes = pd.Index([indexes])
+        elif isinstance(indexes, list):
+            indexes = pd.Index(indexes)
+        df = self.filtered_df if is_filtered else self.df
+        out = df.iloc[indexes].reset_index().groupby("original").index.min()
+        return pd.Index(out.values)
 
 class TranslationTableView(QTableView):
-    def __init__(self, parent=None, settings=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -249,9 +282,7 @@ class TranslationTableView(QTableView):
         self.customContextMenuRequested.connect(self.show_context_menu)
         # allow inline editing via double-click or edit key
         self.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed | QAbstractItemView.SelectedClicked)
-        if settings is None:
-            settings = Settings()
-        self.translator = Translator(settings)
+        self.translator = Translator()
 
         self.history = QUndoStack()
         self.undo_action = self.history.createUndoAction(self, "Undo")
@@ -265,14 +296,19 @@ class TranslationTableView(QTableView):
         current = model.data(model.index(row, model._columns.index("translation")), Qt.DisplayRole)
         text, ok = QInputDialog.getText(self, "Edit Translation", "Translation:", text=str(current))
         if ok:
+            idx = model.get_true_indexes([row])
             self.history.push(TranslationCommand(
                 model=model,
-                idxs=pd.Index([row]),
+                idxs=idx,
                 translations=text,
                 levels=TranslationLevel.VERIFIED,
                 description=f"Edit: {row}"
             ))
-
+            
+            idx = model.get_true_indexes([row])
+            # When manually editing, assume the user verifies the translation, so set level to VERIFIED.
+            self.share_translations(idx.tolist(), need_confirmation=True, max_level=TranslationLevel.VERIFIED, is_filtered=False)
+            
     def keyPressEvent(self, event):
         key = event.key()
         if key in (Qt.Key_Return, Qt.Key_Enter):
@@ -288,12 +324,13 @@ class TranslationTableView(QTableView):
             return
         super().keyPressEvent(event)
         
-    def translate_rows_with_api(self, rows: list[QModelIndex]):
+    def translate_rows_with_api(self, rows: list[QModelIndex], only_first_unique=True):
         model = self.model()
-        if not isinstance(model, TranslationTableModel):
-            return
+        assert isinstance(model, TranslationTableModel)
         filtered_idxs = pd.Index((idx.row() for idx in rows))
-        originals = model.filtered_data.iloc[filtered_idxs]["original"].tolist()
+        if only_first_unique:
+            filtered_idxs = model.get_first_unique_original_idxs(filtered_idxs, is_filtered=True)        
+        originals = model.filtered_df.iloc[filtered_idxs]["original"].tolist()
         idxs = model.get_true_indexes(filtered_idxs)
         translations = self.translator.batch_translate(originals)
         self.history.push(TranslationCommand(
@@ -303,7 +340,45 @@ class TranslationTableView(QTableView):
             levels=TranslationLevel.API,
             description=f"API: {len(rows)} rows"
         ))
+        return idxs, translations
+        
+    def show_share_translation_confirmation(self):
+        # Display the confirmation box
+        if confirm:=(settings.get("confirm.shareTranslation")) is not None:
+            # User chose to not show again, use the saved preference
+            return confirm
+        
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setWindowTitle("Confirm Action")
+        msg_box.setText(L["confirmationMessage.shareTranslation"])
+        check_box = QCheckBox(L["confirmationMessage.dontAskAgain"])
+        msg_box.setCheckBox(check_box)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        # Handle user selection
+        result = msg_box.exec()
+        if check_box.isChecked():
+            settings['confirm.shareTranslation'] = False
+        if result == QMessageBox.StandardButton.Yes:
+            return True
+        else:
+            return False
     
+    def share_translations(self, indxes:list[int], need_confirmation: bool, max_level=TranslationLevel.UNTRANSLATED, is_filtered=False):
+        model = self.model()
+        assert isinstance(model, TranslationTableModel)
+        if not model.is_same_original_exists(indxes, is_filtered):
+            return
+        if need_confirmation and not self.show_share_translation_confirmation():
+            return
+        for idx in indxes:
+            share_command = ShareTranslationCommand(
+                model, idx, description=f"Share Translation for idx {idx}",
+                max_level=max_level # Only share to text units that are currently untranslated, to avoid overwriting existing translations at higher levels. This can be adjusted based on user preference.
+            )
+            self.history.push(share_command)
+
     def show_context_menu(self, pos):
         idx = self.indexAt(pos)
         if not idx.isValid():
@@ -324,15 +399,18 @@ class TranslationTableView(QTableView):
             return
         if action == api_action:
             rows = self.selectionModel().selectedRows()
-            self.translate_rows_with_api(rows)
-            
+            true_idxs, _ = self.translate_rows_with_api(rows)
+            self.share_translations(true_idxs.tolist(), need_confirmation=False, max_level=TranslationLevel.UNTRANSLATED, is_filtered=False)
+
         elif action == edit_action:
-            self.edit_translation_row(row, model)
+            self.edit_translation_row(row, model) # share translation is handled in the edit_translation_row method, which will set the level to VERIFIED
+            
         elif action == reset_action:
+            idx = model.get_true_indexes([row])
             self.history.push(TranslationCommand(
                 model=model,
-                idxs=pd.Index([row]),
-                translations=model.filtered_data.iloc[row]["original"],
+                idxs=idx,
+                translations=model.filtered_df.iloc[row]["original"],
                 levels=TranslationLevel.UNTRANSLATED,
                 description=f"Reset: {row}"
             ))
@@ -352,14 +430,30 @@ class TranslationCommand(QUndoCommand):
         super().__init__(description)
         self.model = model
         self.idxs = idxs
-        self.old = model._data.loc[idxs, "translation"].copy()
-        self.old_levels = model._data.loc[idxs, "level"].copy()
+        self.old = model.df.loc[idxs, "translation"].copy()
+        self.old_levels = model.df.loc[idxs, "level"].copy()
         self.new = translations
         self.new_levels: Optional[pd.Series|TranslationLevel] = levels
         self.description = description
     def undo(self):
         self.model.set_translations(self.idxs, self.old, levels=self.old_levels)
-        logger.debug("UNDO: translation patch: %s", self.description)
+        logger.debug("UNDO: Translation: %s", self.description)
     def redo(self):
         self.model.set_translations(self.idxs, self.new, levels=self.new_levels)
-        logger.debug("DO: translation patch: %s", self.description)
+        logger.debug("DO: Translation: %s", self.description)
+
+class ShareTranslationCommand(TranslationCommand):
+    """A command to share a translation to all text units with the same original text."""
+    def __init__(self, model: TranslationTableModel, idx: int, description: str = "Share Translation", max_level: TranslationLevel = TranslationLevel.API):
+        # Get all indexes with the same original text
+        same_original_idxs = model.get_idxs_same_original(idx, is_filtered=False, max_level=max_level)
+        # Get the current translation to be shared
+        current_translation = model.df.iloc[idx].translation
+        levels = model.df.iloc[idx].level
+        super().__init__(
+            model=model,
+            idxs=same_original_idxs,
+            translations=current_translation,
+            levels=levels,
+            description=description
+        )
