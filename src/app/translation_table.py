@@ -1,14 +1,15 @@
 import pandas as pd
 import logging
+from pathlib import Path
 from typing import Iterable, Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
 from PyQt5.QtWidgets import (
-    QMessageBox, QTableView, QAbstractItemView, QCheckBox,
+    QMessageBox, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QUndoCommand, QUndoStack
 )
-
+from iod import IndexedOrderedDict
 from config import settings
 from core.text_unit import TextUnit
 from core.translation_level import TranslationLevel
@@ -417,6 +418,63 @@ class TranslationTableView(QTableView):
         elif action == copy_action:
             original = model.data(model.index(row, model._columns.index("original")), Qt.DisplayRole)
             QApplication.clipboard().setText(str(original))
+
+class TranslationTabWidget(QTabWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.tabs = IndexedOrderedDict()  # file_name -> TranslationTableView
+    # ---------- Overrides ----------
+    def addTab(self, widget: TranslationTableView, title: str): 
+        # Type hinting for the widget parameter to ensure it's a TranslationTableView, which allows us to access its model and other specific methods if needed in the future.
+        assert isinstance(widget, TranslationTableView), "Only TranslationTableView instances can be added to TranslationTabWidget"
+        super().addTab(widget, title)
+    
+    def removeTab(self, index: int):
+        if index < 0 or index >= self.count():
+            return
+        key = self.tabs.keys()[index]
+        self.tabs.pop(key)  # Remove from the tabs dict based on index
+        super().removeTab(index)
+        logger.debug("Tab removed: {key}, %d remaining", len(self.tabs))
+        
+    def currentWidget(self) -> TranslationTableView:
+        widget = super().currentWidget()
+        assert isinstance(widget, TranslationTableView), "Current widget is not a TranslationTableView"
+        return widget
+    
+    def currentModel(self) -> Optional[TranslationTableModel]:
+        current_widget = self.currentWidget()
+        model = current_widget.model()
+        if not isinstance(model, TranslationTableModel):
+            return None
+        return model
+    # ---------- END of Overrides ----------
+    def add_translation_tab(self, file_name: str, model: Optional[TranslationTableModel] = None) -> TranslationTableView:
+        if file_name in self.tabs:
+            return self.tabs[file_name]
+        new_tab = TranslationTableView(self)
+        model = model or TranslationTableModel([])
+        new_tab.setModel(model)
+        self.tabs[file_name] = new_tab
+        self.addTab(new_tab, Path(file_name).name)
+        return new_tab
+    
+    def focus_tab(self, file_name: str):
+        if file_name not in self.tabs:
+            return
+        index = self.indexOf(self.tabs[file_name])
+        if index != -1:
+            self.setCurrentIndex(index)
+    
+    def chs2cht_current_tab(self):
+        current_model = self.currentModel()
+        if current_model is not None:
+            current_model.chs2cht()
+    
+    def cht2chs_current_tab(self):
+        current_model = self.currentModel()
+        if current_model is not None:
+            current_model.cht2chs()
 
 class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""

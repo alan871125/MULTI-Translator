@@ -5,7 +5,7 @@ from dataclasses import dataclass, asdict, field
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
-    QFileDialog, QMainWindow, QWidget, 
+    QFileDialog, QMainWindow, QTabWidget, QWidget, 
     QVBoxLayout, QHBoxLayout, 
     QPushButton, 
     QInputDialog, QDialog, QDialogButtonBox,
@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 )
 
 from app.gui.theme import ThemeManager
-from app.translation_table import TranslationTableModel, TranslationTableView
+from app.translation_table import TranslationTableModel, TranslationTableView, TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings, SettingsDialog
 from .menu import initialize_menu
@@ -47,13 +47,16 @@ class TranslationApp(QMainWindow):
     
     def open_filter_menu(self):
         # Popup a filter Menu with Column: entries for columns in the table.
-        dialog = SearchDialog(self, filters=self.model.filters)
-        dialog.replace_signal.connect(self.model.search_and_replace)  # Connect the replace signal to the model's replace method
+        if (model := self.translation_table.currentModel()) is None:
+            logger.warning("No active translation tab to apply filters to.")
+            return
+        dialog = SearchDialog(self, filters=model.filters)
+        dialog.replace_signal.connect(model.search_and_replace)  # Connect the replace signal to the model's replace method
         dialog.replace_widget.setVisible(False)  # Hide the replace button since we're only using this for filtering
         dialog.exec_()
         filters = dialog.get_filters()
         # Apply the filters to the table model
-        self.model.set_filters(filters)
+        model.set_filters(filters)
         
     def initUI(self):
         self.central_widget = QWidget(self)
@@ -71,20 +74,19 @@ class TranslationApp(QMainWindow):
         functions_layout.addWidget(widgets['filter_button'])
         functions_layout.addWidget(widgets['engine_select'])
         
-        self.table = TranslationTableView(self)
-        self.model = TranslationTableModel([])
-        self.table.setModel(self.model)
+        self.translation_table = TranslationTabWidget()
+        self.translation_table.setTabsClosable(True)
+        self.translation_table.tabCloseRequested.connect(self.translation_table.removeTab)
+        
+        # self.add_translation_tab('*Untitled')  # Add an initial tab for new translations without a loaded file
+        # self.model = self.translation_tabs['*Untitled'].model()  # Reference to the model of the initial tab for easy access in methods like open_filter_menu
         
         self.init_menu_bar() # Initialize the menu bar after creating the table and model, so that menu actions can interact with them
         self.main_layout.addLayout(functions_layout)
-        self.main_layout.addWidget(self.table)
+        self.main_layout.addWidget(self.translation_table)
         
-        for col, width in enumerate(TranslationTableModel._COLWIDTHS):
-            self.table.setColumnWidth(col, width)
-        # make header stretch for readability
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.debug()  # Load test data # Remove this line in production #TODO
-        
+        # self.debug()  # Load test data # Remove this line in production #TODO
+
     def on_engine_changed(self, engine_name:str):
         self.settings.engine = engine_name
         self.settings.save()  # Save settings immediately when engine is changed to persist the choice
@@ -99,8 +101,8 @@ class TranslationApp(QMainWindow):
             "settings": self.open_settings,
             "edit.undo": None,  # Placeholder for undo action
             "edit.redo": None,  # Placeholder for redo action
-            "tools.chineseConversion.chs2cht": self.model.chs2cht,  # Placeholder for Chinese conversion tool
-            "tools.chineseConversion.cht2chs": self.model.cht2chs,  # Placeholder for Chinese conversion tool
+            "tools.chineseConversion.chs2cht": self.translation_table.chs2cht_current_tab,
+            "tools.chineseConversion.cht2chs": self.translation_table.cht2chs_current_tab,  # Placeholder for Chinese conversion tool
         } 
         # use `$n:` as a special prefix before file paths in the menu definition 
         # to indicate that the menu item should use the file path as its name.
@@ -108,12 +110,6 @@ class TranslationApp(QMainWindow):
         menus = initialize_menu(self, menu_def, tr=L.__getitem__)
         self.lru_menu = menus.get("file.recentFiles")
         self.refresh_recent_files_menu()  # Populate the recent files menu with the current list of recent files from settings
-            # # Dynamicallymenus add recent files to the File menu
-        # if (lru_menu:=.get("file.recentFiles")) and isinstance(lru_menu, QMenu):
-        #     for file_path in self.settings._recent_files.iter(reverse=True):  # Show most recent files at the top
-        #         action = QAction(file_path.as_posix(), self)
-        #         action.triggered.connect(lambda checked, fp=file_path: self.load_game_file(fp))
-        #         lru_menu.addAction(action)
         
     def refresh_recent_files_menu(self):
         assert isinstance(self.lru_menu, QMenu), "Recent Files menu should be a QMenu instance."
@@ -144,14 +140,21 @@ class TranslationApp(QMainWindow):
         if not file_path:
             return  # User cancelled the file dialog
         self.load_game_file(file_path)
+        
     def load_game_file(self, file_path: str|Path):
         file_path = Path(file_path).absolute()  # Normalize the file path
-        extractor = engines.extractors[self.settings.engine]()        
-        self.model.load_units(extractor.extract_file(file_path))
-        self.settings._recent_files.add_recent_file(file_path)  # Add the loaded file to recent
-        self.settings.save()  # Save settings to persist the updated recent files list
-        self.refresh_recent_files_menu()  # Refresh the recent files menu to reflect the updated list
-
+        try:
+            model = TranslationTableModel([])  # Create a new model for the translation tab
+            tab = self.translation_table.add_translation_tab(file_path.as_posix(), model=model)  # Add a new tab for the loaded file, using the file name as the tab name
+            extractor = engines.extractors[self.settings.engine]()
+            model.load_units(extractor.extract_file(file_path))
+        
+            self.settings._recent_files.add_recent_file(file_path)  # Add the loaded file to recent
+            self.settings.save()  # Save settings to persist the updated recent files list
+            self.refresh_recent_files_menu()  # Refresh the recent files menu to reflect the updated list
+        except Exception as e:
+            logger.exception(f"Failed to load game file {file_path}: {e}")
+            # Optionally, show a message box to the user indicating the error
     def save_game_file(self):        pass #TODO: implement saving the game data file with
     
     

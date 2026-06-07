@@ -7,3 +7,4 @@ pandas
 opencc
 dotenv
 deep-translator @ git+https://github.com/alan871125/deep-translator.git@master
+iod @ https://github.com/alan871125/IndexedOrderedDict/releases/download/0.1.0/iod-0.1.0-cp39-abi3-win_amd64.whl

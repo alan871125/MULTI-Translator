@@ -103,8 +103,6 @@ class ThemeManager:
                 base_theme = base_theme.replace(f"${key}", value)
         theme = cls.get_global_style_theme()
         theme+="""
-        
-        
         QTableView::item:selected,
         QTableWidget::item:selected {{
             background-color: {SELECT_COLOR};
@@ -163,7 +161,6 @@ class ThemeManager:
         }}
         QMenu::item:selected,
         QMenuBar::item:selected,
-        QTabBar::tab:selected,
         QPushButton:selected {{
             background-color: {SELECT_COLOR};
             border: 1px solid {SELECT_BORDER_COLOR};
@@ -173,6 +170,16 @@ class ThemeManager:
         QMenuBar::item:hover,
         QTabBar::tab:hover,
         QPushButton:hover {{
+            background-color: {HOVER_COLOR};
+            border: 1px solid {HOVER_BORDER_COLOR};
+            border-radius: {BUTTON_RADIUS};
+        }}
+        
+        QTabBar::tab:selected{{background-color: {MAIN_CONTENT_COLOR}; border-color: {BORDER_COLOR} {BORDER_COLOR} {MAIN_CONTENT_COLOR} {BORDER_COLOR};}}
+        QTabBar::close-button {{
+            image: url(:/assets/resources/icons/close.svg);
+        }}
+        QTabBar::close-button::hover {{
             background-color: {HOVER_COLOR};
             border: 1px solid {HOVER_BORDER_COLOR};
             border-radius: {BUTTON_RADIUS};

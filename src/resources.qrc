@@ -2,5 +2,6 @@
   <qresource prefix="/assets">
     <file>resources/icons/chevron-up.svg</file>
     <file>resources/icons/chevron-down.svg</file>
+    <file>resources/icons/close.svg</file>
   </qresource>
 </RCC>
