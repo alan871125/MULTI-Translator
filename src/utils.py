@@ -14,9 +14,11 @@ def walk_json(d, path=[], parent=None):
     # so that the path can be easily used to locate the item in the original JSON structure for replacement
     if isinstance(d, dict):
         for k, v in d.items():
-            yield from walk_json(v, path + [f'"{k}"'], d)
+            # yield from walk_json(v, path + [f'"{k}"'], d)
+            yield from walk_json(v, path + [k], d)
     elif isinstance(d, list):
         for i, v in enumerate(d):
-            yield from walk_json(v, path + [str(i)], d)
+            # yield from walk_json(v, path + [str(i)], d)
+            yield from walk_json(v, path + [i], d)
     else:
         yield d, path, parent

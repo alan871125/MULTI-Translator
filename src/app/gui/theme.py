@@ -160,7 +160,7 @@ class ThemeManager:
             background-color: {BUTTON_COLOR};
             border: 1px solid {BORDER_COLOR};
             padding: {PADDING_Y} {PADDING_X};
-        }}    
+        }}
         QMenu::item:selected,
         QMenuBar::item:selected,
         QTabBar::tab:selected,
@@ -177,5 +177,6 @@ class ThemeManager:
             border: 1px solid {HOVER_BORDER_COLOR};
             border-radius: {BUTTON_RADIUS};
         }}
+        QMenu{{padding: 4px; padding-left: 30px;}}
         """
         return base_theme+theme.format_map(cls.theme.asdict())

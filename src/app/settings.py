@@ -8,7 +8,9 @@ from PyQt5.QtWidgets import (
     QComboBox, QDialog, QVBoxLayout, QFormLayout, QGroupBox, QHBoxLayout,
     QCheckBox, QSpinBox, QLineEdit, QPushButton, QFileDialog, QDialogButtonBox, QTabWidget, QWidget
 )
+import inspect
 from utils import JSONWithCommentsDecoder
+from lru_file import LeastRecentlyUsedFiles
 # from engines import supported_engines
 from .language import LanguagePack
 
@@ -34,19 +36,37 @@ class Settings:
     language: str = "en"
     dark_mode: bool = False
     theme: str = "default"
-        
-    def asdict(self) -> dict:
-        return asdict(self)
+    
+    _recent_files: LeastRecentlyUsedFiles = field(init = False, default_factory=LeastRecentlyUsedFiles)
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
     
     def get(self, key:str, default:Any=None):
         return getattr(self, key, default)
+    
+    def asdict(self) -> dict:
+        d = asdict(self)
+        d["_recent_files"] = self._recent_files.to_list()
+        return d
+    
+    @classmethod
+    def from_dict(cls,data: dict) -> "Settings":
+        valid_fields = inspect.signature(cls).parameters
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        settings = Settings(**filtered_data)
+        settings._recent_files = LeastRecentlyUsedFiles.from_list(data.get("_recent_files", []))
+        return settings
     
     @staticmethod    
     def load(path: str|Path):
         try:
             with open(path, "r") as f:
                 data = json.load(f, cls=JSONWithCommentsDecoder)
-            settings=Settings(**data)
+            settings = Settings.from_dict(data)
         except FileNotFoundError:
             logger.info("Initializing new settings with default values.")
             settings=Settings()  # Return default settings if file not found
@@ -71,12 +91,6 @@ class Settings:
         except Exception as e:
             logger.error(f"Failed to save settings to {path}: {e}")
             
-    def __getitem__(self, key):
-        return getattr(self, key)
-    
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-        
 class PathSettingsLayout(QHBoxLayout):
     def __init__(self, default_path:str|Path, browse_type: str = "dir"):
         super().__init__()

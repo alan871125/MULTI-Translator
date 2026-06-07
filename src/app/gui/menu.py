@@ -1,5 +1,8 @@
-from typing import Callable
-from PyQt5.QtWidgets import QMainWindow, QMenu, QAction
+from typing import Callable, Iterable, Mapping, cast
+from PyQt5.QtWidgets import QMainWindow, QMenu, QAction, QMenuBar
+
+MenuCallback = Callable[..., object]
+MenuDefinition = Mapping[str, None | MenuCallback | type[QMenu]]
 
 class MenuPath(str):
     def __new__(cls, value:str, separator:str='.'):
@@ -19,17 +22,18 @@ class MenuPath(str):
         if not self:
             return MenuPath(other, separator=self.separator)
         return MenuPath(f"{self}{self.separator}{other}", separator=self.separator)
-    
+
 def initialize_menu(
-        main: 'QMainWindow', menu_def:dict[str, None|Callable], root_menu=None, root_menu_name:str='menu',
+        main: QMainWindow, menu_def: MenuDefinition, root_menu:QMenu|QMenuBar|None=None, root_menu_name:str='menu',
         tr: Callable[[str], str] = lambda x: x
     ) -> dict[str, QMenu|QAction]:
         """Initialize menu and submenus from a *Flat* dictionary definition.
         
         Arguments:
-            menu_def (dict[str,None|Callable]): 
+            menu_def (Mapping[str, None | Callable | type[QMenu]]): 
                 A flat dictionary where keys are menu item names.
-                Values are either None for placeholders or callables for actions.
+                Values are either None for placeholders, callables for actions,
+                or QMenu for submenu placeholders.
             root_menu (QMenu, optional):
                 The parent menu to which the defined menu items will be added.
                 If None, the menu items will be added to the main window's menu bar.
@@ -58,11 +62,20 @@ def initialize_menu(
         if root_menu is None:
             root_menu = main.menuBar()
         menus = {}
-        for menu_name, func in menu_def.items():
-            menu_path = MenuPath(menu_name)
+        for menu_path, func in menu_def.items():
+            splits = menu_path.split('$n:')
+            if len(splits) == 2:
+                menu_path, display_name = splits
+            else:
+                display_name =tr(root_menu_name/menu_path)
+            
+            menu_path = MenuPath(menu_path)
             if menu_path.parent == MenuPath('') and menu_path not in menus: # Top level action
-                action = menus[menu_path] = QAction(tr(root_menu_name/menu_path), main)
-                root_menu.addAction(action)
+                if func is QMenu:
+                    action = menus[menu_path] = root_menu.addMenu(display_name)
+                else:
+                    action = menus[menu_path] = QAction(display_name, main)
+                    root_menu.addAction(action)
             else:
                 path = MenuPath('')
                 parent_menu = root_menu
@@ -73,8 +86,11 @@ def initialize_menu(
                         parent_menu = menus[path] = parent_menu.addMenu(tr(root_menu_name/path))
                     else:
                         parent_menu = menus[path]
-                action = menus[menu_path] = QAction(tr(root_menu_name/menu_path), main)
-                parent_menu.addAction(action)
-            if func is not None:
-                action.triggered.connect(func)
+                if func is QMenu:
+                    action = menus[menu_path] = parent_menu.addMenu(display_name)
+                else:
+                    action = menus[menu_path] = QAction(display_name, main)
+                    parent_menu.addAction(action)
+            if func is not None and func is not QMenu:
+                action.triggered.connect(cast(MenuCallback, func))
         return menus

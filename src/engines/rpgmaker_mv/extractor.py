@@ -5,6 +5,7 @@ from utils import walk_json
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
 
 class RPGMakerMVExtractor:
+    SUPPORTED_FILES_TYPES = ['.json']
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
         stem = path.stem
