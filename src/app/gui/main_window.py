@@ -119,7 +119,7 @@ class TranslationApp(QMainWindow):
         assert isinstance(self.lru_menu, QMenu), "Recent Files menu should be a QMenu instance."
         self.lru_menu.clear()
         lru_iter = self.settings._recent_files.iter(reverse=True)  # Show most recent files at the top
-        file_def = {f"{i}$n:{fp.as_posix()}": lambda : self.load_game_file(fp) for i,fp in enumerate(lru_iter)}
+        file_def = {f"{i}$n:{fp.as_posix()}": lambda check,fp=fp: self.load_game_file(fp) for i,fp in enumerate(lru_iter)}
         lru_menus = initialize_menu(self, menu_def = file_def, root_menu=self.lru_menu, root_menu_name="file.recentFiles", tr=lambda x:x)  # Initialize an empty submenu for recent files
 
     def init_hotkeys(self):
