@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from core.text_unit import TextUnit
+from core.text_unit import TextUnit, JsonPath
 from utils import walk_json
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
 
@@ -32,7 +32,7 @@ class RPGMakerMVExtractor:
                         attribute=field,
                         original=text,
                         translation=text, # Initialize translation with original text for easier editing in the table
-                        json_path=[i, field]
+                        json_path=JsonPath.from_list([i, field])
                     ))
         return out
     def _extract_events_file(self, path: Path) -> list[TextUnit]:
@@ -51,11 +51,11 @@ class RPGMakerMVExtractor:
                 continue
             out.extend(self._extract_event_pages(
                 path, event.get("pages", []), 
-                json_path = ['events', i, 'pages'])
-            )
+                json_path = JsonPath.from_list(['events', i, 'pages'])
+            ))
         return out
 
-    def _extract_event_pages(self, path: Path, pages: list, json_path: list|None=None) -> list[TextUnit]:
+    def _extract_event_pages(self, path: Path, pages: list, json_path: JsonPath|None=None) -> list[TextUnit]:
         """Extracts text units from event pages, looking for specific command codes that contain translatable text. 
         
         Example of event data structure:
@@ -66,7 +66,7 @@ class RPGMakerMVExtractor:
         ```
         """
         out: list[TextUnit] = []
-        json_path = json_path or []
+        json_path = json_path or JsonPath.from_list([])
         for item in pages:
             if not isinstance(item, dict):
                 continue
@@ -82,6 +82,6 @@ class RPGMakerMVExtractor:
                             attribute=f"CMD:{cmd_type}",
                             original=param,
                             translation=param, # Initialize translation with original text for easier editing in the table
-                            json_path=json_path + current_path
+                            json_path=json_path + JsonPath.from_list(current_path)
                         ))
         return out

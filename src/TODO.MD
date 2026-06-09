@@ -16,7 +16,10 @@ Some of the functionalities may be higly related, the order is therefore not nec
 
 ## API Support
 1. [X] Google Translate
-2. [X] DEEPL
+2. [X] DeepL
+   1. [X] [deep-translator](https://github.com/nidhaloff/deep-translator) Support (needs update)
+   2. [X] Update Language List
+   3. [X] Update [deep-translator](https://github.com/nidhaloff/deep-translator) to use DeepL-v3
 3. [ ] Add Custom LLM API Support (Open Router).
    1. Write a Translation Prompt
    2. Should use API URL for easier support accross different APIs (ex: Claude, OpenAI .etc)
@@ -56,12 +59,14 @@ Some of the functionalities may be higly related, the order is therefore not nec
 - [x] Add background color for each level.
 
 ## History Tracing
-1. [ ] Keep a queue of Actions to Redo/Undo when regret.
-2. [ ] Trace a List of Recent Files
-3. [ ] Allow keeping a dictionary(*.json ?) of saved translations for each game file. Should be key:translation pairs. (Optional) With some other meta data included.
+1. [X] Keep a queue of Actions to Redo/Undo when regret.
+2. [X] Trace a List of Recent Files
+3. [X] Allow keeping a dictionary(*.json ?) of saved translations for each game file. Should be key:translation pairs. (Optional) With some other meta data included.
+   - [X] save
+   - [ ] load
 
 ## Hot Key Supports
-1. [ ] CTRL+S: Save Dictionary
+1. [X] CTRL+S: Save Dictionary
 2. [ ] CTRL+C: Copy Translation
 3. [ ] CTRL+V: Paste Translation
 4. [ ] CTRL+Z: Undo Action

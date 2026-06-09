@@ -12,9 +12,12 @@
     "language": "語言",
     
     "settings": "設置",
+    "settings.dictionary.dataDir": "字典儲存路徑",
+    "browse": "瀏覽",
+    "fontSize": "字體大小",
     "menu.settings": "設置",
     "menu.file": "文件",
-    "menu.file.saveTranslation": "保存翻譯",
+    "menu.file.saveTranslation": "保存翻譯 (Ctrl+S)",
     "menu.file.loadTranslation": "加載翻譯",
     "menu.file.saveGameFile": "保存為...",
     "menu.file.loadGameFile": "加載文件...",

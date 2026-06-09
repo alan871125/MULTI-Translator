@@ -3,7 +3,7 @@ import PyQt5.QtWidgets as qt
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import cast
-from core.translation_level import TranslationLevel
+from core.translation.level import TranslationLevel
 
 logger = logging.getLogger(__name__)
 BASE_THEME = Path(__file__).parent / "styles" / "base.qss"
@@ -15,6 +15,7 @@ class Theme:
     ALT_CONTENT_COLOR:str = "#f8f8f8"
     BORDER_COLOR:str = "#cccccc"
     TEXT_COLOR:str = "#000000"
+    DISABLED_COLOR:str = "#999999"
     HOVER_COLOR:str = "rgba(85, 148, 230, 0.25)"
     HOVER_BORDER_COLOR:str = "rgba(85, 148, 230, 0.5)"
     SELECT_COLOR:str = "rgba(0, 100, 255, .2)" # Semi-transparent selection color
@@ -49,6 +50,7 @@ DARK = Theme(
     ALT_CONTENT_COLOR = "#272727",
     BORDER_COLOR = "#333333",
     TEXT_COLOR = "#ffffff",
+    DISABLED_COLOR = "#777777",
     HOVER_COLOR = "#5c5c5c",
     HOVER_BORDER_COLOR = "rgba(85, 148, 230, 0.5)",
     SELECT_COLOR = "rgba(85, 148, 230, 0.25)",
@@ -167,7 +169,6 @@ class ThemeManager:
             border-radius: {BUTTON_RADIUS};
         }}
         CustomContextMenu::item:hover,
-        QMenuBar::item:hover,
         QTabBar::tab:hover,
         QPushButton:hover {{
             background-color: {HOVER_COLOR};
@@ -184,6 +185,12 @@ class ThemeManager:
             border: 1px solid {HOVER_BORDER_COLOR};
             border-radius: {BUTTON_RADIUS};
         }}
-        QMenu{{padding: 4px; padding-left: 30px;}}
+        QMenu{{padding: 4px 0px;}}
+        QMenu::item{{padding: 4px 30px;}}
+        QMenu::item:disabled{{color: {DISABLED_COLOR};}}
+        QMenu::item:disabled:selected{{
+            background-color: transparent;
+            border: none;
+        }}
         """
         return base_theme+theme.format_map(cls.theme.asdict())

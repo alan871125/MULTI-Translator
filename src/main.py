@@ -1,11 +1,12 @@
 import os
 import sys
 import shutil
-from dotenv import load_dotenv
+import traceback
 import logging
+from dotenv import load_dotenv
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTextEdit
 
 import resources_rc
-import PyQt5.QtWidgets as qt
 from config import settings
 from app.gui.main_window import TranslationApp
 
@@ -19,13 +20,52 @@ def load_dotenv_example():
     load_dotenv()
     logger.info("Environment variables loaded from .env file")
 
+def exception_hook(exc_type, exc_value, exc_traceback):
+    """
+    Global function to catch unhandled exceptions and show them in a Qt Dialogue.
+    """
+    # Don't handle KeyboardInterrupt to allow Ctrl+C in terminal
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    # Format the traceback into a readable string
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    tb_text = "".join(tb_lines)
+
+    # Log to stderr so it still appears in the console/logs
+    print(tb_text, file=sys.stderr)
+
+    # Ensure a QApplication instance exists before making UI calls
+    if QApplication.instance():
+        # Create a critical error dialogue
+        errorbox = QMessageBox()
+        errorbox.setIcon(QMessageBox.Icon.Critical)
+        errorbox.setWindowTitle("Error")
+        errorbox.setText("An unhandled exception occurred.")
+        errorbox.setInformativeText(str(exc_value))
+        
+        # Place full technical details inside an expandable text area
+        details_box = QTextEdit()
+        details_box.setPlainText(tb_text)
+        details_box.setReadOnly(True)
+        errorbox.setDetailedText(tb_text)
+        
+        errorbox.exec()
+        
+    # Optional: Exit the application after the dialogue closes
+    # sys.exit(1)
+
+# Assign the custom hook to the system interceptor
+sys.excepthook = exception_hook
+
 def main():
     load_dotenv_example()  # Load environment variables from .env file
     launch_args = sys.argv
     if (darkmode := int(settings.dark_mode)):
         # let the dark mode setting take effect on Win11's TitleBar
         launch_args += ['-platform', f'windows:darkmode={darkmode}'] 
-    app = qt.QApplication(launch_args)
+    app = QApplication(launch_args)
     translator = TranslationApp(settings)
     translator.show()
     app.exec_()

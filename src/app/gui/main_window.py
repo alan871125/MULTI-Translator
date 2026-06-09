@@ -86,15 +86,17 @@ class TranslationApp(QMainWindow):
         self.main_layout.addWidget(self.translation_table)
         
         # self.debug()  # Load test data # Remove this line in production #TODO
-
-    def on_engine_changed(self, engine_name:str):
-        self.settings.engine = engine_name
-        self.settings.save()  # Save settings immediately when engine is changed to persist the choice
-        logger.debug(f"Engine changed to {engine_name}, settings saved.")
+    def init_bottom_tab(self):
+        """Includes the Dictionary and Fuzzy-matching suggestions for the current selected cell.
+        """
+        tab_widget = QTabWidget()
+        tab_widget.addTab(QWidget(), L["bottomTab.dictionary"])
+        tab_widget.addTab(QWidget(), L["bottomTab.fuzzySuggestions"])
+        
         
     def init_menu_bar(self):
         menu_def = {
-            "file.saveTranslation": self.save_translations,
+            "file.saveTranslation": self.translation_table.save_current_tab_as_dictionary,
             "file.loadGameFile": self.load_game_file_dialog,
             "file.saveGameFile": self.save_game_file,
             "file.recentFiles": QMenu,  # Placeholder for recent files submenu
@@ -108,6 +110,8 @@ class TranslationApp(QMainWindow):
         # to indicate that the menu item should use the file path as its name.
         
         menus = initialize_menu(self, menu_def, tr=L.__getitem__)
+        menus["file.saveTranslation"].setEnabled(False)  # Disable save translation action until a tab is loaded with a file
+        self.translation_table.tab_exist_signal.connect(lambda exist: menus["file.saveTranslation"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
         self.lru_menu = menus.get("file.recentFiles")
         self.refresh_recent_files_menu()  # Populate the recent files menu with the current list of recent files from settings
         
@@ -123,11 +127,11 @@ class TranslationApp(QMainWindow):
             "save": QShortcut(Qt.CTRL + Qt.Key_S, self),
             "search": QShortcut(Qt.CTRL + Qt.Key_F, self),
         }
-        self.hotkeys["save"].activated.connect(self.save_translations)
+        self.hotkeys["save"].activated.connect(self.translation_table.save_current_tab_as_dictionary)
+        self.hotkeys["save"].setEnabled(False)  # Disable save hotkey until a tab with a loaded file exists
         self.hotkeys["search"].activated.connect(self.open_filter_menu)
+        self.translation_table.tab_exist_signal.connect(lambda exist:self.hotkeys["save"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
 
-    def save_translations(self):
-        pass #TODO: implement saving translation dictionary to reuse for later sessions
     def load_translations(self): 
         pass #TODO: implement loading translation dictionary from previous sessions to avoid losing work and to reuse translations across similar text in different files
     
@@ -190,3 +194,8 @@ class TranslationApp(QMainWindow):
             ThemeManager().set_theme(dark = self.settings.dark_mode)
         else:
             logger.debug("Settings dialog cancelled")
+
+    def on_engine_changed(self, engine_name:str):
+        self.settings.engine = engine_name
+        self.settings.save()  # Save settings immediately when engine is changed to persist the choice
+        logger.debug(f"Engine changed to {engine_name}, settings saved.")

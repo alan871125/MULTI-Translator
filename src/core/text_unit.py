@@ -1,6 +1,17 @@
 from dataclasses import dataclass, field, asdict
-from typing import Any
-from .translation_level import TranslationLevel
+import json
+
+from .translation.level import TranslationLevel
+
+class JsonPath(str):
+    @classmethod
+    def from_list(cls, json_path_list: list[str|int]):
+        return cls(json.dumps(json_path_list))
+    def to_list(self):
+        return json.loads(self)
+    def __add__(self, other: 'JsonPath'):
+        return JsonPath(self[:-1] + "," + other[1:])  # Combine two JSON paths by merging their list representations
+    
 @dataclass
 class TextUnit:
     """ A class representing a single text unit that needs to be translated.
@@ -11,15 +22,16 @@ class TextUnit:
         field (str): The specific field within the file where the text unit is located.
         original (str): The original text that needs to be translated.
         translation (str): The translated text, initially empty.
-        json_path (list): The path within the JSON structure to locate this text unit, used for updating translations back into the JSON.
+        json_path (JsonPath|None): The path within the JSON structure to locate this text unit, used for updating translations back into the JSON.
     """
     file: str
     id: str
     attribute: str
     original: str
     translation: str = ""
-    json_path: list = field(default_factory=list)
+    json_path: JsonPath|None = None
     level: TranslationLevel = TranslationLevel.UNTRANSLATED
+    
     def update_translation(self, new_translation: str):
         # TODO: Implement
         self.translation = new_translation

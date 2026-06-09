@@ -6,14 +6,13 @@ from typing import Iterable, Optional
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
 from PyQt5.QtWidgets import (
-    QMessageBox, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
+    QFileDialog, QMessageBox, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QUndoCommand, QUndoStack
 )
 from iod import IndexedOrderedDict
 from config import settings
 from core.text_unit import TextUnit
-from core.translation_level import TranslationLevel
-from translation import Translator, batch_chinese_convertion
+from core.translation import TranslationLevel, TranslationDictionary, Translator, batch_chinese_convertion
 from .language import LanguagePack
 from .gui.theme import ThemeManager
 
@@ -22,7 +21,7 @@ L = LanguagePack()
 
 class TranslationTableModel(QAbstractTableModel):
     _columns = ["file", "id", "attribute", "original", "translation"]
-    _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
+    _HIDDEN_COLUMNS = ["level", "json_path"]  # Columns that are not displayed but used for internal logic, such as translation level
     _COLWIDTHS = [100, 20, 80, 500, 500, 100]
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
     def __init__(self, data):
@@ -283,7 +282,7 @@ class TranslationTableView(QTableView):
         self.customContextMenuRequested.connect(self.show_context_menu)
         # allow inline editing via double-click or edit key
         self.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed | QAbstractItemView.SelectedClicked)
-        self.translator = Translator()
+        self.translator = Translator(settings)
 
         self.history = QUndoStack()
         self.undo_action = self.history.createUndoAction(self, "Undo")
@@ -420,14 +419,17 @@ class TranslationTableView(QTableView):
             QApplication.clipboard().setText(str(original))
 
 class TranslationTabWidget(QTabWidget):
+    tab_exist_signal = pyqtSignal(bool)  # file_name
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.tabs = IndexedOrderedDict()  # file_name -> TranslationTableView
+        self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView
+        self.dictionaries: IndexedOrderedDict[str, TranslationDictionary] = IndexedOrderedDict()  # file_name -> TranslationDictionary
     # ---------- Overrides ----------
     def addTab(self, widget: TranslationTableView, title: str): 
         # Type hinting for the widget parameter to ensure it's a TranslationTableView, which allows us to access its model and other specific methods if needed in the future.
         assert isinstance(widget, TranslationTableView), "Only TranslationTableView instances can be added to TranslationTabWidget"
         super().addTab(widget, title)
+        self.tab_exist_signal.emit(True)
     
     def removeTab(self, index: int):
         if index < 0 or index >= self.count():
@@ -435,7 +437,9 @@ class TranslationTabWidget(QTabWidget):
         key = self.tabs.keys()[index]
         self.tabs.pop(key)  # Remove from the tabs dict based on index
         super().removeTab(index)
-        logger.debug("Tab removed: {key}, %d remaining", len(self.tabs))
+        logger.debug("Tab removed: %s, %d remaining", key, len(self.tabs))
+        if not self.tabs:            
+            self.tab_exist_signal.emit(False)
         
     def currentWidget(self) -> TranslationTableView:
         widget = super().currentWidget()
@@ -475,7 +479,70 @@ class TranslationTabWidget(QTabWidget):
         current_model = self.currentModel()
         if current_model is not None:
             current_model.cht2chs()
+            
+    def save_current_tab_as_dictionary(self):
+        """ Save the current tab's translations as a dictionary CSV file.
+        This file is meant to be as a saving point of the translation progress, 
+        which can be loaded later to continue translation or share with others.
+        """
+        
+        if (model := self.currentModel()) is None:
+            return
+        file_path = self.tabText(self.currentIndex())
+        # Skip confirmaiton, this is not the final file applied.
+        
+        # file_path, _ = QFileDialog.getSaveFileName(self, "Save Dictionary", default_file_name, "CSV Files (*.csv)")
+        if file_path:
+            dictionary = TranslationDictionary(
+                df=model.df,
+                source_lang=settings.SOURCE_LANG,
+                target_lang=settings.TARGET_LANG
+            )
+        save_dir = Path(settings.data_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        dictionary.save_csv(save_dir/file_path)
+        logger.debug("Dictionary saved: %s", file_path)            
 
+    def load_dictionary(self, file_path: str|Path)-> TranslationDictionary:
+        file_path = Path(file_path).absolute().as_posix()
+        dictionary = TranslationDictionary(file_path)
+        self.dictionaries[file_path] = dictionary
+        return dictionary
+    
+    def apply_dictionary(self, file_path: str|Path, target_tab:str|Path|None = None, keys: Optional[list[str]] = None):
+        """Apply translations from the specified dictionary to the target tab.
+        
+        Arguments:
+            file_path (str|Path): The path to the dictionary CSV file.
+            target_tab (Optional[str|Path]): The file name of the target tab to apply translations to. If None, it will apply to the currently active tab. Default is None.
+            keys (Optional[list[str]]): 
+                The columns to use as keys for matching translations. \\
+                If None, it will use `["json_path", "original"]`.
+        """
+        if keys is None:
+            keys = ["json_path", "original"]  # use json_path and original text as keys to match translations, since sometimes the same original text may appear in different contexts and have different translations. This can be adjusted based on user preference.
+        file_path = Path(file_path).absolute().as_posix()
+        if target_tab is None:
+            target_tab = file_path
+        else:
+            target_tab = Path(target_tab).absolute().as_posix()
+        if (tab := self.tabs.get(target_tab)) is None:
+            return
+        model = tab.model()
+        assert isinstance(model, TranslationTableModel), "Tab's model is not a TranslationTableModel"
+        if (dictionary:= self.dictionaries.get(file_path)) is None:
+            dictionary = self.load_dictionary(file_path)
+        # replace the `translation` and `level` columns if the level in the dictionary is higher than the current level, to avoid overwriting more verified translations with less verified ones. This can be adjusted based on user preference.
+        # use json_path as the key to match translations.
+        # tab.history.beginMacro(f"Apply Dictionary: {Path(file_path).name}")
+        model.df.set_index(keys, inplace=True)
+        dict_df = dictionary.df.set_index(keys)
+        dict_df = dict_df.reindex(model.df.index)
+        mask = dict_df["level"] > model.df["level"]
+        model.df.loc[mask, "translation"] = dict_df.loc[mask, "translation"]
+        model.df.loc[mask, "level"] = dict_df.loc[mask, "level"]
+        model.df.reset_index(inplace=True)
+        
 class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""
     def __init__(

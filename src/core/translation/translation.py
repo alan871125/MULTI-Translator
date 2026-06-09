@@ -1,55 +1,54 @@
 
-import logging
 import os
-from typing import Iterable, Sequence
 import opencc
-from deep_translator.base import BaseTranslator
-from deep_translator import GoogleTranslator, DeeplTranslator
+import logging
+from typing import Protocol, Iterable, Sequence, Optional
 
-from config import settings
+from .providers import providers, TranslationProvider
+
+# deep_translator.constants is not up to date,
 
 logger = logging.getLogger(__name__)
 
 
-providers = {
-    'google': GoogleTranslator,
-    'deepl': DeeplTranslator
-}
+
+class TranslatorSettings(Protocol):
+    SOURCE_LANG: str
+    TARGET_LANG: str
+    API: str
 
 class Translator:
     """A wrapper class to unify the interface of different translation providers.
     And also links the translation settings from the app's Settings for easier use in the GUI and other parts of the app.
     """
+    def __init__(self, settings: TranslatorSettings):
+        self.settings = settings
     def _translate(self, source: str):
         return translate(
             source,
-            source_lang=settings.SOURCE_LANG,
-            target_lang=settings.TARGET_LANG,
-            provider=settings.API
+            source_lang=self.settings.SOURCE_LANG,
+            target_lang=self.settings.TARGET_LANG,
+            provider=self.settings.API,
         )
     def batch_translate(self, sources: list[str]) -> Sequence[str|None]:
         return batch_translate(
             sources,
-            source_lang=settings.SOURCE_LANG,
-            target_lang=settings.TARGET_LANG,
-            provider=settings.API
+            source_lang=self.settings.SOURCE_LANG,
+            target_lang=self.settings.TARGET_LANG,
+            provider=self.settings.API,
         )
 
-def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> BaseTranslator|None:
+def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> TranslationProvider|None:
     """Helper function to get translation settings, 
     including mapping language names to codes based on the provider's supported languages."""
     # Map language names to codes based on the provider's supported languages
     # Safe if the input is already a code.
-    if provider.lower() == 'deepl':
+    if provider.lower() in providers:
         if not api_key:
             api_key = os.getenv("DEEPL_API_KEY")
-        from deep_translator.constants import DEEPL_LANGUAGE_TO_CODE as supported_languages
-    elif provider.lower() == 'google':
-        from deep_translator.constants import GOOGLE_LANGUAGES_TO_CODES as supported_languages
     else:
-        supported_languages = {}
-    source_lang = supported_languages.get(source_lang.lower(), source_lang)
-    target_lang = supported_languages.get(target_lang.lower(), target_lang)
+        logger.error(f"Unsupported translation provider: {provider}")
+        return None
     if (translator_class := providers.get(provider.lower())) is None:
         logger.error(f"Unsupported translation provider: {provider}")
         return None
@@ -89,7 +88,7 @@ def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str=
         translator = get_translator(source_lang, target_lang, provider, api_key)
         if not translator:
             return []
-        translated = translator._translate_batch(sources)
+        translated = translator.translate_batch(sources)
     except Exception as e:
         logger.error(f"Translation API error: {e}")
         return []
@@ -103,9 +102,9 @@ def batch_chinese_convertion(texts: Iterable[str], target:str='tw')-> Sequence[s
         texts (Sequence[str]): the sequence of texts to be converted
         target (str): the target Chinese variant, either 's' for Simplified or 'tw' for Traditional. Default is 'tw'.    
     """
-    if target.lower() in ['s','simplified', 'chs','cn','zh-cn']:
+    if target.lower() in ['s','simplified', 'chs','cn','zh-cn', 'zh-hans']:
         convertion_file = 'tw2s.json'
-    elif target.lower() in ['t','traditional', 'cht','tw','zh-tw']:
+    elif target.lower() in ['t','traditional', 'cht','tw','zh-tw', 'zh-hk', 'zh-hant']:
         convertion_file = 's2tw.json'
     else:
         logger.error(f"Unsupported Chinese conversion target: {target}. Use either 's' or 'tw'.")

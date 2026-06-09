@@ -12,9 +12,12 @@
     "language": "Language",
     
     "settings": "Settings",
+    "settings.dictionary.dataDir": "Dictionary Data Directory",
+    "browse": "Browse",
+    "fontSize": "Font Size",
     "menu.settings": "Settings",
     "menu.file": "File",
-    "menu.file.saveTranslation": "Save Translation",
+    "menu.file.saveTranslation": "Save Translation (Ctrl+S)",
     "menu.file.loadTranslation": "Load Translation",
     "menu.file.saveGameFile": "Save As...",
     "menu.file.loadGameFile": "Open File...",
