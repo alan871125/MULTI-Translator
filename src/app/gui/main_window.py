@@ -30,7 +30,6 @@ class TableFilters:
     attribute: str = ""
     original: str = ""
     translated: str = ""
-
     
 # Actors.json: name, nickname, profile
 class TranslationApp(QMainWindow):
@@ -96,7 +95,7 @@ class TranslationApp(QMainWindow):
         
     def init_menu_bar(self):
         menu_def = {
-            "file.saveTranslation": self.translation_table.save_current_tab_as_dictionary,
+            "file.saveTranslation": self.translation_table.save_current_tab,
             "file.loadGameFile": self.load_game_file_dialog,
             "file.saveGameFile": self.save_game_file,
             "file.recentFiles": QMenu,  # Placeholder for recent files submenu
@@ -127,7 +126,7 @@ class TranslationApp(QMainWindow):
             "save": QShortcut(Qt.CTRL + Qt.Key_S, self),
             "search": QShortcut(Qt.CTRL + Qt.Key_F, self),
         }
-        self.hotkeys["save"].activated.connect(self.translation_table.save_current_tab_as_dictionary)
+        self.hotkeys["save"].activated.connect(self.translation_table.save_current_tab)
         self.hotkeys["save"].setEnabled(False)  # Disable save hotkey until a tab with a loaded file exists
         self.hotkeys["search"].activated.connect(self.open_filter_menu)
         self.translation_table.tab_exist_signal.connect(lambda exist:self.hotkeys["save"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
@@ -158,37 +157,14 @@ class TranslationApp(QMainWindow):
             self.refresh_recent_files_menu()  # Refresh the recent files menu to reflect the updated list
             
             # --- Auto-load dictionary ---
-            from core.translation.dictionary import TranslationDictionary
-            dict_path = TranslationDictionary.get_dictionary_path(
-                Path(self.settings.data_dir)/file_path.name,
-                source_lang=self.settings.SOURCE_LANG,
-                target_lang=self.settings.TARGET_LANG
-            )
-            if dict_path:
-                self.translation_table.apply_dictionary(dict_path, target_tab=file_path.as_posix())
+            dict_path = Path(self.settings.data_dir)/f"{file_path.stem}.csv"
+            self.translation_table.apply_dictionary(dict_path, target_tab=file_path.as_posix())
             # ---------------------------
 
         except Exception as e:
             logger.exception(f"Failed to load game file {file_path}: {e}")
             # Optionally, show a message box to the user indicating the error
     def save_game_file(self):        pass #TODO: implement saving the game data file with
-    
-    
-    def debug(self):
-        self.settings.engine = "RPG Maker MV"
-        self.settings.save()  # Save settings immediately when engine is changed to persist the choice
-        self.load_game_file("test/data/Actors.json")
-        pass
-        # with open("test/dictionary.json", "r", encoding="utf-8") as f:
-        #     self.model.translated_mapping = json.load(f)
-        # from engines.rpgmaker_mv.extractor import RPGMakerMVExtractor
-        # extractor = engines.extractors[self.settings.engine]()
-        # self.model.load_units(extractor.extract_file("test/Actors.json"))
-        # self.model.load_units(extractor.extract_file("test/Armors.json"))
-        # self.model.load_units(extractor.extract_file("test/Items.json"))
-        # self.model.load_units(extractor.extract_file("test/Classes.json"))
-        # self.model.load_units(extractor.extract_file("test/CommonEvents.json"))
-        # self.model.load_units(extractor.extract_file("test/Map001.json"))
         
     def open_settings(self):
         """Open settings dialog"""

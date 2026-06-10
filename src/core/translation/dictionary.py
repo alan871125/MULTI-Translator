@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from rapidfuzz import process, fuzz
 import pandas as pd
-from ..text_unit import JsonPath
+from ..json_path import JsonPath
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,57 @@ def format2regex(format_str: str) -> str:
     return regex_pattern
 
 class TranslationDictionary:
+    """A translation Dictionary in wide format,
+    
+    Each language takes 2 columns: {lang}, {lang}.level
+    """
+    # file: the file name where the text unit is located
+    # json_path: the json path to locate the text unit in the file (unique key)
+    # attribute: the attribute name of the text unit (e.g., name, description)
+    # original: the original text in the source language (for reference)
+    # {lang}: the translated text in the target language
+    # {lang}.level: the translation level. see TranslationLevel for more details.
+    REQUIRED_COLUMNS = ["file", "json_path","attribute", "original"]
+    def __init__(self, df: pd.DataFrame, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
+        assert all(col in df.columns for col in self.REQUIRED_COLUMNS), f"DataFrame must contain the following columns: {self.REQUIRED_COLUMNS}"
+        self.df = df
+        self.source_lang = source_lang
+        self.target_lang = target_lang
+
+    @property
+    def languages(self)->list[str]:
+        """Returns a list of languages in the dictionary, excluding 'original'."""
+        # find columns that end with .level and extract the language name
+        cols = self.df.columns
+        return [col[:-6] for col in cols if col.endswith(".level")]
+
+    def get(self, lang: str) -> Optional[pd.DataFrame]:
+        """Returns a DataFrame with columns: file, json_path, attribute, original, {lang}, {lang}.level"""
+        if lang not in self.languages:
+            logger.warning(f"Language '{lang}' not found in the dictionary. Available languages: {self.languages}")
+            return None
+        return self.df[["file", "json_path", "attribute", "original", lang, f"{lang}.level"]]
+    
+    def __getitem__(self, lang: str) -> pd.DataFrame:
+        """Returns a DataFrame with columns: file, json_path, attribute, original, {lang}, {lang}.level"""
+        return self.df[["file", "json_path", "attribute", "original", lang, f"{lang}.level"]]
+        
+    def save(self, file_path: str|Path):
+        """Saves the dictionary to a CSV file."""
+        file_path = Path(file_path).with_suffix(".csv")
+        self.df.to_csv(file_path, index=False)
+    
+    @classmethod
+    def load(cls, file_path: str|Path, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
+        """Loads the dictionary from a CSV file."""
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        df = pd.read_csv(file_path, converters={"json_path": JsonPath})
+        return cls(df=df, source_lang=source_lang, target_lang=target_lang)
+
+class TranslationDictionaryLong:
+    # Deprecated: A translation Dictionary in long format, with columns: file, json_path, attribute, original, translation, level
     DEFAULT_FILE_NAME_FORMAT = "{file_name}_{source_lang}_{target_lang}.csv"
     
     def __init__(self, df: Optional[str|Path|pd.DataFrame] = None, source_lang: Optional[str] = None, target_lang: Optional[str] = None, file_name_format: Optional[str] = None):

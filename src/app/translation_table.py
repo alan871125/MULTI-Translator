@@ -231,19 +231,22 @@ class TranslationTableModel(QAbstractTableModel):
         
         # Create copies to avoid modifying original dataframes directly until ready
         df_copy = self.df.set_index(keys)
-        dict_df = dictionary.df.set_index(keys)
+        if (dict_df := dictionary.get(settings.TARGET_LANG)) is None:
+            logger.warning(f"Dictionary does not contain target language '{settings.TARGET_LANG}'. No translations applied.")
+            return
+        dict_df = dict_df.set_index(keys)
         
         # Reindex the dictionary to match the model's index structure
         # This will fill missing entries with NaN, which we can filter out.
         dict_df = dict_df.reindex(df_copy.index)
         
         # Apply translations only if the level in the dictionary is higher
-        mask = dict_df["level"] > df_copy["level"]
+        mask = dict_df[f"{settings.TARGET_LANG}.level"] > df_copy["level"]
         
         # Update the model's data
         self.df.set_index(keys, inplace=True)
-        self.df.loc[mask, "translation"] = dict_df.loc[mask, "translation"]
-        self.df.loc[mask, "level"] = dict_df.loc[mask, "level"]
+        self.df.loc[mask, "translation"] = dict_df.loc[mask, settings.TARGET_LANG]
+        self.df.loc[mask, "level"] = dict_df.loc[mask, f"{settings.TARGET_LANG}.level"]
         self.df.reset_index(inplace=True)
         
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
@@ -505,20 +508,17 @@ class TranslationTabWidget(QTabWidget):
         current_model = self.currentModel()
         if current_model is not None:
             current_model.cht2chs()
-        
-    def save_current_tab_as_dictionary(self):
-        """ Save the current tab's translations as a dictionary CSV file.
-        This file is meant to be as a saving point of the translation progress, 
-        which can be loaded later to continue translation or share with others.
+    
+    def save_current_tab(self):
         """
-        
+        If dictionary for the current tab already exists, update and save it;
+        otherwise, create a new dictionary from the current tab's model and save it.
+        """
         if (model := self.currentModel()) is None:
             return
         file_path = self.tabText(self.currentIndex())
-        # Skip confirmaiton, this is not the final file applied.
-        
-        # file_path, _ = QFileDialog.getSaveFileName(self, "Save Dictionary", default_file_name, "CSV Files (*.csv)")
-        if file_path:
+        dictionary = self.dictionaries.get(file_path)
+        if dictionary is None:
             dictionary = TranslationDictionary(
                 df=model.df,
                 source_lang=settings.SOURCE_LANG,
@@ -526,7 +526,7 @@ class TranslationTabWidget(QTabWidget):
             )
         save_dir = Path(settings.data_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
-        dictionary.save_csv(save_dir/file_path, use_convention=True)
+        dictionary.save(save_dir/file_path)
         
     def load_dictionary_to_current_tab(self, dict_path: str|Path, keys: Optional[list[str]] = None):
         """load translations from the specified dictionary to the current tab."""
@@ -539,9 +539,9 @@ class TranslationTabWidget(QTabWidget):
         self.apply_dictionary(dict_path, target_tab=self.tabText(self.currentIndex()), keys=keys)
 
     def load_dictionary(self, file_path: str|Path)-> TranslationDictionary:
-        file_path = Path(file_path).absolute().as_posix()
-        dictionary = TranslationDictionary(file_path)
-        self.dictionaries[file_path] = dictionary
+        file_path = Path(file_path).absolute()
+        dictionary = TranslationDictionary.load(file_path.with_suffix('.csv'))
+        self.dictionaries[file_path.as_posix()] = dictionary
         return dictionary
     
     def apply_dictionary(self, dict_path: str|Path, target_tab:str|Path|None = None, keys: Optional[list[str]] = None):

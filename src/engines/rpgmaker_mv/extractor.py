@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
-from core.text_unit import TextUnit, JsonPath
+from core.json_path import JsonPath
+from core.text_unit import TextUnit
 from utils import walk_json
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
 
