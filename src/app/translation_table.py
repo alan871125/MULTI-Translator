@@ -22,7 +22,6 @@ L = LanguagePack()
 class TranslationTableModel(QAbstractTableModel):
     _columns = ["file", "id", "attribute", "original", "translation"]
     _HIDDEN_COLUMNS = ["level", "json_path"]  # Columns that are not displayed but used for internal logic, such as translation level
-    _COLWIDTHS = [100, 20, 80, 500, 500, 100]
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
     def __init__(self, data):
         super().__init__()
@@ -105,7 +104,7 @@ class TranslationTableModel(QAbstractTableModel):
             level = self._level_from_value(row.level)
             return QColor(ThemeManager.theme.get_level_color(level))
         
-        if role == Qt.DisplayRole:
+        if role in (Qt.DisplayRole, Qt.EditRole):
             if r < 0 or r >= len(self.filtered_df):
                 return None
             if c < 0 or c >= len(self._columns):
@@ -300,6 +299,7 @@ class TranslationTableModel(QAbstractTableModel):
         return pd.Index(out.values)
 
 class TranslationTableView(QTableView):
+    _COLWIDTHS = [60, 20, 80, 500, 500]
     def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
@@ -310,8 +310,15 @@ class TranslationTableView(QTableView):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         # allow inline editing via double-click or edit key
-        self.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed | QAbstractItemView.SelectedClicked)
+        self.setEditTriggers(
+            QAbstractItemView.DoubleClicked | 
+            QAbstractItemView.EditKeyPressed | # F2
+            QAbstractItemView.SelectedClicked  #
+        ) 
         self.translator = Translator(settings)
+        # horizontal header left align and stretch last section
+        self.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.horizontalHeader().setStretchLastSection(True)
 
         self.history = QUndoStack()
         self.undo_action = self.history.createUndoAction(self, "Undo")
@@ -320,6 +327,14 @@ class TranslationTableView(QTableView):
         self.redo_action.setShortcuts(QKeySequence.Redo)   # Ctrl+Y / Cmd+Shift+Z
         self.addAction(self.undo_action)
         self.addAction(self.redo_action)
+        
+    def setModel(self, model):
+        super().setModel(model)
+        self.set_column_widths(self._COLWIDTHS)
+        
+    def set_column_widths(self, colwidths: list[int]):
+        for i, width in enumerate(colwidths):
+            self.setColumnWidth(i, width)
             
     def edit_translation_row(self, row: int, model: TranslationTableModel) -> None:
         current = model.data(model.index(row, model._columns.index("translation")), Qt.DisplayRole)
@@ -341,6 +356,11 @@ class TranslationTableView(QTableView):
     def keyPressEvent(self, event):
         key = event.key()
         if key in (Qt.Key_Return, Qt.Key_Enter):
+            # If currently inline editing, let the view handle the enter key (usually commits the edit)
+            if self.state() == QAbstractItemView.EditingState:
+                super().keyPressEvent(event)
+                return
+
             # edit the selected row using the same dialog as the context menu
             sel = self.selectionModel().selectedRows()
             if not sel:
@@ -435,11 +455,12 @@ class TranslationTableView(QTableView):
             self.edit_translation_row(row, model) # share translation is handled in the edit_translation_row method, which will set the level to VERIFIED
             
         elif action == reset_action:
-            idx = model.get_true_indexes([row])
+            rows = self.selectionModel().selectedRows()
+            idxs = model.get_true_indexes([idx.row() for idx in rows])
             self.history.push(TranslationCommand(
                 model=model,
-                idxs=idx,
-                translations=model.filtered_df.iloc[row]["original"],
+                idxs=idxs,
+                translations=model.df.iloc[idxs]["original"],
                 levels=TranslationLevel.UNTRANSLATED,
                 description=f"Reset: {row}"
             ))
