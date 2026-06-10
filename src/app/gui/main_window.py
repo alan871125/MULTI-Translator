@@ -156,6 +156,18 @@ class TranslationApp(QMainWindow):
             self.settings._recent_files.add_recent_file(file_path)  # Add the loaded file to recent
             self.settings.save()  # Save settings to persist the updated recent files list
             self.refresh_recent_files_menu()  # Refresh the recent files menu to reflect the updated list
+            
+            # --- Auto-load dictionary ---
+            from core.translation.dictionary import TranslationDictionary
+            dict_path = TranslationDictionary.get_dictionary_path(
+                Path(self.settings.data_dir)/file_path.name,
+                source_lang=self.settings.SOURCE_LANG,
+                target_lang=self.settings.TARGET_LANG
+            )
+            if dict_path:
+                self.translation_table.apply_dictionary(dict_path, target_tab=file_path.as_posix())
+            # ---------------------------
+
         except Exception as e:
             logger.exception(f"Failed to load game file {file_path}: {e}")
             # Optionally, show a message box to the user indicating the error

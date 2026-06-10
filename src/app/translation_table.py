@@ -222,6 +222,32 @@ class TranslationTableModel(QAbstractTableModel):
         
         return True
     
+    def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None):
+        """Apply translations from the specified dictionary to the model."""
+        if keys is None:
+            keys = ["json_path", "original"]
+        
+        # We need to be careful with set_index if keys are not unique.
+        
+        # Create copies to avoid modifying original dataframes directly until ready
+        df_copy = self.df.set_index(keys)
+        dict_df = dictionary.df.set_index(keys)
+        
+        # Reindex the dictionary to match the model's index structure
+        # This will fill missing entries with NaN, which we can filter out.
+        dict_df = dict_df.reindex(df_copy.index)
+        
+        # Apply translations only if the level in the dictionary is higher
+        mask = dict_df["level"] > df_copy["level"]
+        
+        # Update the model's data
+        self.df.set_index(keys, inplace=True)
+        self.df.loc[mask, "translation"] = dict_df.loc[mask, "translation"]
+        self.df.loc[mask, "level"] = dict_df.loc[mask, "level"]
+        self.df.reset_index(inplace=True)
+        
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
+        
     def chs2cht(self):
         """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
         filtered = self.filtered_df
@@ -479,7 +505,7 @@ class TranslationTabWidget(QTabWidget):
         current_model = self.currentModel()
         if current_model is not None:
             current_model.cht2chs()
-            
+        
     def save_current_tab_as_dictionary(self):
         """ Save the current tab's translations as a dictionary CSV file.
         This file is meant to be as a saving point of the translation progress, 
@@ -500,8 +526,17 @@ class TranslationTabWidget(QTabWidget):
             )
         save_dir = Path(settings.data_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
-        dictionary.save_csv(save_dir/file_path)
-        logger.debug("Dictionary saved: %s", file_path)            
+        dictionary.save_csv(save_dir/file_path, use_convention=True)
+        
+    def load_dictionary_to_current_tab(self, dict_path: str|Path, keys: Optional[list[str]] = None):
+        """load translations from the specified dictionary to the current tab."""
+        current_tab = self.currentWidget()
+        if current_tab is None:
+            return
+        current_model = current_tab.model()
+        if not isinstance(current_model, TranslationTableModel):
+            return
+        self.apply_dictionary(dict_path, target_tab=self.tabText(self.currentIndex()), keys=keys)
 
     def load_dictionary(self, file_path: str|Path)-> TranslationDictionary:
         file_path = Path(file_path).absolute().as_posix()
@@ -509,39 +544,32 @@ class TranslationTabWidget(QTabWidget):
         self.dictionaries[file_path] = dictionary
         return dictionary
     
-    def apply_dictionary(self, file_path: str|Path, target_tab:str|Path|None = None, keys: Optional[list[str]] = None):
+    def apply_dictionary(self, dict_path: str|Path, target_tab:str|Path|None = None, keys: Optional[list[str]] = None):
         """Apply translations from the specified dictionary to the target tab.
         
         Arguments:
-            file_path (str|Path): The path to the dictionary CSV file.
+            dict_path (str|Path): The path to the dictionary CSV file.
             target_tab (Optional[str|Path]): The file name of the target tab to apply translations to. If None, it will apply to the currently active tab. Default is None.
             keys (Optional[list[str]]): 
                 The columns to use as keys for matching translations. \\
                 If None, it will use `["json_path", "original"]`.
         """
-        if keys is None:
-            keys = ["json_path", "original"]  # use json_path and original text as keys to match translations, since sometimes the same original text may appear in different contexts and have different translations. This can be adjusted based on user preference.
-        file_path = Path(file_path).absolute().as_posix()
+        dict_path = Path(dict_path).absolute().as_posix()
         if target_tab is None:
-            target_tab = file_path
+            target_tab = dict_path
         else:
             target_tab = Path(target_tab).absolute().as_posix()
+            
         if (tab := self.tabs.get(target_tab)) is None:
             return
+            
         model = tab.model()
         assert isinstance(model, TranslationTableModel), "Tab's model is not a TranslationTableModel"
-        if (dictionary:= self.dictionaries.get(file_path)) is None:
-            dictionary = self.load_dictionary(file_path)
-        # replace the `translation` and `level` columns if the level in the dictionary is higher than the current level, to avoid overwriting more verified translations with less verified ones. This can be adjusted based on user preference.
-        # use json_path as the key to match translations.
-        # tab.history.beginMacro(f"Apply Dictionary: {Path(file_path).name}")
-        model.df.set_index(keys, inplace=True)
-        dict_df = dictionary.df.set_index(keys)
-        dict_df = dict_df.reindex(model.df.index)
-        mask = dict_df["level"] > model.df["level"]
-        model.df.loc[mask, "translation"] = dict_df.loc[mask, "translation"]
-        model.df.loc[mask, "level"] = dict_df.loc[mask, "level"]
-        model.df.reset_index(inplace=True)
+        
+        dictionary = self.dictionaries.get(dict_path) or self.load_dictionary(dict_path)
+        
+        # Apply the dictionary using the model's new method
+        model.apply_dictionary(dictionary, keys=keys)
         
 class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""
