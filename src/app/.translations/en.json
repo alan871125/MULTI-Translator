@@ -13,6 +13,7 @@
     
     "settings": "Settings",
     "settings.dictionary.dataDir": "Dictionary Data Directory",
+    "settings.startup.restoreLastSession": "Restore Last Session",
     "browse": "Browse",
     "fontSize": "Font Size",
     "menu.settings": "Settings",

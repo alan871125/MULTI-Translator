@@ -13,6 +13,7 @@
     
     "settings": "設置",
     "settings.dictionary.dataDir": "字典儲存路徑",
+    "settings.startup.restoreLastSession": "啟動時恢復上次的工作階段",
     "browse": "瀏覽",
     "fontSize": "字體大小",
     "menu.settings": "設置",

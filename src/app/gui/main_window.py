@@ -43,7 +43,24 @@ class TranslationApp(QMainWindow):
         self.setAcceptDrops(True)
         self.initUI()
         self.init_hotkeys()
+        if settings.restore_last_session:
+            self.restore_open_tabs()  # Attempt to restore previously open tabs if the setting is enabled
+        
+    def closeEvent(self, event):
+        # save the current state of the application
+        open_tabs = self.translation_table.tabs.keys()
+        self.settings._last_open_tabs = open_tabs  # Save the list of currently open tabs to
+        self.settings.save()  # Save settings to persist the list of open tabs for the next session
+        super().closeEvent(event)
     
+    def restore_open_tabs(self):
+        # Load the previously open tabs from settings and attempt to restore them
+        for file_path in self.settings._last_open_tabs:
+            if Path(file_path).exists():
+                self.load_game_file(file_path)
+            else:
+                logger.warning(f"Previously open file {file_path} not found. Skipping.")
+        
     def open_filter_menu(self):
         # Popup a filter Menu with Column: entries for columns in the table.
         if (model := self.translation_table.currentModel()) is None:
@@ -91,7 +108,6 @@ class TranslationApp(QMainWindow):
         tab_widget = QTabWidget()
         tab_widget.addTab(QWidget(), L["bottomTab.dictionary"])
         tab_widget.addTab(QWidget(), L["bottomTab.fuzzySuggestions"])
-        
         
     def init_menu_bar(self):
         menu_def = {

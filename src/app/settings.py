@@ -41,8 +41,11 @@ class Settings:
     dark_mode: bool = False
     theme: str = "default"
     
+    # Recent files and session
+    restore_last_session: bool = True
+    _last_open_tabs: list[str] = field(default_factory=list)
     _recent_files: LeastRecentlyUsedFiles = field(init = False, default_factory=LeastRecentlyUsedFiles)
-
+    
     def __getitem__(self, key):
         return getattr(self, key)
     
@@ -168,11 +171,12 @@ class SettingsDialog(QDialog):
         self.settings_layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.settings_layout.addWidget(self.tabs)
-        self.widgets = {"translator": {}, "UI": {}, "dictionary": {}}
+        self.widgets = {"translator": {}, "UI": {}, "dictionary": {}, "startup": {}}
         self.layouts = {}        
         self.init_translator_settings_tab()
         self.init_ui_settings_tab()
         self.init_dictionary_settings_tab()
+        self.init_startup_settings_tab()
         
         self.settings_layout.addStretch()
         # Dialog buttons (OK/Cancel)
@@ -187,6 +191,14 @@ class SettingsDialog(QDialog):
         self.widgets["dictionary"]["dataDir"] = PathSettingsLayout(self.settings.data_dir, browse_type="dir")
         self.layouts["dictionary"].addRow(L["settings.dictionary.dataDir"], self.widgets["dictionary"]["dataDir"])
         self.tabs.addTab(dictionary_tab, L["Dictionary"])
+        
+    def init_startup_settings_tab(self):
+        startup_tab = QWidget()
+        self.layouts["startup"] = QFormLayout(startup_tab)
+        self.widgets["startup"]["restore_last_session"] = QCheckBox()
+        self.widgets["startup"]["restore_last_session"].setChecked(self.settings.restore_last_session)
+        self.layouts["startup"].addRow(L["settings.startup.restoreLastSession"], self.widgets["startup"]["restore_last_session"])
+        self.tabs.addTab(startup_tab, L["Startup"])
         
     def init_translator_settings_tab(self):
         # Translation Settings Tab
