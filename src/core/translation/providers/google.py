@@ -173,7 +173,7 @@ _GOOGLE_NMT_SUPPORTED_LANGUAGES = {
     "ceb":    "Cebuano",
     "ny":     "Chichewa (Nyanja)",
     "zh":     "Chinese (Simplified)",
-    "zh-CN":  "Chinese (Simplified)", 
+    "zh-CN":  "Chinese (Simplified-CN)", 
     "zh-TW":  "Chinese (Traditional)",
     "cv":     "Chuvash",
     "co":     "Corsican",
