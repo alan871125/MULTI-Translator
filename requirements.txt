@@ -5,6 +5,7 @@ pyqt5-stubs==5.15.6.0
 pytest==9.0.3
 pandas
 opencc
+openai==2.41
 dotenv
 rapidfuzz==3.14.5
 deep-translator @ git+https://github.com/alan871125/deep-translator.git@master

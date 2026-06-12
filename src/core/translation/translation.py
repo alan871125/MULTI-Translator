@@ -4,14 +4,19 @@ import opencc
 import logging
 from typing import Protocol, Iterable, Sequence, Optional
 
-from .providers import providers, TranslationProvider
+from core.translation._language import Language
 
-# deep_translator.constants is not up to date,
+from ._providers import providers
 
 logger = logging.getLogger(__name__)
 
-
-
+class TranslatorProtocol(Protocol):
+    _languages: dict[str, Language]
+    def translate(self, text: str, **kwargs) -> str:
+        ...
+    def _translate_batch(self, batch: list[str], **kwargs) -> Sequence[str|None]:
+        ...
+    
 class TranslatorSettings(Protocol):
     SOURCE_LANG: str
     TARGET_LANG: str
@@ -22,38 +27,74 @@ class Translator:
     And also links the translation settings from the app's Settings for easier use in the GUI and other parts of the app.
     """
     def __init__(self, settings: TranslatorSettings):
+        """
+        Arguments:
+            settings (TranslatorSettings): 
+                Required attributes:
+                * SOURCE_LANG (str)
+                * TARGET_LANG (str)
+                * API (str)
+        """
+        
         self.settings = settings
-    def _translate(self, source: str):
+    def translate(self, text: str):
         return translate(
-            source,
+            text,
             source_lang=self.settings.SOURCE_LANG,
             target_lang=self.settings.TARGET_LANG,
             provider=self.settings.API,
         )
-    def batch_translate(self, sources: list[str]) -> Sequence[str|None]:
+    def batch_translate(self, batch: list[str]) -> Sequence[str|None]:
         return batch_translate(
-            sources,
+            batch,
             source_lang=self.settings.SOURCE_LANG,
             target_lang=self.settings.TARGET_LANG,
             provider=self.settings.API,
         )
+    def get_supported_languages(self) -> list[Language]:
+        return get_supported_languages(self.settings)
+        
+def get_supported_languages(settings: TranslatorSettings, role:Optional[str] = None) -> list[Language]:
+    """
+    Get the list of supported languages from the translation provider based on the current settings.
 
-def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> TranslationProvider|None:
+    Arguments:
+        settings (TranslatorSettings): 
+            Required attributes:
+                * SOURCE_LANG (str)
+                * TARGET_LANG (str)
+                * API (str)
+        role (Optional[str]): `"source"` or `"target"`. Use `None` for both.
+    """
+    if (translator := get_translator('auto', 'en', provider=settings.API)) is None:
+        return []
+    elif role is None:
+        return list(translator._languages.values())
+    elif role == "source":
+        return list(lang for lang in translator._languages.values() if lang.is_source)
+    elif role == "target":
+        return list(lang for lang in translator._languages.values() if lang.is_target)
+    return []
+    
+
+def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> TranslatorProtocol|None:
     """Helper function to get translation settings, 
     including mapping language names to codes based on the provider's supported languages."""
     # Map language names to codes based on the provider's supported languages
     # Safe if the input is already a code.
-    if provider.lower() in providers:
-        if not api_key:
+    if provider in providers:
+        if provider == 'DeepL' and not api_key:
             api_key = os.getenv("DEEPL_API_KEY")
+        elif provider == 'Custom API (LLM)' and not api_key: 
+            api_key = os.getenv("CUSTOM_API_KEY")
     else:
         logger.error(f"Unsupported translation provider: {provider}")
         return None
-    if (translator_class := providers.get(provider.lower())) is None:
+    if (translator_class := providers.get(provider)) is None:
         logger.error(f"Unsupported translation provider: {provider}")
         return None
     translator = translator_class(
-        source_lang, target_lang, api_key=api_key
+        source=source_lang, target=target_lang, api_key=api_key
     )
     return translator
 
@@ -88,7 +129,7 @@ def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str=
         translator = get_translator(source_lang, target_lang, provider, api_key)
         if not translator:
             return []
-        translated = translator.translate_batch(sources)
+        translated = translator._translate_batch(sources)
     except Exception as e:
         logger.error(f"Translation API error: {e}")
         return []

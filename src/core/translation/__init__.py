@@ -1,3 +1,5 @@
 from .level import TranslationLevel
-from .translation import translate, batch_translate, Translator, batch_chinese_convertion
+from ._language import Language
+from ._providers import providers
+from .translation import *
 from .dictionary import TranslationDictionaryLong, TranslationDictionary

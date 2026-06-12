@@ -9,12 +9,11 @@ from PyQt5.QtWidgets import (
     QCheckBox, QSpinBox, QLineEdit, QPushButton, QFileDialog, QDialogButtonBox, QTabWidget, QWidget
 )
 import inspect
-from core.translation.providers._base import Language
+from core.translation import Language, providers, get_supported_languages
 from utils import JSONWithCommentsDecoder
 from lru_file import LeastRecentlyUsedFiles
 # from engines import supported_engines
 from .language import LanguagePack
-from core.translation.providers import providers
 
 logger = logging.getLogger(__name__)
 L = LanguagePack()
@@ -33,7 +32,8 @@ class Settings:
     API: str = "google"
     DEEPL_API_KEY: str = ""
     CUSTOM_API_KEY: str = ""
-    CUSTOM_API_URL: str = "https://openrouter.ai/api/v1/chat/completions" # This is used for custom API, ignored for built-in APIs like Google Translate
+    CUSTOM_API_URL: str = "https://openrouter.ai/api/v1" # This is used for custom API, ignored for built-in APIs like Google Translate
+    CUSTOM_API_MODEL: str = "openrouter/free"
     max_workers: int = 4
     
     # Theme and UI
@@ -149,9 +149,9 @@ class SettingsDialog(QDialog):
         if api in providers:
             provider = providers[api]
             if role == 'source':
-                supported_langs.extend(provider.SOURCE_SUPPORTED_LANGUAGES.values())
+                supported_langs.extend(get_supported_languages(self.settings, role='source'))
             elif role == 'target':
-                supported_langs.extend(provider.TARGET_SUPPORTED_LANGUAGES.values())
+                supported_langs.extend(get_supported_languages(self.settings, role='target'))
             else:
                 raise ValueError(f"Invalid role: {role}. Must be 'source' or 'target'.")
         else:
@@ -219,6 +219,7 @@ class SettingsDialog(QDialog):
         self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.DEEPL_API_KEY)
         self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.CUSTOM_API_KEY)
         self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.CUSTOM_API_URL)
+        self.widgets["translator"]["CUSTOM_API_MODEL"] = QLineEdit(self.settings.CUSTOM_API_MODEL)
         self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["DEEPL_API_KEY.hint"])
         self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["CUSTOM_API_KEY.hint"])
         self.tabs.addTab(translation_tab, L["translator"])
