@@ -25,6 +25,7 @@ class Settings:
     engine: str = "RPG Maker MV"
     
     data_dir: str = "./data"
+    output_dir: str = "./output"
     
     # Translation
     SOURCE_LANG: str = "auto" # should be saved as language code, but can be displayed as language name in the UI
@@ -184,7 +185,7 @@ class SettingsDialog(QDialog):
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         self.settings_layout.addWidget(button_box)
-        
+
     def init_dictionary_settings_tab(self):
         dictionary_tab = QWidget()
         self.layouts["dictionary"] = QFormLayout(dictionary_tab)

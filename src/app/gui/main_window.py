@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QFileDialog, QMainWindow, QTabWidget, QWidget, 
     QVBoxLayout, QHBoxLayout, 
-    QPushButton, 
+    QPushButton, QMessageBox,
     QInputDialog, QDialog, QDialogButtonBox,
     QMenu, QApplication, QShortcut, QComboBox, QAction,
 )
@@ -113,8 +113,9 @@ class TranslationApp(QMainWindow):
         menu_def = {
             "file.saveTranslation": self.translation_table.save_current_tab,
             "file.loadGameFile": self.load_game_file_dialog,
-            "file.saveGameFile": self.save_game_file,
             "file.recentFiles": QMenu,  # Placeholder for recent files submenu
+            "file.saveGameFile": self.save_game_file,
+            "file.saveGameFileAs": self.save_game_file_dialog,
             "settings": self.open_settings,
             "edit.undo": None,  # Placeholder for undo action
             "edit.redo": None,  # Placeholder for redo action
@@ -163,10 +164,13 @@ class TranslationApp(QMainWindow):
     def load_game_file(self, file_path: str|Path):
         file_path = Path(file_path).absolute()  # Normalize the file path
         try:
-            model = TranslationTableModel([])  # Create a new model for the translation tab
-            tab = self.translation_table.add_translation_tab(file_path.as_posix(), model=model)  # Add a new tab for the loaded file, using the file name as the tab name
             extractor = engines.extractors[self.settings.engine]()
-            model.load_units(extractor.extract_file(file_path))
+            # Create a new model for the translation tab, bound to the file and engine
+            model = TranslationTableModel(file_path=file_path, engine=extractor) 
+            tab = self.translation_table.add_translation_tab(file_path.as_posix(), model=model)
+            
+            # Load units from the file using the bound engine
+            model.load_from_file()
         
             self.settings._recent_files.add_recent_file(file_path)  # Add the loaded file to recent
             self.settings.save()  # Save settings to persist the updated recent files list
@@ -179,8 +183,37 @@ class TranslationApp(QMainWindow):
 
         except Exception as e:
             logger.exception(f"Failed to load game file {file_path}: {e}")
-            # Optionally, show a message box to the user indicating the error
-    def save_game_file(self):        pass #TODO: implement saving the game data file with
+            QMessageBox.critical(self, "Load Error", f"Failed to load game file:\n{e}")
+            
+    def save_game_file_dialog(self):
+        if (model := self.translation_table.currentModel()) is None:
+            logger.warning("No active translation tab to save.")
+            return
+        current_file = model.file_path
+        default_name = current_file.name if current_file else "translated_file.json"
+        save_path, _ = QFileDialog.getSaveFileName(self, L["fileDialoge.SaveTranslatedFile"], default_name, "JSON Files (*.json);;All Files (*.*)")
+        if not save_path:
+            return  # User cancelled the save dialog
+        try:
+            model.save_to_game_file(save_path=save_path)  # Save the current tab's translations back to a game file using the bound engine's apply_translations method
+            self.statusBar().showMessage(L["statusBar.savedSuccess"], 3000)  # Optional: show a success message in status bar
+        except Exception as e:
+            logger.exception(f"Failed to save game file: {e}")
+            QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
+    
+    def save_game_file(self):        
+        if (model := self.translation_table.currentModel()) is None:
+            logger.warning("No active translation tab to save.")
+            return
+            
+        try:
+            model.save_to_game_file()
+            # Optional: show a success message in status bar
+            self.statusBar().showMessage(L["statusBar.savedSuccess"], 3000)
+        except Exception as e:
+            logger.exception(f"Failed to save game file: {e}")
+            QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
+        
         
     def open_settings(self):
         """Open settings dialog"""

@@ -6,5 +6,8 @@ class JsonPath(str):
         return cls(json.dumps(json_path_list))
     def to_list(self):
         return json.loads(self)
+    @property
+    def parts(self):
+        return self.to_list()
     def __add__(self, other: 'JsonPath'):
         return JsonPath(self[:-1] + "," + other[1:])  # Combine two JSON paths by merging their list representations

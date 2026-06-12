@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any, cast
 
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
@@ -21,11 +21,13 @@ L = LanguagePack()
 
 class TranslationTableModel(QAbstractTableModel):
     _columns = ["file", "id", "attribute", "original", "translation"]
-    _HIDDEN_COLUMNS = ["level", "json_path"]  # Columns that are not displayed but used for internal logic, such as translation level
+    _HIDDEN_COLUMNS = ["json_path", "level"]  # Columns that are not displayed but used for internal logic, such as translation level
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
-    def __init__(self, data):
+    def __init__(self, data=None, file_path: Optional[Path|str] = None, engine = None):
         super().__init__()
-        self.df:pd.DataFrame = pd.DataFrame(data, columns=self._columns+self._HIDDEN_COLUMNS)
+        self.file_path = Path(file_path) if file_path else None
+        self.engine = engine
+        self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._columns+self._HIDDEN_COLUMNS)
         self._filtered_df = None
         self.filters = {}
         self._mask_indexes = None
@@ -52,6 +54,31 @@ class TranslationTableModel(QAbstractTableModel):
         
         self.df = pd.concat([self.df, data], ignore_index=True)
         self.set_filters(self.filters)  # Re-apply filters to include new data
+
+    def get_units(self) -> list[TextUnit]:
+        """Convert the internal DataFrame back into a list of TextUnit objects."""
+        # Using cast to satisfy the static analyzer that keys are strings
+        records = cast(list[dict[str, Any]], self.df.to_dict(orient='records'))
+        return [TextUnit(**row) for row in records]
+
+    def load_from_file(self):
+        """Extract units from the bound file_path using the bound engine."""
+        if not self.file_path or not self.engine:
+            logger.error("Cannot load: file_path or engine not set.")
+            return
+        units = self.engine.extract_file(self.file_path)
+        self.load_units(units)
+
+    def save_to_game_file(self, save_path: Optional[Path|str] = None):
+        """Apply translations back to the game file using the bound engine."""
+        if not self.file_path or not self.engine:
+            logger.error("Cannot save: file_path or engine not set.")
+            return
+        
+        save_path = save_path or Path(settings.output_dir) / self.file_path.name
+        units = self.get_units()
+        self.engine.apply_translations(self.file_path, units, save_path=save_path)
+        logger.info(f"Saved translations to {save_path}")
 
     def set_filters(self, filters):
         # filters: dict of {column: {"text": str, "is_regex": bool}}
