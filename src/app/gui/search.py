@@ -59,7 +59,7 @@ class SearchDialog(qt.QDialog):
     def __init__(self, parent=None, filters=None):
         super().__init__(parent)
         filters = filters or {}
-        self.setWindowTitle(L["searchAndReplace"])
+        self.setWindowTitle(L["search_and_replace"])
         self.resize(400, 100)
         
         self.center_on_parent()
@@ -164,7 +164,7 @@ class SearchDialog(qt.QDialog):
         
         replace_container_layout.addWidget(replace_box, stretch=1)
         
-        replace_button = qt.QPushButton(L["replaceAll"], self)
+        replace_button = qt.QPushButton(L["replace_all"], self)
         replace_button.setCursor(Qt.PointingHandCursor)
         replace_button.clicked.connect(self.on_replace)
         replace_container_layout.addWidget(replace_button)

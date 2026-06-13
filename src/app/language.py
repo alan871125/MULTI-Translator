@@ -26,7 +26,15 @@ class LanguagePack:
     @classmethod
     def __getitem__(cls, key)->str:
         # fallback order: current language -> English -> key itself
-        return cls.lang_data[cls.LANGUAGE].get(key, None) or cls.lang_data.get("en", {}).get(key, key)
+        if (found := cls.lang_data[cls.LANGUAGE].get(key)) is not None:
+            return found
+        elif (found := cls.lang_data.get("en", {}).get(key)) is not None:
+            logger.warning(f"Untranslated key '{key}' in language '{cls.LANGUAGE}'. Falling back to English.")
+            return found
+        # elif (key_last_part := key.split(".")[-1])!=key:
+        #     return cls.__getitem__(key_last_part)  # try fallback to last part of the key, e.g. "settings.startup" -> "startup"
+        logger.warning(f"Untranslated key '{key}' in language '{cls.LANGUAGE}' and English. Returning key as fallback.")
+        return key
 
     @classmethod
     def load_translations(cls, lang, force=False):

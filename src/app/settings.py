@@ -211,7 +211,7 @@ class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self.settings: Settings = settings
-        self.setWindowTitle(L["Settings"])
+        self.setWindowTitle(L["settings"])
         self.setMinimumSize(700, 270)        
         self.init_ui()
 
@@ -266,8 +266,7 @@ class SettingsDialog(QDialog):
         self.layouts["startup"] = QFormLayout(startup_tab)
         self.widgets["startup"]["restore_last_session"] = QCheckBox()
         self.widgets["startup"]["restore_last_session"].setChecked(self.settings.restore_last_session)
-        # self.layouts["startup"].addRow(L["settings.startup.restoreLastSession"], self.widgets["startup"]["restoreLastSession"])
-        self.tabs.addTab(startup_tab, L["Startup"])
+        self.tabs.addTab(startup_tab, L["settings.startup"])
         
     def init_translator_settings_tab(self):
         # Translation Settings Tab
@@ -314,6 +313,7 @@ class SettingsDialog(QDialog):
         self.layouts["workspace"] = QFormLayout(workspace_tab)
         self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings.workspace.workspace_dir or "./", browse_type="dir")
         self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.game_data_dir, browse_type="dir")
+        self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.user_dict_dir, browse_type="dir")
         self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.workspace.output_dir, browse_type="dir")
         self.widgets["workspace"]["engine"] = QComboBox()
         self.widgets["workspace"]["engine"].addItems(supported_engines)

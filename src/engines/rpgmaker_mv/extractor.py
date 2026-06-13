@@ -5,8 +5,9 @@ from core.json_path import JsonPath
 from core.text_unit import TextUnit
 from utils import walk_json
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
+from ..simple_json.extractor import SimpleJsonExtractor
 
-class RPGMakerMVExtractor:
+class RPGMakerMVExtractor(SimpleJsonExtractor):
     SUPPORTED_FILES_TYPES = ['.json']
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
@@ -88,27 +89,3 @@ class RPGMakerMVExtractor:
                         ))
         return out
     
-    def apply_translations(
-        self, file_path: Path|str, 
-        text_units: list[TextUnit], 
-        save_path: Optional[Path|str] = None,
-        **kwargs
-    ):
-        """Applies translations from a list of TextUnit objects back into the JSON file, saving the result to a new file if save_path is provided. """
-        file_path = Path(file_path)
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        for text_unit in text_units:
-            if text_unit.json_path and text_unit.translation != text_unit.original:
-                apply_json_path(data, text_unit.json_path, text_unit.translation)
-        if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=kwargs.get("indent", 4))
-
-
-def apply_json_path(data: dict, json_path: JsonPath, new_value: str):
-    """Applies a new value to a JSON structure at the location specified by the JsonPath. """
-    current = data
-    for part in json_path.parts[:-1]:
-        current = current[part]
-    current[json_path.parts[-1]] = new_value

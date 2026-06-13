@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 from pathlib import Path
-from typing import Iterable, Optional, Any, cast
+from typing import Iterable, Literal, Optional, Any, cast
 
 from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
@@ -13,6 +13,7 @@ from iod import IndexedOrderedDict
 from config import settings
 from core.text_unit import TextUnit
 from core.translation import TranslationLevel, TranslationDictionary, Translator, batch_chinese_convertion
+from engines._base import BaseExtractor
 from .language import LanguagePack
 from .gui.theme import ThemeManager
 
@@ -23,7 +24,7 @@ class TranslationTableModel(QAbstractTableModel):
     _columns = ["file", "id", "attribute", "original", "translation"]
     _HIDDEN_COLUMNS = ["json_path", "level"]  # Columns that are not displayed but used for internal logic, such as translation level
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
-    def __init__(self, data=None, file_path: Optional[Path|str] = None, engine = None):
+    def __init__(self, data=None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
@@ -207,10 +208,11 @@ class TranslationTableModel(QAbstractTableModel):
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return True
         
-    def search_and_replace(self, filters: dict, replace_text: str, column: str = "original"):
+    def search_and_replace(self, filters: dict, replace_text: str, column: Literal['original', 'translation'] = "original"):
         """Replace translations based on search criteria. 
         Filters is a dict of {column: {"text": str, "is_regex": bool, "match_case": bool}}.
-        Replace_text is a regex pattern or plain text to replace with. Column specifies which column to apply the search and replace on (default "original").
+        Replace_text is a regex pattern or plain text to replace with. 
+        Column specifies which column to apply the search and replace on if both are in the filters.
         Returns the number of replacements made.
         """
         if column not in self.df.columns:
@@ -218,8 +220,15 @@ class TranslationTableModel(QAbstractTableModel):
         mask = self.build_mask(filters)
         if not mask.any():
             return 0
+        if column == "original":
+            _filter = filters.get(column, filters.get("translation", {}))
+        elif column == "translation":
+            _filter = filters.get(column, {})
+        else:
+            raise ValueError("Invalid column specified for search and replace.")
+
         self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
-            filters[column]["text"], replace_text, regex=filters[column].get("is_regex", False),
+            _filter.get("text", ""), replace_text, regex=_filter.get("is_regex", False),
         )
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return mask.sum()
@@ -420,26 +429,23 @@ class TranslationTableView(QTableView):
         
     def show_share_translation_confirmation(self):
         # Display the confirmation box
-        if confirm:=(settings.get("confirm.shareTranslation")) is not None:
+        if confirm:=(settings.get("confirm.share_translation")) is not None:
             # User chose to not show again, use the saved preference
             return confirm
         
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Question)
         msg_box.setWindowTitle("Confirm Action")
-        msg_box.setText(L["confirmationMessage.shareTranslation"])
-        check_box = QCheckBox(L["confirmationMessage.dontAskAgain"])
+        msg_box.setText(L["confirm_msg.share_translation"])
+        check_box = QCheckBox(L["confirm_msg.dont_ask_again"])
         msg_box.setCheckBox(check_box)
         msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
         # Handle user selection
-        result = msg_box.exec()
+        result = (msg_box.exec()==QMessageBox.StandardButton.Yes)
         if check_box.isChecked():
-            settings['confirm.shareTranslation'] = False
-        if result == QMessageBox.StandardButton.Yes:
-            return True
-        else:
-            return False
+            settings['confirm.share_translation'] = result
+        return result
     
     def share_translations(self, indxes:list[int], need_confirmation: bool, max_level=TranslationLevel.UNTRANSLATED, is_filtered=False):
         model = self.model()
@@ -465,10 +471,10 @@ class TranslationTableView(QTableView):
             return
         menu = QMenu(self)
         
-        api_action =   menu.addAction(L['rightClick.translateWithAPI'])
-        edit_action =  menu.addAction(L['rightClick.editTranslation'])
-        reset_action = menu.addAction(L['rightClick.resetTranslation'])
-        copy_action =  menu.addAction(L['rightClick.copyOriginal'])
+        api_action =   menu.addAction(L['right_click.translate_with_api'])
+        edit_action =  menu.addAction(L['right_click.edit_translation'])
+        reset_action = menu.addAction(L['right_click.reset_translation'])
+        copy_action =  menu.addAction(L['right_click.copy_original'])
 
         action = menu.exec_(self.viewport().mapToGlobal(pos))
         if action is None:

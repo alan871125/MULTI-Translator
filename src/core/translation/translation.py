@@ -2,16 +2,24 @@
 import os
 import opencc
 import logging
-from typing import Protocol, Iterable, Sequence, Optional
+from typing import Literal, Protocol, Iterable, Sequence, Optional, Iterable
 
-from core.translation._language import Language
+from deep_translator.base import Language
 
 from ._providers import providers
 
 logger = logging.getLogger(__name__)
 
 class TranslatorProtocol(Protocol):
-    _languages: dict[str, Language]
+    @property
+    def supported_languages(self) -> Iterable[Language]:
+        ...
+    @property
+    def source_supported_languages(self) -> Iterable[Language]:
+        ...
+    @property
+    def target_supported_languages(self) -> Iterable[Language]:
+        ...
     def translate(self, text: str, **kwargs) -> str:
         ...
     def _translate_batch(self, batch: list[str], **kwargs) -> Sequence[str|None]:
@@ -52,9 +60,9 @@ class Translator:
             provider=self.settings.API,
         )
     def get_supported_languages(self) -> list[Language]:
-        return get_supported_languages(self.settings.API)
+        return list(get_supported_languages(self.settings.API))
         
-def get_supported_languages(api:str, role:Optional[str] = None) -> list[Language]:
+def get_supported_languages(api:str, role:Optional[Literal["source", "target"]] = None) -> Iterable[Language]:
     """
     Get the list of supported languages from the translation provider based on the current settings.
 
@@ -65,11 +73,11 @@ def get_supported_languages(api:str, role:Optional[str] = None) -> list[Language
     if (translator := get_translator('auto', 'en', provider=api)) is None:
         return []
     elif role is None:
-        return list(translator._languages.values())
+        return translator.supported_languages
     elif role == "source":
-        return list(lang for lang in translator._languages.values() if lang.is_source)
+        return translator.source_supported_languages
     elif role == "target":
-        return list(lang for lang in translator._languages.values() if lang.is_target)
+        return translator.target_supported_languages
     return []
     
 

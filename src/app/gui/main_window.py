@@ -92,26 +92,26 @@ class TranslationApp(QMainWindow):
         
     def init_menu_bar(self):
         menu_def = {
-            "file.loadGameFile": self.load_game_file_dialog,
-            "file.loadWorkspace": self.load_workspace_dialog,
-            "file.newWorkspace": self.load_workspace_dialog,
-            "file.saveTranslation": self.translation_table.save_current_tab,
-            "file.recentFiles": QMenu,  # Placeholder for recent files submenu
-            "file.saveGameFile": self.save_game_file,
-            "file.saveGameFileAs": self.save_game_file_dialog,
+            "file.load_game_file": self.load_game_file_dialog,
+            "file.load_workspace": self.load_workspace_dialog,
+            "file.new_workspace": self.load_workspace_dialog,
+            "file.save_translation": self.translation_table.save_current_tab,
+            "file.recent_files": QMenu,  # Placeholder for recent files submenu
+            "file.save_game_file": self.save_game_file,
+            "file.save_game_file_as": self.save_game_file_dialog,
             "settings": self.open_settings,
             "edit.undo": None,  # Placeholder for undo action
             "edit.redo": None,  # Placeholder for redo action
-            "tools.chineseConversion.chs2cht": self.translation_table.chs2cht_current_tab,
-            "tools.chineseConversion.cht2chs": self.translation_table.cht2chs_current_tab,  # Placeholder for Chinese conversion tool
+            "tools.chinese_conversion.chs2cht": self.translation_table.chs2cht_current_tab,
+            "tools.chinese_conversion.cht2chs": self.translation_table.cht2chs_current_tab,  # Placeholder for Chinese conversion tool
         } 
         # use `$n:` as a special prefix before file paths in the menu definition 
         # to indicate that the menu item should use the file path as its name.
         
         menus = initialize_menu(self, menu_def, tr=L.__getitem__)
-        menus["file.saveTranslation"].setEnabled(False)  # Disable save translation action until a tab is loaded with a file
-        self.translation_table.tab_exist_signal.connect(lambda exist: menus["file.saveTranslation"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
-        self.lru_menu = menus.get("file.recentFiles")
+        menus["file.save_translation"].setEnabled(False)  # Disable save translation action until a tab is loaded with a file
+        self.translation_table.tab_exist_signal.connect(lambda exist: menus["file.save_translation"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
+        self.lru_menu = menus.get("file.recent_files")
         self.refresh_recent_files_menu()  # Populate the recent files menu with the current list of recent files from settings
     
     def init_top_bar(self):
@@ -135,8 +135,8 @@ class TranslationApp(QMainWindow):
         """Includes the Dictionary and Fuzzy-matching suggestions for the current selected cell.
         """
         tab_widget = QTabWidget()
-        tab_widget.addTab(QWidget(), L["bottomTab.dictionary"])
-        tab_widget.addTab(QWidget(), L["bottomTab.fuzzySuggestions"])
+        tab_widget.addTab(QWidget(), L["bottom_tab.dictionary"])
+        tab_widget.addTab(QWidget(), L["bottom_tab.fuzzy_suggestions"])
         return tab_widget
     
     def refresh_recent_files_menu(self):
@@ -168,10 +168,10 @@ class TranslationApp(QMainWindow):
         pass #TODO: implement loading translation dictionary from previous sessions to avoid losing work and to reuse translations across similar text in different files
     
     def load_workspace_dialog(self):
-        workspace_dir = QFileDialog.getExistingDirectory(self, L["fileDialoge.SelectWorkspaceDirectory"], "")
+        workspace_dir = QFileDialog.getExistingDirectory(self, L["FileDialoge.select_workspace_dir"], "")
         if workspace_dir:
             self.load_workspace(workspace_dir)
-            self.widgets['top.workspace_button'].setText(Path(workspace_dir).name)  # Update the workspace button text to show the name of the loaded workspace
+            
     
     def load_workspace(self, config_path: str|Path):
         config_path = Path(config_path).absolute()
@@ -179,13 +179,14 @@ class TranslationApp(QMainWindow):
         self.settings._recent_files.add_recent_file(config_path)  # Add the loaded workspace to recent files
         self.settings.save()  # Save settings to persist the updated recent files list
         self.refresh_recent_files_menu()  # Refresh the recent files menu to reflect the updated list
+        self.widgets['top.workspace_button'].setText(Path(config_path).stem)  # Update the workspace button text to show the name of the loaded workspace
         
     def load_game_file_dialog(self):
         # import supported file types from the selected engine
         extractor = engines.extractors[self.settings.engine]()
         supported_types = extractor.SUPPORTED_FILES_TYPES
         file_filters = ";;".join(f"{ft.upper()} Files (*{ft})" for ft in supported_types)+f";;All Files (*.*)"
-        file_path, _ = QFileDialog.getOpenFileName(self, L["fileDialoge.SelectGameFile"], "", file_filters)
+        file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_game_file"], "", file_filters)
         if not file_path:
             return  # User cancelled the file dialog
         self.load_game_file(file_path)
@@ -207,7 +208,8 @@ class TranslationApp(QMainWindow):
             
             # --- Auto-load dictionary ---
             dict_path = Path(self.settings.user_dict_dir)/f"{file_path.stem}.csv"
-            self.translation_table.apply_dictionary(dict_path, target_tab=file_path.as_posix())
+            if dict_path.exists():
+                self.translation_table.apply_dictionary(dict_path, target_tab=file_path.as_posix())
             # ---------------------------
 
         except Exception as e:
@@ -220,12 +222,12 @@ class TranslationApp(QMainWindow):
             return
         current_file = model.file_path
         default_name = current_file.name if current_file else "translated_file.json"
-        save_path, _ = QFileDialog.getSaveFileName(self, L["fileDialoge.SaveTranslatedFile"], default_name, "JSON Files (*.json);;All Files (*.*)")
+        save_path, _ = QFileDialog.getSaveFileName(self, L["file_dialog.save_translated_file"], default_name, "JSON Files (*.json);;All Files (*.*)")
         if not save_path:
             return  # User cancelled the save dialog
         try:
             model.save_to_game_file(save_path=save_path)  # Save the current tab's translations back to a game file using the bound engine's apply_translations method
-            self.statusBar().showMessage(L["statusBar.savedSuccess"], 3000)  # Optional: show a success message in status bar
+            self.statusBar().showMessage(L["statusBar.saved_success"], 3000)  # Optional: show a success message in status bar
         except Exception as e:
             logger.exception(f"Failed to save game file: {e}")
             QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
@@ -238,7 +240,7 @@ class TranslationApp(QMainWindow):
         try:
             model.save_to_game_file()
             # Optional: show a success message in status bar
-            self.statusBar().showMessage(L["statusBar.savedSuccess"], 3000)
+            self.statusBar().showMessage(L["statusBar.saved_success"], 3000)
         except Exception as e:
             logger.exception(f"Failed to save game file: {e}")
             QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")

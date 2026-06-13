@@ -29,7 +29,11 @@ class TranslationDictionary:
     REQUIRED_COLUMNS = ["file", "json_path","attribute", "original"]
     def __init__(self, df: pd.DataFrame, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
         assert all(col in df.columns for col in self.REQUIRED_COLUMNS), f"DataFrame must contain the following columns: {self.REQUIRED_COLUMNS}"
-        self.df = df
+        self.df = df.copy()
+        if "translation" in df.columns and "level" in df.columns:
+            assert target_lang is not None, "Provide target_lang or rename 'translation' and 'level' columns to include the target language (e.g., ('en','en.level'), ('zh-TW','zh-TW.level'))"
+            # convert to long format:
+            self.df.rename(columns={"translation": f"{target_lang}", "level": f"{target_lang}.level"}, inplace=True)
         self.source_lang = source_lang
         self.target_lang = target_lang
 
