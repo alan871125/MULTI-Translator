@@ -3,7 +3,7 @@ import json
 import logging  
 from pathlib import Path
 from dataclasses import dataclass, asdict, field
-from typing import Any
+from typing import Any, Optional
 from PyQt5.QtWidgets import (
     QComboBox, QDialog, QVBoxLayout, QFormLayout, QGroupBox, QHBoxLayout,
     QCheckBox, QSpinBox, QLineEdit, QPushButton, QFileDialog, QDialogButtonBox, QTabWidget, QWidget
@@ -18,19 +18,59 @@ from .language import LanguagePack
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
+@dataclass
+class WorkspaceSettings:
+    """Settings specific to the translation workspace, including paths and last opened tabs."""
+    workspace_dir: Optional[str] = None  # None means the global default workspace
+    game_data_dir: Optional[str] = None
+    user_dict_dir: Optional[str] = None
+    output_dir: str = "./output"
+    engine: str = "RPG Maker MV"
+    last_open_tabs: list[str] = field(default_factory=list)
+    
+    def asdict(self) -> dict:
+        return asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
+    
+    @classmethod
+    def load(cls, path: str|Path="./workspace.translation-workspace") -> 'WorkspaceSettings':
+        path = Path(path)
+        if path.is_dir():
+            if (path / "workspace.translation-workspace").exists():
+                path = path / "workspace.translation-workspace"
+            else: 
+                logging.info(f"No workspace settings file found in {path}. Initializing with default settings.")
+                return cls(workspace_dir=path.as_posix())
+        if path.suffix!=".translation-workspace":
+            logger.warning(f"Loading workspace settings from a file with unexpected extension: {path}. Expecting '.translation-workspace' but loading anyway.")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return cls(**data)
+        
+    def load_update(self, path: str|Path="./workspace.translation-workspace"):
+        """Load workspace settings from a file and update the current settings. This is useful for loading a workspace without affecting the global settings."""
+        new_settings = self.load(path)
+        for field_name in asdict(self).keys():
+            new_value = getattr(new_settings, field_name)
+            if new_value is not None:
+                setattr(self, field_name, new_value)
+                
+    def save(self, path: Optional[str|Path] = None):
+        workspace_dir = self.workspace_dir or "."
+        if path is None:
+            path = Path(workspace_dir) / "workspace.translation-workspace"
+        else:
+            path = Path(path)
+        if path.suffix != ".translation-workspace":
+            logger.warning(f"Saving workspace settings to a file with unexpected extension: {path}. Expecting '.translation-workspace'.")
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(self.asdict(), f, indent=4, ensure_ascii=False)
 
 @dataclass
-class Settings:
-    # Engine
-    engine: str = "RPG Maker MV"
-    
-    data_dir: str = "./data"
-    output_dir: str = "./output"
-    
+class Settings:    
     # Translation
     SOURCE_LANG: str = "auto" # should be saved as language code, but can be displayed as language name in the UI
     TARGET_LANG: str = "en"   # should be saved as language code, but can be displayed as language name in the UI
-    API: str = "google"
+    API: str = "Google"
     DEEPL_API_KEY: str = ""
     CUSTOM_API_KEY: str = ""
     CUSTOM_API_URL: str = "https://openrouter.ai/api/v1" # This is used for custom API, ignored for built-in APIs like Google Translate
@@ -44,14 +84,37 @@ class Settings:
     
     # Recent files and session
     restore_last_session: bool = True
-    _last_open_tabs: list[str] = field(default_factory=list)
     _recent_files: LeastRecentlyUsedFiles = field(init = False, default_factory=LeastRecentlyUsedFiles)
+
+    workspace: WorkspaceSettings = field(init=False, default_factory=WorkspaceSettings)
     
     def __getitem__(self, key):
         return getattr(self, key)
     
     def __setitem__(self, key, value):
         setattr(self, key, value)
+    
+    @property
+    def game_data_dir(self) -> str:
+        return self.workspace.game_data_dir or "./data"
+    @property
+    def output_dir(self) -> str:
+        return self.workspace.output_dir
+    @property
+    def user_dict_dir(self) -> str:
+        return (Path(self.workspace.user_dict_dir or '.')/"dictionary").as_posix()
+    @property
+    def last_open_tabs(self) -> list[str]:
+        return self.workspace.last_open_tabs
+    @last_open_tabs.setter
+    def last_open_tabs(self, tabs: list[str]):
+        self.workspace.last_open_tabs = tabs
+    @property
+    def engine(self) -> str:
+        return self.workspace.engine
+    @engine.setter
+    def engine(self, value: str):
+        self.workspace.engine = value
     
     def get(self, key:str, default:Any=None):
         return getattr(self, key, default)
@@ -65,30 +128,39 @@ class Settings:
     def from_dict(cls,data: dict) -> "Settings":
         valid_fields = inspect.signature(cls).parameters
         filtered_data = {k: v for k, v in data.items() if k in valid_fields}
-        settings = Settings(**filtered_data)
+        settings = cls(**filtered_data)
         settings._recent_files = LeastRecentlyUsedFiles.from_list(data.get("_recent_files", []))
         return settings
     
-    @staticmethod    
-    def load(path: str|Path):
+    @classmethod    
+    def load(cls, path: str|Path, workspace_path: Optional[str|Path] = None) -> "Settings":
         try:
             with open(path, "r") as f:
                 data = json.load(f, cls=JSONWithCommentsDecoder)
-            settings = Settings.from_dict(data)
+            settings = cls.from_dict(data)
         except FileNotFoundError:
             logger.info("Initializing new settings with default values.")
-            settings=Settings()  # Return default settings if file not found
+            settings=cls()  # Return default settings if file not found
         except Exception as e:
             logger.error(f"Failed to load settings from {path}: {e}")
-            settings=Settings()  # Return default settings on failure
+            settings=cls()  # Return default settings on failure
         settings.DEEPL_API_KEY = os.getenv("DEEPL_API_KEY", settings.DEEPL_API_KEY)
         settings.CUSTOM_API_KEY = os.getenv("CUSTOM_API_KEY", settings.CUSTOM_API_KEY)
+        if workspace_path and Path(workspace_path).exists():
+            settings.workspace = WorkspaceSettings.load(workspace_path)
+        else:
+            settings.workspace = WorkspaceSettings(**data.get("workspace", {}))
         return settings
     
     def save(self, path: str|Path="settings.json"):
         settings = self.asdict()
         DEEPL_API_KEY =settings.pop("DEEPL_API_KEY", "")
         CUSTOM_API_KEY = settings.pop("CUSTOM_API_KEY", "")
+        settings.pop("workspace", None)  # Workspace settings are saved separately in the workspace directory
+        if self.workspace.workspace_dir is not None:
+            self.workspace.save(path=None)  # Save workspace settings to its own file in the workspace directory
+        else:
+            self.workspace.save(path="./default.translation-workspace")  # Save workspace settings to a separate file with the same name but .translation-workspace extension
         if DEEPL_API_KEY or CUSTOM_API_KEY:  # Remove CUSTOM_API_KEY from the settings to be save in .env file
             import dotenv
             dotenv.set_key(".env", "DEEPL_API_KEY", DEEPL_API_KEY)
@@ -148,11 +220,10 @@ class SettingsDialog(QDialog):
         api = self.widgets["translator"]["API"].currentText()
         supported_langs: list[Language] = [Language(code="auto", name="Auto")] if has_auto else []
         if api in providers:
-            provider = providers[api]
             if role == 'source':
-                supported_langs.extend(get_supported_languages(self.settings, role='source'))
+                supported_langs.extend(get_supported_languages(self.settings.API, role='source'))
             elif role == 'target':
-                supported_langs.extend(get_supported_languages(self.settings, role='target'))
+                supported_langs.extend(get_supported_languages(self.settings.API, role='target'))
             else:
                 raise ValueError(f"Invalid role: {role}. Must be 'source' or 'target'.")
         else:
@@ -172,33 +243,30 @@ class SettingsDialog(QDialog):
         self.settings_layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.settings_layout.addWidget(self.tabs)
-        self.widgets = {"translator": {}, "UI": {}, "dictionary": {}, "startup": {}}
+        self.widgets = {"translator": {}, "UI": {}, "dictionary": {}, "startup": {}, "workspace": {}}
         self.layouts = {}        
         self.init_translator_settings_tab()
         self.init_ui_settings_tab()
-        self.init_dictionary_settings_tab()
         self.init_startup_settings_tab()
+        self.init_workspace_settings_tab()
         
+        for layout_key, form_layout in self.layouts.items():
+            for k, widget in self.widgets[layout_key].items():
+                form_layout.addRow(L[f"settings.{layout_key}.{k}"], widget)
+                
         self.settings_layout.addStretch()
         # Dialog buttons (OK/Cancel)
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         self.settings_layout.addWidget(button_box)
-
-    def init_dictionary_settings_tab(self):
-        dictionary_tab = QWidget()
-        self.layouts["dictionary"] = QFormLayout(dictionary_tab)
-        self.widgets["dictionary"]["dataDir"] = PathSettingsLayout(self.settings.data_dir, browse_type="dir")
-        self.layouts["dictionary"].addRow(L["settings.dictionary.dataDir"], self.widgets["dictionary"]["dataDir"])
-        self.tabs.addTab(dictionary_tab, L["Dictionary"])
         
     def init_startup_settings_tab(self):
         startup_tab = QWidget()
         self.layouts["startup"] = QFormLayout(startup_tab)
         self.widgets["startup"]["restore_last_session"] = QCheckBox()
         self.widgets["startup"]["restore_last_session"].setChecked(self.settings.restore_last_session)
-        self.layouts["startup"].addRow(L["settings.startup.restoreLastSession"], self.widgets["startup"]["restore_last_session"])
+        # self.layouts["startup"].addRow(L["settings.startup.restoreLastSession"], self.widgets["startup"]["restoreLastSession"])
         self.tabs.addTab(startup_tab, L["Startup"])
         
     def init_translator_settings_tab(self):
@@ -221,9 +289,9 @@ class SettingsDialog(QDialog):
         self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.CUSTOM_API_KEY)
         self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.CUSTOM_API_URL)
         self.widgets["translator"]["CUSTOM_API_MODEL"] = QLineEdit(self.settings.CUSTOM_API_MODEL)
-        self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["DEEPL_API_KEY.hint"])
-        self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["CUSTOM_API_KEY.hint"])
-        self.tabs.addTab(translation_tab, L["translator"])
+        self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["settings.translator.DEEPL_API_KEY.hint"])
+        self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["settings.translator.CUSTOM_API_KEY.hint"])
+        self.tabs.addTab(translation_tab, L["settings.translator"])
         
     def init_ui_settings_tab(self):        
         languages = L.get_available_languages()
@@ -233,15 +301,25 @@ class SettingsDialog(QDialog):
         self.widgets["UI"]["language"] = QComboBox()
         self.widgets["UI"]["language"].addItems(languages)
         self.widgets["UI"]["language"].setCurrentText(self.settings.language)
-        self.widgets["UI"]["fontSize"] = QSpinBox()
-        self.widgets["UI"]["fontSize"].setRange(8, 24)
-        self.widgets["UI"]["fontSize"].setValue(14)
+        self.widgets["UI"]["font_size"] = QSpinBox()
+        self.widgets["UI"]["font_size"].setRange(8, 24)
+        self.widgets["UI"]["font_size"].setValue(14)
         self.widgets["UI"]["dark_mode"] = QCheckBox()
         self.widgets["UI"]["dark_mode"].setChecked(self.settings.dark_mode)
-        self.tabs.addTab(ui_tab, L["UI"])
-        for layout_key, form_layout in self.layouts.items():
-            for k, widget in self.widgets[layout_key].items():
-                form_layout.addRow(L[k], widget)
+        self.tabs.addTab(ui_tab, L["settings.UI"])
+                
+    def init_workspace_settings_tab(self):
+        from engines import supported_engines
+        workspace_tab = QWidget()
+        self.layouts["workspace"] = QFormLayout(workspace_tab)
+        self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings.workspace.workspace_dir or "./", browse_type="dir")
+        self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.game_data_dir, browse_type="dir")
+        self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.workspace.output_dir, browse_type="dir")
+        self.widgets["workspace"]["engine"] = QComboBox()
+        self.widgets["workspace"]["engine"].addItems(supported_engines)
+        self.widgets["workspace"]["engine"].setCurrentText(self.settings.engine)
+        self.widgets["workspace"]["engine"].setCurrentText(self.settings.workspace.engine)
+        self.tabs.addTab(workspace_tab, L["settings.workspace"])
         
     def save_settings(self):
         """Update settings from the dialog inputs"""

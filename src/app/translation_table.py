@@ -518,13 +518,16 @@ class TranslationTabWidget(QTabWidget):
         if not self.tabs:            
             self.tab_exist_signal.emit(False)
         
-    def currentWidget(self) -> TranslationTableView:
+    def currentWidget(self) -> Optional[TranslationTableView]:
         widget = super().currentWidget()
-        assert isinstance(widget, TranslationTableView), "Current widget is not a TranslationTableView"
+        if not isinstance(widget, TranslationTableView):
+            logger.warning("Current widget is not a TranslationTableView: %s", type(widget))
+            return None
         return widget
     
     def currentModel(self) -> Optional[TranslationTableModel]:
-        current_widget = self.currentWidget()
+        if not (current_widget := self.currentWidget()):
+            return None
         model = current_widget.model()
         if not isinstance(model, TranslationTableModel):
             return None
@@ -572,7 +575,7 @@ class TranslationTabWidget(QTabWidget):
                 source_lang=settings.SOURCE_LANG,
                 target_lang=settings.TARGET_LANG
             )
-        save_dir = Path(settings.data_dir)
+        save_dir = Path(settings.user_dict_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
         dictionary.save(save_dir/file_path)
         

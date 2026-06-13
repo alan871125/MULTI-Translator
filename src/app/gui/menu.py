@@ -27,7 +27,12 @@ def initialize_menu(
         main: QMainWindow, menu_def: MenuDefinition, root_menu:QMenu|QMenuBar|None=None, root_menu_name:str='menu',
         tr: Callable[[str], str] = lambda x: x
     ) -> dict[str, QMenu|QAction]:
-        """Initialize menu and submenus from a *Flat* dictionary definition.
+        """Initialize menu and submenus from a *Flat* dictionary definition.  
+        
+        ## Speciall indicators in the menu_def
+            - key: "$n:MenuName" -> The menu item will be displayed as "MenuName" but the translation key will be based on the actual menu path. This is useful for items that need to display dynamic content like file paths.
+            - value: `QMenu` -> The menu item is a submenu placeholder, and will be initialized as an actual QMenu object. This is useful for defining the menu structure without needing to worry about the order of definitions.
+            - value: "$separator" -> The menu item will be a separator. This is useful for visually grouping related menu items together.
         
         Arguments:
             menu_def (Mapping[str, None | Callable | type[QMenu]]): 
@@ -73,6 +78,8 @@ def initialize_menu(
             if menu_path.parent == MenuPath('') and menu_path not in menus: # Top level action
                 if func is QMenu:
                     action = menus[menu_path] = root_menu.addMenu(display_name)
+                elif isinstance(func, str) and func == '$separator':
+                    action = menus[menu_path] = root_menu.addSeparator()
                 else:
                     action = menus[menu_path] = QAction(display_name, main)
                     root_menu.addAction(action)
@@ -88,9 +95,11 @@ def initialize_menu(
                         parent_menu = menus[path]
                 if func is QMenu:
                     action = menus[menu_path] = parent_menu.addMenu(display_name)
+                elif isinstance(func, str) and func == '$separator':
+                    action = menus[menu_path] = parent_menu.addSeparator()
                 else:
                     action = menus[menu_path] = QAction(display_name, main)
                     parent_menu.addAction(action)
-            if func is not None and func is not QMenu:
-                action.triggered.connect(cast(MenuCallback, func))
+            if func is not None and isinstance(func, Callable):
+                action.triggered.connect(func)
         return menus

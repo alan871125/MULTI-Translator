@@ -52,21 +52,17 @@ class Translator:
             provider=self.settings.API,
         )
     def get_supported_languages(self) -> list[Language]:
-        return get_supported_languages(self.settings)
+        return get_supported_languages(self.settings.API)
         
-def get_supported_languages(settings: TranslatorSettings, role:Optional[str] = None) -> list[Language]:
+def get_supported_languages(api:str, role:Optional[str] = None) -> list[Language]:
     """
     Get the list of supported languages from the translation provider based on the current settings.
 
     Arguments:
-        settings (TranslatorSettings): 
-            Required attributes:
-                * SOURCE_LANG (str)
-                * TARGET_LANG (str)
-                * API (str)
+        api (str): The translation provider to use.
         role (Optional[str]): `"source"` or `"target"`. Use `None` for both.
     """
-    if (translator := get_translator('auto', 'en', provider=settings.API)) is None:
+    if (translator := get_translator('auto', 'en', provider=api)) is None:
         return []
     elif role is None:
         return list(translator._languages.values())
