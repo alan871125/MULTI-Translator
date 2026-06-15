@@ -19,6 +19,7 @@
     "settings.workspace": "Workspace",
     "settings.workspace.workspace_dir": "Workspace Directory",
     "settings.workspace.game_data_dir": "Game Data Directory",
+    "settings.workspace.user_dict_dir": "User Dictionary Directory",
     "settings.workspace.output_dir": "Output Directory",
     "settings.workspace.engine": "Game Engine",
     
@@ -56,6 +57,7 @@
     "search_and_replace": "Search and Replace",
     "search": "Search",
     "replace": "Replace",
+    "browse": "Browse",
     "replace_all": "Replace All",
 
     "confirm_msg.share_translation": "Do you want to replace other identical entries with this translation?",

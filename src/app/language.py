@@ -31,9 +31,9 @@ class LanguagePack:
         elif (found := cls.lang_data.get("en", {}).get(key)) is not None:
             logger.warning(f"Untranslated key '{key}' in language '{cls.LANGUAGE}'. Falling back to English.")
             return found
-        # elif (key_last_part := key.split(".")[-1])!=key:
-        #     return cls.__getitem__(key_last_part)  # try fallback to last part of the key, e.g. "settings.startup" -> "startup"
-        logger.warning(f"Untranslated key '{key}' in language '{cls.LANGUAGE}' and English. Returning key as fallback.")
+        
+        langs = cls.LANGUAGE if cls.LANGUAGE == "en" else f"{cls.LANGUAGE} or en"
+        logger.warning(f"Untranslated key '{key}' in language {langs}. Returning key as fallback.")
         return key
 
     @classmethod
