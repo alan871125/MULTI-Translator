@@ -10,15 +10,16 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, 
     QPushButton, QMessageBox,
     QInputDialog, QDialog, QDialogButtonBox,
-    QMenu, QApplication, QShortcut, QComboBox, QAction,
+    QMenu, QShortcut, QComboBox, QAction,
 )
 
 from app.gui.theme import ThemeManager
-from app.translation_table import TranslationTableModel, TranslationTableView, TranslationTabWidget
+from app.translation_table import TranslationTableModel, TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings, SettingsDialog
 from .menu import initialize_menu
 from .search import SearchDialog
+from .components import TopBar, BottomPanel, RecentFilesMenu
 import engines
 
 logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
@@ -32,7 +33,6 @@ class TableFilters:
     original: str = ""
     translated: str = ""
     
-# Actors.json: name, nickname, profile
 class TranslationApp(QMainWindow):
     def __init__(self, settings: Settings):
         super().__init__()
@@ -43,26 +43,25 @@ class TranslationApp(QMainWindow):
         self.setWindowTitle("RPG Translator")
         self.setGeometry(100, 100, 800, 600)
         self.setAcceptDrops(True)
-        self.initUI()
+        self.init_ui()
         self.init_hotkeys()
         # 2. Register callbacks with setting signals
-        settings.workspace_changed.connect(self.refresh_top_bar)  # Connect engine change signal to refresh the top bar so that the selected engine is always in sync with settings
-        
+        self.settings.setting_changed.connect(self.lru_menu.refresh)  # Refresh recent files menu when settings change
         # 3. Post-initialization actions: Restore session
         if self.settings.restore_last_session:
-            self.restore_session()  # Attempt to restore previously open tabs if the setting is enabled
+            self.restore_session()
         
     def closeEvent(self, event):
         # save the current state of the application
         open_tabs = self.translation_table.tabs.keys()
-        self.settings.last_open_tabs = open_tabs  # Save the list of currently open tabs to
+        self.settings.last_open_tabs = open_tabs
         self.settings.last_open_workspace = self.settings.workspace_dir
-        self.settings.save()  # Save settings to persist the list of open tabs for the next session
+        self.settings.save()
         super().closeEvent(event)
     
     def restore_session(self):
         # Load previous workspace
-        self.settings.load_last_open_workspace()  # Load the last open workspace, which will also trigger a refresh of the top bar through signals
+        self.settings.load_last_open_workspace()
         # Load the previously open tabs from settings and attempt to restore them
         for file_path in self.settings.last_open_tabs:
             if Path(file_path).exists():
@@ -77,95 +76,56 @@ class TranslationApp(QMainWindow):
             return
         dialog = SearchDialog(self, filters=model.filters)
         dialog.replace_signal.connect(model.search_and_replace)  # Connect the replace signal to the model's replace method
-        dialog.replace_widget.setVisible(False)  # Hide the replace button since we're only using this for filtering
+        # Hide the replace button (hidden when only filtering)
+        dialog.replace_widget.setVisible(False)  
         dialog.exec_()
         filters = dialog.get_filters()
         # Apply the filters to the table model
         model.set_filters(filters)
         
-    def initUI(self):
+    def init_ui(self):
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
-        self.widgets = {}  # Dictionary to hold references to dynamically created widgets for easy access
-        top_layout, top_widgets = self.init_top_bar()
-        self.widgets.update(top_widgets)  # Store references to top bar widgets for later use
+        
+        # 1. Top Bar
+        self.top_bar = TopBar(self.settings, self)
+        self.top_bar.filter_clicked.connect(self.open_filter_menu)
+        self.top_bar.workspace_clicked.connect(self.load_workspace_dialog)
+        
+        # 2. Translation Table
         self.translation_table = TranslationTabWidget()
         self.translation_table.setTabsClosable(True)
         self.translation_table.tabCloseRequested.connect(self.translation_table.removeTab)
-        self.init_menu_bar() # Initialize the menu bar after creating the table and model, so that menu actions can interact with them
-        self.main_layout.addLayout(top_layout)
+
+        self.init_menu_bar()
+        
+        # 4. Bottom Panel
+        # self.bottom_panel = BottomPanel(L, self)
+        
+        self.main_layout.addWidget(self.top_bar)
         self.main_layout.addWidget(self.translation_table)
+        # self.main_layout.addWidget(self.bottom_panel)
         
     def init_menu_bar(self):
+        self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
         menu_def = {
             "file.load_game_file": self.load_game_file_dialog,
             "file.load_workspace": self.load_workspace_dialog,
             "file.new_workspace": self.load_workspace_dialog,
             "file.save_translation": self.translation_table.save_current_tab,
-            "file.recent_files": QMenu,  # Placeholder for recent files submenu
+            "file.recent_files": self.lru_menu,
             "file.save_game_file": self.save_game_file,
             "file.save_game_file_as": self.save_game_file_dialog,
             "settings": self.open_settings,
             "edit.undo": None,  # Placeholder for undo action
             "edit.redo": None,  # Placeholder for redo action
             "tools.chinese_conversion.chs2cht": self.translation_table.chs2cht_current_tab,
-            "tools.chinese_conversion.cht2chs": self.translation_table.cht2chs_current_tab,  # Placeholder for Chinese conversion tool
+            "tools.chinese_conversion.cht2chs": self.translation_table.cht2chs_current_tab,
         } 
-        # use `$n:` as a special prefix before file paths in the menu definition 
-        # to indicate that the menu item should use the file path as its name.
-        
-        menus = initialize_menu(self, menu_def, tr=L.__getitem__)
+        menus = initialize_menu(menu_def, self.menuBar(), root_menu_name="menu", tr=L.__getitem__)
         menus["file.save_translation"].setEnabled(False)  # Disable save translation action until a tab is loaded with a file
         self.translation_table.tab_exist_signal.connect(lambda exist: menus["file.save_translation"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
-        self.lru_menu = menus.get("file.recent_files")
-        self.refresh_recent_files_menu()  # Populate the recent files menu with the current list of recent files from settings
-    
-    def init_top_bar(self):
-        layout = QHBoxLayout()
-        widgets = {}
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        widgets['top.filter_button'] = QPushButton("Filter", self)
-        widgets['top.filter_button'].clicked.connect(self.open_filter_menu)
-        widgets['top.workspace_button'] = QPushButton(current_workspace, self)
-        widgets['top.workspace_button'].clicked.connect(self.load_workspace_dialog)
-        widgets['top.engine_select'] = QComboBox()
-        widgets['top.engine_select'].addItems(engines.supported_engines)
-        widgets['top.engine_select'].setCurrentText(self.settings.engine)
-        widgets['top.engine_select'].currentTextChanged.connect(lambda text: setattr(self.settings, 'engine', text))  # Update settings when engine selection changes
-        
-        for widget in widgets.values():
-            layout.addWidget(widget)
-        return layout, widgets
-    
-    def refresh_top_bar(self, *args, **kwargs):
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.widgets['top.workspace_button'].setText(current_workspace)
-        self.widgets['top.engine_select'].setCurrentText(self.settings.engine)
-        logger.debug('Top bar refreshed with current workspace and engine.')
-    
-    def init_bottom_tab(self):
-        """Includes the Dictionary and Fuzzy-matching suggestions for the current selected cell.
-        """
-        tab_widget = QTabWidget()
-        tab_widget.addTab(QWidget(), L["bottom_tab.dictionary"])
-        tab_widget.addTab(QWidget(), L["bottom_tab.fuzzy_suggestions"])
-        return tab_widget
-    
-    def refresh_recent_files_menu(self):
-        assert isinstance(self.lru_menu, QMenu), "Recent Files menu should be a QMenu instance."
-        self.lru_menu.clear()
-        lru_iter = self.settings.recent_files.iter(reverse=True)  # Show most recent files at the top
-        dir_def = {}# workspaces
-        file_def = {}  # individual files
-        for path in lru_iter:
-            if path.is_dir() or path.suffix == ".translation-workspace":
-                dir_def['$n:'+path.as_posix()] = lambda check,fp=path: self.settings.update_workspace(fp)
-            else:
-                file_def['$n:'+path.as_posix()]= lambda check,fp=path: self.load_game_file(fp)
-        # file_def = {f"{i}$n:{fp.as_posix()}": lambda check,fp=fp: self.load_game_file(fp) for i,fp in enumerate(lru_iter)}
-        recent_files_def = dir_def | {'$n:separator1':'$separator'}|file_def  # Merge directory and file definitions, directories will be listed before files
-        lru_menus = initialize_menu(self, menu_def = recent_files_def, root_menu=self.lru_menu, root_menu_name="file.recentFiles", tr=lambda x:x)  # Initialize an empty submenu for recent files
 
     def init_hotkeys(self):
         self.hotkeys = {
@@ -175,15 +135,14 @@ class TranslationApp(QMainWindow):
         self.hotkeys["save"].activated.connect(self.translation_table.save_current_tab)
         self.hotkeys["save"].setEnabled(False)  # Disable save hotkey until a tab with a loaded file exists
         self.hotkeys["search"].activated.connect(self.open_filter_menu)
-        self.translation_table.tab_exist_signal.connect(lambda exist:self.hotkeys["save"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
+        self.translation_table.tab_exist_signal.connect(lambda exist:self.hotkeys["save"].setEnabled(exist))
 
     def load_workspace_dialog(self):
         workspace_dir = QFileDialog.getExistingDirectory(self, L["FileDialoge.select_workspace_dir"], "")
         if workspace_dir:
-            self.settings.update_workspace(workspace_dir)  # Load the selected workspace using the settings manager, which will also update recent files and refresh the top bar through signals
+            self.settings.update_workspace(workspace_dir) # Load the selected workspace using the settings manager, which will also update recent files and refresh the top bar through signals
             
     def load_game_file_dialog(self):
-        # import supported file types from the selected engine
         extractor = engines.extractors[self.settings.engine]()
         supported_types = extractor.SUPPORTED_FILES_TYPES
         file_filters = ";;".join(f"{ft.upper()} Files (*{ft})" for ft in supported_types)+f";;All Files (*.*)"
@@ -193,7 +152,7 @@ class TranslationApp(QMainWindow):
         self.load_game_file(file_path)
         
     def load_game_file(self, file_path: str|Path):
-        file_path = Path(file_path).absolute()  # Normalize the file path
+        file_path = Path(file_path).absolute()
         try:
             extractor = engines.extractors[self.settings.engine]()
             # Create a new model for the translation tab, bound to the file and engine
@@ -224,8 +183,9 @@ class TranslationApp(QMainWindow):
         if not save_path:
             return  # User cancelled the save dialog
         try:
-            model.save_to_game_file(save_path=save_path)  # Save the current tab's translations back to a game file using the bound engine's apply_translations method
-            self.statusBar().showMessage(L["statusBar.saved_success"], 3000)  # Optional: show a success message in status bar
+            model.save_to_game_file(save_path=save_path)
+            self.statusBar().showMessage(L["statusBar.saved_success"], 3000)
+            # TODO: Implement the status bar
         except Exception as e:
             logger.exception(f"Failed to save game file: {e}")
             QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
@@ -234,25 +194,21 @@ class TranslationApp(QMainWindow):
         if (model := self.translation_table.currentModel()) is None:
             logger.warning("No active translation tab to save.")
             return
-            
         try:
             model.save_to_game_file()
-            # Optional: show a success message in status bar
+            # TODO: Implement the status bar
             self.statusBar().showMessage(L["statusBar.saved_success"], 3000)
         except Exception as e:
             logger.exception(f"Failed to save game file: {e}")
             QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
-        
         
     def open_settings(self):
         """Open settings dialog"""
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec_()== QDialog.Accepted:
             dialog.save_settings()
-            L.set_language(self.settings.language) #TODO: optimize by only reloading translations if language actually changed
-            # TODO: update UI language immediately without needing to restart the app. This requires all UI text to be retrieved from LanguagePack with the current language, and emitting signals to update text when language changes.
+            L.set_language(self.settings.language)
             logger.debug("Settings saved")
-            # Persist and apply theme immediately
             try:
                 self.settings.save()
             except Exception:
@@ -260,8 +216,4 @@ class TranslationApp(QMainWindow):
             ThemeManager().set_theme(dark = self.settings.dark_mode)
         else:
             logger.debug("Settings dialog cancelled")
-    
-    def on_settings_changed(self, setting_name: str):
-        """Handle changes to settings that require immediate UI updates."""
-        if setting_name == "recent_files":
-            self.refresh_recent_files_menu()  # Refresh recent files menu if the recent files list has changed
+

@@ -24,7 +24,7 @@ class MenuPath(str):
         return MenuPath(f"{self}{self.separator}{other}", separator=self.separator)
 
 def initialize_menu(
-        main: QMainWindow, menu_def: MenuDefinition, root_menu:QMenu|QMenuBar|None=None, root_menu_name:str='menu',
+        menu_def: MenuDefinition, root_menu:QMenu|QMenuBar, root_menu_name:str='menu',
         tr: Callable[[str], str] = lambda x: x
     ) -> dict[str, QMenu|QAction]:
         """Initialize menu and submenus from a *Flat* dictionary definition.  
@@ -39,9 +39,8 @@ def initialize_menu(
                 A flat dictionary where keys are menu item names.
                 Values are either None for placeholders, callables for actions,
                 or QMenu for submenu placeholders.
-            root_menu (QMenu, optional):
-                The parent menu to which the defined menu items will be added.
-                If None, the menu items will be added to the main window's menu bar.
+            root_menu (QMenu | QMenuBar):
+                The parent menu or menu bar to which the defined menu items will be added.
             root_menu_name (str, optional):
                 The base name for translation keys for the menu items. Default is 'menu'.
         Example:
@@ -64,10 +63,8 @@ def initialize_menu(
             dict[str, QMenu|QAction]: A `flat` dictionary mapping menu item names to their corresponding QMenu or QAction objects for further manipulation if needed.
         """
         root_menu_name = MenuPath(root_menu_name)
-        if root_menu is None:
-            root_menu = main.menuBar()
         menus = {}
-        for menu_path, func in menu_def.items():
+        for menu_path, menu_item in menu_def.items():
             splits = menu_path.split('$n:')
             if len(splits) == 2:
                 menu_path, display_name = splits
@@ -76,12 +73,12 @@ def initialize_menu(
             
             menu_path = MenuPath(menu_path)
             if menu_path.parent == MenuPath('') and menu_path not in menus: # Top level action
-                if func is QMenu:
+                if menu_item is QMenu:
                     action = menus[menu_path] = root_menu.addMenu(display_name)
-                elif isinstance(func, str) and func == '$separator':
+                elif isinstance(menu_item, str) and menu_item == '$separator':
                     action = menus[menu_path] = root_menu.addSeparator()
                 else:
-                    action = menus[menu_path] = QAction(display_name, main)
+                    action = menus[menu_path] = QAction(display_name, root_menu)
                     root_menu.addAction(action)
             else:
                 path = MenuPath('')
@@ -93,13 +90,15 @@ def initialize_menu(
                         parent_menu = menus[path] = parent_menu.addMenu(tr(root_menu_name/path))
                     else:
                         parent_menu = menus[path]
-                if func is QMenu:
+                if menu_item is QMenu:
                     action = menus[menu_path] = parent_menu.addMenu(display_name)
-                elif isinstance(func, str) and func == '$separator':
+                elif isinstance(menu_item, QMenu):
+                    action = menus[menu_path] = parent_menu.addMenu(menu_item)
+                elif isinstance(menu_item, str) and menu_item == '$separator':
                     action = menus[menu_path] = parent_menu.addSeparator()
                 else:
-                    action = menus[menu_path] = QAction(display_name, main)
+                    action = menus[menu_path] = QAction(display_name, parent_menu)
                     parent_menu.addAction(action)
-            if func is not None and isinstance(func, Callable):
-                action.triggered.connect(func)
+            if menu_item is not None and isinstance(menu_item, Callable):
+                action.triggered.connect(menu_item)
         return menus
