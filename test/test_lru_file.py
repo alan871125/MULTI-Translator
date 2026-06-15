@@ -53,18 +53,18 @@ class TestLRUFiles:
         assert [node.as_posix() for node in lru.iter()] == file_list
     
     def test_settings_integration(self):
-        from app.settings import Settings
+        from app.settings import SettingsData
         
         # 1. Test that when loading settings with recent files being empty, it initializes correctly
-        settings = Settings.from_dict({"_recent_files": []})
-        (lru:=settings._recent_files).add_recent_file("file1.txt")
+        settings = SettingsData.from_dict({"recent_files": []})
+        (lru:=settings.recent_files).add_recent_file("file1.txt")
         lru.add_recent_file("file1.txt")
         assert ((lru.head is not None and lru.tail is not None) and 
                 lru.head.as_posix() == lru.tail.as_posix() == "file1.txt"), "After adding the first file, head and tail should point to the same file."
         
         # 2. Test that when loading settings with recent files, it initializes correctly
-        settings = Settings.from_dict({'_recent_files': ["file1.txt", "file2.txt", "file3.txt"]})
-        (lru:=settings._recent_files).add_recent_file("file1.txt")
+        settings = SettingsData.from_dict({'recent_files': ["file1.txt", "file2.txt", "file3.txt"]})
+        (lru:=settings.recent_files).add_recent_file("file1.txt")
         assert lru.to_list() == ["file2.txt", "file3.txt", "file1.txt"], "After accessing file1.txt, it should move to the end of the list."
         lru.add_recent_file("file2.txt")
         lru.add_recent_file("file3.txt")
