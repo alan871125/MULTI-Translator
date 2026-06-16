@@ -1,12 +1,11 @@
 pyqt5==5.15.11
 pyqt5-qt5==5.15.2
 pyqt5-sip==12.17.0
-pyqt5-stubs==5.15.6.0
-pytest==9.0.3
 pandas
 opencc
 openai==2.41
 dotenv
 rapidfuzz==3.14.5
+lxml==6.1.1
 deep-translator @ git+https://github.com/alan871125/deep-translator.git@master
 iod @ https://github.com/alan871125/IndexedOrderedDict/releases/download/0.1.1/iod-0.1.1-cp39-abi3-win_amd64.whl

@@ -1,0 +1,5 @@
+-r requirements.txt
+pyqt5-stubs==5.15.6.0
+lxml-stubs==0.5.1
+pytest
+ipykernel
