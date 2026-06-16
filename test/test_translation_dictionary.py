@@ -6,18 +6,18 @@ from core.json_path import JsonPath
 from core.translation.dictionary import TranslationDictionary, TranslationDictionaryLong, format2regex
 
 csv_data_wide = """
-file,id,attribute,original,en,en.level,zh-tw,zh-tw.level,json_path
-Actors,1,name,Victor,Victor,1,維克多,3,"[1,""name""]"
-Actors,2,nickname,Vic, Vic,1,維克,2,"[1,""nickname""]"
-Actors,3,name,Anna,Anna,1,安娜,3,"[2,""name""]"
-Actors,4,name,John,John,1,約翰,3,"[3,""name""]"
+file,original,en,en.level,zh-tw,zh-tw.level,key
+Actors,Victor,Victor,1,維克多,3,"[1,""name""]"
+Actors,Vic, Vic,1,維克,2,"[1,""nickname""]"
+Actors,Anna,1,安娜,3,"[2,""name""]"
+Actors,John,1,約翰,3,"[3,""name""]"
 """
 csv_data_long = """
-file,id,attribute,original,translation,level,json_path
-Actors,1,name,Victor,維克多,1,"[1,""name""]"
-Actors,2,nickname,Vic, 維克,1,"[1,""nickname""]"
-Actors,3,name,Anna,安娜,1,"[2,""name""]"
-Actors,4,name,John,約翰,1,"[3,""name""]"
+file,original,translation,level,key
+Actors,Victor,維克多,1,"[1,""name""]"
+Actors,Vic, 維克,1,"[1,""nickname""]"
+Actors,Anna,安娜,1,"[2,""name""]"
+Actors,John,約翰,1,"[3,""name""]"
 """
 class TestTranslationDictionary:
     def test_translation_dictionary_init(self):
@@ -27,9 +27,9 @@ class TestTranslationDictionary:
         assert dictionary.target_lang == "zh-tw"
         assert set(dictionary.languages) == {"en", "zh-tw"}
         en_df = dictionary["en"]
-        assert list(en_df.columns) == ["file", "json_path", "attribute", "original", "en", "en.level"]
+        assert list(en_df.columns) == TranslationDictionary.REQUIRED_COLUMNS + ["en", "en.level"]
         zh_tw_df = dictionary["zh-tw"]
-        assert list(zh_tw_df.columns) == ["file", "json_path", "attribute", "original", "zh-tw", "zh-tw.level"]
+        assert list(zh_tw_df.columns) == TranslationDictionary.REQUIRED_COLUMNS + ["zh-tw", "zh-tw.level"]
 
 class TestSaveLoadDictionaryLong():
     def test_format2regex(self):
@@ -48,12 +48,12 @@ class TestSaveLoadDictionaryLong():
 
     def test_save_load_json_path(self):
         test_df = pd.DataFrame({
-            "json_path": [JsonPath.from_list(["key1", "key2",1,"1"]), JsonPath.from_list(["key3", "key4",2,"2"])]
+            "key": [JsonPath(["key1", "key2",1,"1"]), JsonPath(["key3", "key4",2,"2"])]
         })
         # Simulate saving to CSV and loading back
         test_df.to_csv("test_json_path_en_en.csv", index=False)
         dictionary = TranslationDictionaryLong("test_json_path_en_en.csv")
-        assert dictionary.df["json_path"].iloc[0].to_list() == ["key1", "key2",1,"1"], f"Expected: ['key1', 'key2',1,'1'], Got: {dictionary.df['json_path'].iloc[0].to_list()}"
+        assert dictionary.df["key"].iloc[0].parts == ["key1", "key2",1,"1"], f"Expected: ['key1', 'key2',1,'1'], Got: {dictionary.df['json_path'].iloc[0].parts}"
         # delete the test file after the test
         import os
         os.remove("test_json_path_en_en.csv")

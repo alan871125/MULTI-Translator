@@ -48,7 +48,15 @@
     "right_click.reset_translation": "Reset Translation",
     "right_click.copy_original": "Copy Original Text",
 
+    "button.untranslated.tooltip": "Show untranslated entries",
+    "button.heuristic.tooltip": "Show heuristic translated entries",
+    "button.partial.tooltip": "Show partially translated entries",
+    "button.dictionary.tooltip": "Show dictionary translated entries",
+    "button.api.tooltip": "Show API translated entries",
+    "button.verified.tooltip": "Show verified entries",
+
     "file": "File",
+    "key": "KEY",
     "id": "ID",
     "attribute": "Attribute",
     "original": "Original",

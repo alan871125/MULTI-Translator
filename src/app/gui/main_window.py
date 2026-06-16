@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 )
 
 from app.gui.theme import ThemeManager
+from app.gui.search import TableFilters
 from app.translation_table import TranslationTableModel, TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings, SettingsDialog
@@ -26,12 +27,6 @@ logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
-@dataclass
-class TableFilters:
-    file: str = ""
-    attribute: str = ""
-    original: str = ""
-    translated: str = ""
     
 class TranslationApp(QMainWindow):
     def __init__(self, settings: Settings):
@@ -39,14 +34,17 @@ class TranslationApp(QMainWindow):
         self.settings = settings
         L.set_language(self.settings.language)
         ThemeManager().set_theme(dark = settings.dark_mode) # Apply theme based on settings at startup
+        # 0. Initialize shared object
+        self.filter_manager = TableFilters()  # Create a shared TableFilters instance that can be accessed by all components that need it
         # 1. Inintialize UI
         self.setWindowTitle("RPG Translator")
         self.setGeometry(100, 100, 800, 600)
         self.setAcceptDrops(True)
         self.init_ui()
         self.init_hotkeys()
-        # 2. Register callbacks with setting signals
+        # 2. Register callbacks
         self.settings.setting_changed.connect(self.lru_menu.refresh)  # Refresh recent files menu when settings change
+        
         # 3. Post-initialization actions: Restore session
         if self.settings.restore_last_session:
             self.restore_session()
@@ -74,14 +72,13 @@ class TranslationApp(QMainWindow):
         if (model := self.translation_table.currentModel()) is None:
             logger.warning("No active translation tab to apply filters to.")
             return
-        dialog = SearchDialog(self, filters=model.filters)
+        dialog = SearchDialog(self.filter_manager, self)
         dialog.replace_signal.connect(model.search_and_replace)  # Connect the replace signal to the model's replace method
         # Hide the replace button (hidden when only filtering)
         dialog.replace_widget.setVisible(False)  
         dialog.exec_()
-        filters = dialog.get_filters()
         # Apply the filters to the table model
-        model.set_filters(filters)
+        dialog.set_filters()
         
     def init_ui(self):
         self.central_widget = QWidget(self)
@@ -89,12 +86,12 @@ class TranslationApp(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)
         
         # 1. Top Bar
-        self.top_bar = TopBar(self.settings, self)
+        self.top_bar = TopBar(self.settings, self.filter_manager)
         self.top_bar.filter_clicked.connect(self.open_filter_menu)
         self.top_bar.workspace_clicked.connect(self.load_workspace_dialog)
         
         # 2. Translation Table
-        self.translation_table = TranslationTabWidget()
+        self.translation_table = TranslationTabWidget(self.filter_manager)
         self.translation_table.setTabsClosable(True)
         self.translation_table.tabCloseRequested.connect(self.translation_table.removeTab)
 
@@ -156,7 +153,7 @@ class TranslationApp(QMainWindow):
         try:
             extractor = engines.extractors[self.settings.engine]()
             # Create a new model for the translation tab, bound to the file and engine
-            model = TranslationTableModel(file_path=file_path, engine=extractor) 
+            model = TranslationTableModel(filters=self.filter_manager, file_path=file_path, engine=extractor)
             tab = self.translation_table.add_translation_tab(file_path.as_posix(), model=model)
             
             # Load units from the file using the bound engine

@@ -26,7 +26,7 @@ class TranslationDictionary:
     # original: the original text in the source language (for reference)
     # {lang}: the translated text in the target language
     # {lang}.level: the translation level. see TranslationLevel for more details.
-    REQUIRED_COLUMNS = ["file", "json_path","attribute", "original"]
+    REQUIRED_COLUMNS = ["file", "key", "original"]
     def __init__(self, df: pd.DataFrame, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
         assert all(col in df.columns for col in self.REQUIRED_COLUMNS), f"DataFrame must contain the following columns: {self.REQUIRED_COLUMNS}"
         self.df = df.copy()
@@ -49,11 +49,11 @@ class TranslationDictionary:
         if lang not in self.languages:
             logger.warning(f"Language '{lang}' not found in the dictionary. Available languages: {self.languages}")
             return None
-        return self.df[["file", "json_path", "attribute", "original", lang, f"{lang}.level"]]
+        return self.df[self.REQUIRED_COLUMNS+[lang, f"{lang}.level"]]
     
     def __getitem__(self, lang: str) -> pd.DataFrame:
         """Returns a DataFrame with columns: file, json_path, attribute, original, {lang}, {lang}.level"""
-        return self.df[["file", "json_path", "attribute", "original", lang, f"{lang}.level"]]
+        return self.df[self.REQUIRED_COLUMNS+[lang, f"{lang}.level"]]
         
     def save(self, file_path: str|Path):
         """Saves the dictionary to a CSV file."""
@@ -66,7 +66,7 @@ class TranslationDictionary:
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-        df = pd.read_csv(file_path, converters={"json_path": JsonPath})
+        df = pd.read_csv(file_path, converters={"key": JsonPath})
         return cls(df=df, source_lang=source_lang, target_lang=target_lang)
 
 class TranslationDictionaryLong:
@@ -121,7 +121,7 @@ class TranslationDictionaryLong:
         self.source_lang = match.group("source_lang")
         self.target_lang = match.group("target_lang")
         # Load the CSV file into a DataFrame
-        self.df:pd.DataFrame = pd.read_csv(file_path, converters={"json_path": JsonPath})
+        self.df:pd.DataFrame = pd.read_csv(file_path, converters={"key": JsonPath})
         
     def save_csv(self, file_path: str|Path, use_convention: bool = False):
         """Saves the current translation table to a CSV file.

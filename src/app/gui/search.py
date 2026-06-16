@@ -1,24 +1,26 @@
 import json
 import logging
 import PyQt5.QtWidgets as qt
-from typing import cast
+from typing import overload, Literal
 from pathlib import Path
 from dataclasses import dataclass, asdict, field
-from app.gui.theme import ThemeManager
-from app.translation_table import TranslationTableModel
+
+import pandas as pd
 from deep_translator import GoogleTranslator
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtGui import QDropEvent, QCursor, QIcon
 from PyQt5.QtWidgets import QAction, QLineEdit, QTableWidget, QDialogButtonBox
 
 from app.language import LanguagePack
+from core.translation import TranslationLevel
+from .filters import ColumnFilter, TableFilters
 
 logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 L = LanguagePack()
-    
+
 class SearchLineEdit(qt.QLineEdit):
     padding=1
     def __init__(self, parent=None):
@@ -56,9 +58,9 @@ class SearchLineEdit(qt.QLineEdit):
 class SearchDialog(qt.QDialog):
     # Note: suppose the replace uses regex if the search does.
     replace_signal = pyqtSignal(dict, str, str)  # filters, replace_text, column
-    def __init__(self, parent=None, filters=None):
+    def __init__(self, filters:TableFilters, parent=None):
         super().__init__(parent)
-        filters = filters or {}
+        self.filters = filters
         self.setWindowTitle(L["search_and_replace"])
         self.resize(400, 100)
         
@@ -84,6 +86,7 @@ class SearchDialog(qt.QDialog):
         self.fold_button.setSizePolicy(qt.QSizePolicy.Policy.Fixed, qt.QSizePolicy.Policy.Expanding)
         self.fold_button.setMinimumWidth(28)
         self.fold_button.setMaximumWidth(28)
+        #TODO: move to theme
         self.fold_button.setStyleSheet("""
             QToolButton {
                 background: transparent;
@@ -111,14 +114,16 @@ class SearchDialog(qt.QDialog):
             box_layout.setContentsMargins(5, 2, 5, 2)
             box_layout.setSpacing(4)
             
-            filter_data = filters.get(col, {})
-            initial_text = filter_data.get("text", "") if isinstance(filter_data, dict) else (str(filter_data) if filter_data else "")
+            if (filter_data := self.filters.get(col)) is not None:
+                initial_text = filter_data.text
+            else:
+                initial_text = ""
             
             entry = SearchLineEdit(self)
             entry.setFrame(False)
             entry.setText(initial_text)
             box_layout.addWidget(entry)
-
+            #TODO: move to theme?
             search_box.setStyleSheet("""
                 QWidget#SearchBox {
                     background: white;
@@ -256,14 +261,26 @@ class SearchDialog(qt.QDialog):
             controls["regex_btn"].setChecked(False)
             controls["regex_btn"].setText("🔎") # Force reset the icon text too
 
-    def get_filters(self):
-        filters = {}
+    def set_filters(self):
+        filters = []
+        for col, controls in self.filter_entries.items():
+            if not (text := controls["entry"].text().strip()):
+                continue
+            filters.append(ColumnFilter(
+                col, text, 
+                controls["regex_btn"].isChecked(), 
+                controls["case_btn"].isChecked()
+            ))
+        self.filters.set_filters(filters) # emits signal only once
+        
+    def get_filters(self) -> list[ColumnFilter]:
+        filters = []
         for col, controls in self.filter_entries.items():
             text = controls["entry"].text().strip()
             is_regex = controls["regex_btn"].isChecked()
             match_case = controls["case_btn"].isChecked()
             if text:
-                filters[col] = {"text": text, "is_regex": is_regex, "match_case": match_case}
+                filters.append(ColumnFilter(col, text, is_regex, match_case))
         return filters
     
     def on_replace(self):

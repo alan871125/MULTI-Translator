@@ -7,6 +7,8 @@ from utils import walk_json
 
 class SimpleJsonExtractor:
     SUPPORTED_FILES_TYPES = ['.json']
+    key = 'json_path'
+    columns = ['file','key','original','translation']
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
         stem = path.stem
@@ -17,11 +19,9 @@ class SimpleJsonExtractor:
             if isinstance(value, str) and value.strip():
                 out.append(TextUnit(
                     file=path.stem,
-                    id="-",  # No specific ID for simple JSON, using a placeholder
-                    attribute="-",  # No specific attribute, using a placeholder
+                    key=JsonPath(json_path),
                     original=value,
                     translation=value, # Initialize translation with original text for easier editing in the table
-                    json_path=JsonPath.from_list(json_path)
                 ))
         return out
     
@@ -36,8 +36,8 @@ class SimpleJsonExtractor:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         for text_unit in text_units:
-            if text_unit.json_path and text_unit.translation != text_unit.original:
-                apply_json_path(data, text_unit.json_path, text_unit.translation)
+            if text_unit.key and text_unit.translation != text_unit.original:
+                apply_json_path(data, text_unit.key, text_unit.translation)
         if save_path:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=kwargs.get("indent", 4))

@@ -1,13 +1,13 @@
 import pandas as pd
 import logging
 from pathlib import Path
-from typing import Iterable, Literal, Optional, Any, cast
+from typing import Iterable, Literal, Optional, Any, cast, override
 
-from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QAbstractTableModel
+from PyQt5.QtCore import Qt, pyqtSignal, QObject, QModelIndex, QAbstractTableModel
 from PyQt5.QtGui import QColor, QKeySequence
 from PyQt5.QtWidgets import (
-    QFileDialog, QMessageBox, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
-    QInputDialog, QMenu, QApplication, QUndoCommand, QUndoStack
+    QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
+    QInputDialog, QMenu, QApplication, QUndoCommand, QUndoStack, QWidget
 )
 from iod import IndexedOrderedDict
 from config import settings
@@ -16,24 +16,27 @@ from core.translation import TranslationLevel, TranslationDictionary, Translator
 from engines._base import BaseExtractor
 from .language import LanguagePack
 from .gui.theme import ThemeManager
+from .gui.search import TableFilters
 
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
 class TranslationTableModel(QAbstractTableModel):
-    _columns = ["file", "id", "attribute", "original", "translation"]
-    _HIDDEN_COLUMNS = ["json_path", "level"]  # Columns that are not displayed but used for internal logic, such as translation level
+    _COLUMNS = ["file", "key", "original", "translation"]
+    _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
     # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
-    def __init__(self, data=None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None):
+    def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
-        self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._columns+self._HIDDEN_COLUMNS)
+        self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS)
         self._filtered_df = None
-        self.filters = {}
         self._mask_indexes = None
-        # self._ensure_level_defaults()
+        self.filters = filters if filters is not None else TableFilters()
+        self.filters.text_filter_changed.connect(self.on_filter_changed)
+        self.filters.level_filter_changed.connect(self.on_filter_changed)
 
+        
     def _level_from_value(self, value):
         if isinstance(value, TranslationLevel):
             return value
@@ -41,20 +44,20 @@ class TranslationTableModel(QAbstractTableModel):
             return TranslationLevel.UNTRANSLATED
         return TranslationLevel(value)
 
+    @override
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole:
             return None
         if orientation == Qt.Horizontal:
-            if 0 <= section < len(self._columns):
-                return L[self._columns[section]]
+            if 0 <= section < len(self._COLUMNS):
+                return L[self._COLUMNS[section]]
         return section + 1
     
     def load_units(self, units: list[TextUnit]):
         """Load a list of TextUnit objects(dataclass), and convert them into the internal DataFrame format for the model."""
-        data = pd.DataFrame(units, columns=self._columns+self._HIDDEN_COLUMNS)
+        data = pd.DataFrame(units, columns=self._COLUMNS+self._HIDDEN_COLUMNS)
         
         self.df = pd.concat([self.df, data], ignore_index=True)
-        self.set_filters(self.filters)  # Re-apply filters to include new data
 
     def get_units(self) -> list[TextUnit]:
         """Convert the internal DataFrame back into a list of TextUnit objects."""
@@ -80,42 +83,14 @@ class TranslationTableModel(QAbstractTableModel):
         units = self.get_units()
         self.engine.apply_translations(self.file_path, units, save_path=save_path)
         logger.info(f"Saved translations to {save_path}")
-
-    def set_filters(self, filters):
-        # filters: dict of {column: {"text": str, "is_regex": bool}}
-        self.filters = filters or {}
-        # clear cached filtered data so it will be recalculated
-        self._mask_indexes = None
-        self.layoutChanged.emit()
-
+    
+    @override
     def rowCount(self, parent=QModelIndex()):
         return len(self.filtered_df)
-    
+    @override
     def columnCount(self, parent=QModelIndex()):
-        return len(self._columns)
-
-    def build_mask(self, filters):
-        # Build boolean mask for all filters (case-insensitive substring match)
-        mask = pd.Series([True] * len(self.df), index=self.df.index)
-        for col, filterdf in filters.items():
-            if col not in self.df.columns:
-                continue
-            text = filterdf.get("text", "")
-            is_regex = filterdf.get("is_regex", False)
-            # ensure strings and perform case-insensitive substring match
-            mask &= self.df[col].astype(str).str.contains(text, case=False, regex=is_regex, na=False)
-        self._mask_indexes = mask[mask].index
-        return mask
-        
-    @property
-    def filtered_df(self):
-        if not self.filters:
-            return self.df
-        if self._mask_indexes is not None:
-            return self.df.loc[self._mask_indexes].reset_index(drop=True)
-        mask = self.build_mask(self.filters)
-        return self.df[mask].reset_index(drop=True)
-
+        return len(self._COLUMNS)
+    @override
     def data(self, index, role=Qt.DisplayRole):
         theme = ThemeManager.theme
         
@@ -135,25 +110,95 @@ class TranslationTableModel(QAbstractTableModel):
         if role in (Qt.DisplayRole, Qt.EditRole):
             if r < 0 or r >= len(self.filtered_df):
                 return None
-            if c < 0 or c >= len(self._columns):
+            if c < 0 or c >= len(self._COLUMNS):
                 return None
             row = self.filtered_df.iloc[r]
-            col = self._columns[c]
+            col = self._COLUMNS[c]
+            if col =='key':
+                return str(row.get(col, ""))
             return row.get(col, "")
         return None
-
-    def flags(self, index):
+    
+    @override
+    def setData(self, index, value, role=Qt.EditRole):
+        # Support inline editing from the view for the Translation column
+        if role != Qt.EditRole or not index.isValid():
+            return False
+        row = index.row()
+        col = index.column()
+        try:
+            col_name = self._COLUMNS[col]
+        except Exception:
+            return False
+        if col_name != "translation":
+            return False
+        text = str(value)
+        # locate original value from filtered data
+        if row < 0 or row >= len(self.filtered_df):
+            return False
+        original = self.filtered_df.iloc[row].get("original")
+        if original is None:
+            return False
+        idx = self.get_true_indexes([row])
+        self.set_translations(idx, [text], levels=TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED)
+        
+        return True
+    @override
+    def flags(self, index): 
         if not index.isValid():
             return Qt.ItemIsEnabled
         # make items selectable and enabled; only the Translation column is editable
         col = index.column()
         flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
         try:
-            if self._columns[col] == "translation":
+            if self._COLUMNS[col] == "translation":
                 flags |= Qt.ItemIsEditable
         except Exception:
             pass
         return flags
+    
+    # def set_filters(self, filters: dict):
+    #     """
+    #     Example:
+    #     ```
+    #         filters = {
+    #             "original": {"text": "Start Game", "is_regex": False},
+    #         }
+    #     ```
+    #     """        
+    #     self.filters = filters or {}
+    #     # clear cached filtered data so it will be recalculated
+    #     self._mask_indexes = None
+    #     self.layoutChanged.emit()
+    
+    # ----- Filtering -----
+    def on_filter_changed(self):
+        self.beginResetModel()
+        self._mask_indexes = None
+        self._filtered_df = None
+        self.endResetModel()
+        
+    @property
+    def filter_mask(self) -> pd.Series:
+        if self._mask_indexes is not None:
+            mask = pd.Series([False] * len(self.df), index=self.df.index)
+            mask[self._mask_indexes] = True
+        else:
+            mask=self.filters.build_mask(self.df)
+            self._mask_indexes = mask[mask].index
+        return mask
+        
+    @property
+    def filtered_df(self) -> pd.DataFrame:
+        if not self.filters.is_filtering:
+            return self.df
+        
+        if self._filtered_df is not None:
+            return self._filtered_df
+            
+        mask = self.filter_mask
+        self._filtered_df = self.df[mask].reset_index(drop=True)
+        return self._filtered_df
     
     def get_true_indexes(self, indexes: Iterable[int]) -> pd.Index:
         """Convert filtered row indexes to true indexes in the original data. 
@@ -200,11 +245,13 @@ class TranslationTableModel(QAbstractTableModel):
             translations = pd.Series(list(translations), index=idxs)
         self.df.loc[idxs, "translation"] = translations  
         if levels is None:
-            return True
+            pass
         elif isinstance(levels, TranslationLevel):
             self.df.loc[idxs, "level"] = levels
         elif isinstance(levels, Iterable):
             self.df.loc[idxs, "level"] = pd.Series(levels, index=idxs)
+        
+        self._filtered_df = None # Invalidate cache
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return True
         
@@ -217,7 +264,7 @@ class TranslationTableModel(QAbstractTableModel):
         """
         if column not in self.df.columns:
             return 0
-        mask = self.build_mask(filters)
+        mask = self.filter_mask
         if not mask.any():
             return 0
         if column == "original":
@@ -230,40 +277,15 @@ class TranslationTableModel(QAbstractTableModel):
         self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
             _filter.get("text", ""), replace_text, regex=_filter.get("is_regex", False),
         )
+        self._filtered_df = None # Invalidate cache
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return mask.sum()
-        
-    def setData(self, index, value, role=Qt.EditRole):
-        # Support inline editing from the view for the Translation column
-        if role != Qt.EditRole or not index.isValid():
-            return False
-        row = index.row()
-        col = index.column()
-        try:
-            col_name = self._columns[col]
-        except Exception:
-            return False
-        if col_name != "translation":
-            return False
-        text = str(value)
-        # locate original value from filtered data
-        if row < 0 or row >= len(self.filtered_df):
-            return False
-        original = self.filtered_df.iloc[row].get("original")
-        if original is None:
-            return False
-        idx = self.get_true_indexes([row])
-        self.set_translations(idx, [text], levels=TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED)
-        
-        return True
     
     def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None):
         """Apply translations from the specified dictionary to the model."""
         if keys is None:
-            keys = ["json_path", "original"]
-        
+            keys = ["key"]
         # We need to be careful with set_index if keys are not unique.
-        
         # Create copies to avoid modifying original dataframes directly until ready
         df_copy = self.df.set_index(keys)
         if (dict_df := dictionary.get(settings.TARGET_LANG)) is None:
@@ -284,21 +306,26 @@ class TranslationTableModel(QAbstractTableModel):
         self.df.loc[mask, "level"] = dict_df.loc[mask, f"{settings.TARGET_LANG}.level"]
         self.df.reset_index(inplace=True)
         
+        self._filtered_df = None # Invalidate cache
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         
     def chs2cht(self):
         """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
-        filtered = self.filtered_df
-        if filtered.empty:
+        mask = self.filter_mask
+        if not mask.any():
             return 
-        filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='tw')
+        self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target='tw')
+        self._filtered_df = None
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         
     def cht2chs(self):
-        """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
-        filtered = self.filtered_df
-        if filtered.empty:
+        """Convert all Chinese translations from Traditional to Simplified using OpenCC."""
+        mask = self.filter_mask
+        if not mask.any():
             return
-        filtered["translation"] = batch_chinese_convertion(filtered["translation"], target='s')
+        self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target='s')
+        self._filtered_df = None
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
     
     def is_same_original_exists(self, idxes: pd.Index|list[int]|int, is_filtered: bool = True) -> bool:
         """Checks if there are any other text units with the same original text as the given indexes. 
@@ -335,7 +362,7 @@ class TranslationTableModel(QAbstractTableModel):
         return pd.Index(out.values)
 
 class TranslationTableView(QTableView):
-    _COLWIDTHS = [60, 20, 80, 500, 500]
+    _COLWIDTHS = [60, 80, 500, 500]
     def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
@@ -348,7 +375,7 @@ class TranslationTableView(QTableView):
         # allow inline editing via double-click or edit key
         self.setEditTriggers(
             QAbstractItemView.DoubleClicked | 
-            QAbstractItemView.EditKeyPressed | # F2
+            # QAbstractItemView.EditKeyPressed | # F2 conflicts with level setting hotkeys.
             QAbstractItemView.SelectedClicked  #
         ) 
         self.translator = Translator(settings)
@@ -363,7 +390,15 @@ class TranslationTableView(QTableView):
         self.redo_action.setShortcuts(QKeySequence.Redo)   # Ctrl+Y / Cmd+Shift+Z
         self.addAction(self.undo_action)
         self.addAction(self.redo_action)
-        
+        self.init_hotkeys()
+    
+    def init_hotkeys(self):
+        # F1~F6 to set translation level for selected rows
+        for i, level in enumerate(TranslationLevel, start=1):
+            hotkey = QShortcut(QKeySequence(f"F{i}"), self)
+            hotkey.activated.connect(lambda lvl=level: self.set_selection_level(lvl))
+    
+    @override
     def setModel(self, model):
         super().setModel(model)
         self.set_column_widths(self._COLWIDTHS)
@@ -371,9 +406,25 @@ class TranslationTableView(QTableView):
     def set_column_widths(self, colwidths: list[int]):
         for i, width in enumerate(colwidths):
             self.setColumnWidth(i, width)
-            
+    
+    def set_selection_level(self, level: TranslationLevel):
+        """Set the translation level for the currently selected rows. This can be used in conjunction with batch operations to set the level of multiple translations at once."""
+        sel = self.selectionModel().selectedRows()
+        if not sel:
+            return
+        model = self.model()
+        assert isinstance(model, TranslationTableModel)
+        idxs = model.get_true_indexes([idx.row() for idx in sel])
+        self.history.push(TranslationCommand(
+            model=model,
+            idxs=idxs,
+            translations=model.df.loc[idxs, "translation"],
+            levels=level,
+            description=f"Set Level: {level.name} for {len(idxs)} rows"
+        ))
+    
     def edit_translation_row(self, row: int, model: TranslationTableModel) -> None:
-        current = model.data(model.index(row, model._columns.index("translation")), Qt.DisplayRole)
+        current = model.data(model.index(row, model._COLUMNS.index("translation")), Qt.DisplayRole)
         text, ok = QInputDialog.getText(self, "Edit Translation", "Translation:", text=str(current))
         if ok:
             idx = model.get_true_indexes([row])
@@ -498,22 +549,24 @@ class TranslationTableView(QTableView):
                 description=f"Reset: {row}"
             ))
         elif action == copy_action:
-            original = model.data(model.index(row, model._columns.index("original")), Qt.DisplayRole)
+            original = model.data(model.index(row, model._COLUMNS.index("original")), Qt.DisplayRole)
             QApplication.clipboard().setText(str(original))
 
 class TranslationTabWidget(QTabWidget):
     tab_exist_signal = pyqtSignal(bool)  # file_name
-    def __init__(self, parent=None):
+    def __init__(self, table_filters:TableFilters, parent:Optional[QWidget]=None):
         super().__init__(parent)
+        self.table_filters = table_filters
         self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView
         self.dictionaries: IndexedOrderedDict[str, TranslationDictionary] = IndexedOrderedDict()  # file_name -> TranslationDictionary
     # ---------- Overrides ----------
+    @override
     def addTab(self, widget: TranslationTableView, title: str): 
         # Type hinting for the widget parameter to ensure it's a TranslationTableView, which allows us to access its model and other specific methods if needed in the future.
         assert isinstance(widget, TranslationTableView), "Only TranslationTableView instances can be added to TranslationTabWidget"
         super().addTab(widget, title)
         self.tab_exist_signal.emit(True)
-    
+    @override
     def removeTab(self, index: int):
         if index < 0 or index >= self.count():
             return
@@ -523,13 +576,14 @@ class TranslationTabWidget(QTabWidget):
         logger.debug("Tab removed: %s, %d remaining", key, len(self.tabs))
         if not self.tabs:            
             self.tab_exist_signal.emit(False)
-        
+    @override
     def currentWidget(self) -> Optional[TranslationTableView]:
         widget = super().currentWidget()
         if not isinstance(widget, TranslationTableView):
             logger.warning("Current widget is not a TranslationTableView: %s", type(widget))
             return None
         return widget
+    # ---------- END of Overrides ----------
     
     def currentModel(self) -> Optional[TranslationTableModel]:
         if not (current_widget := self.currentWidget()):
@@ -538,21 +592,21 @@ class TranslationTabWidget(QTabWidget):
         if not isinstance(model, TranslationTableModel):
             return None
         return model
-    # ---------- END of Overrides ----------
-    def add_translation_tab(self, file_name: str, model: Optional[TranslationTableModel] = None) -> TranslationTableView:
-        if file_name in self.tabs:
-            return self.tabs[file_name]
+    
+    def add_translation_tab(self, file_path: str, model: Optional[TranslationTableModel] = None) -> TranslationTableView:
+        if file_path in self.tabs:
+            return self.tabs[file_path]
         new_tab = TranslationTableView(self)
-        model = model or TranslationTableModel([])
+        model = model or TranslationTableModel([], filters=self.table_filters, file_path=file_path)
         new_tab.setModel(model)
-        self.tabs[file_name] = new_tab
-        self.addTab(new_tab, Path(file_name).name)
+        self.tabs[file_path] = new_tab
+        self.addTab(new_tab, Path(file_path).name)
         return new_tab
     
-    def focus_tab(self, file_name: str):
-        if file_name not in self.tabs:
+    def focus_tab(self, file_path: str):
+        if file_path not in self.tabs:
             return
-        index = self.indexOf(self.tabs[file_name])
+        index = self.indexOf(self.tabs[file_path])
         if index != -1:
             self.setCurrentIndex(index)
     
@@ -609,7 +663,7 @@ class TranslationTabWidget(QTabWidget):
             target_tab (Optional[str|Path]): The file name of the target tab to apply translations to. If None, it will apply to the currently active tab. Default is None.
             keys (Optional[list[str]]): 
                 The columns to use as keys for matching translations. \\
-                If None, it will use `["json_path", "original"]`.
+                If None, it will use `["key"]`.
         """
         dict_path = Path(dict_path).absolute().as_posix()
         if target_tab is None:

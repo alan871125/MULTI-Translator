@@ -1,13 +1,19 @@
 import json
 
 class JsonPath(str):
-    @classmethod
-    def from_list(cls, json_path_list: list[str|int]):
-        return cls(json.dumps(json_path_list))
-    def to_list(self):
-        return json.loads(self)
+    def __new__(cls, value: str|list[str|int]):
+        if isinstance(value, list):
+            return super().__new__(cls, json.dumps(value))
+        if isinstance(value, str):
+            try:
+                json.loads(value)  # Validate if it's a valid JSON string
+            except json.JSONDecodeError:
+                raise ValueError(f"Invalid JSON string: {value}")
+        return super().__new__(cls, value)
     @property
-    def parts(self):
-        return self.to_list()
+    def parts(self)-> list[str|int]:
+        return json.loads(self)  # Parse the JSON string back to a list of parts
     def __add__(self, other: 'JsonPath'):
-        return JsonPath(self[:-1] + "," + other[1:])  # Combine two JSON paths by merging their list representations
+        return JsonPath(self.parts + other.parts)  # Combine two JSON paths by merging their list representations
+    def __repr__(self):
+        return f"JsonPath({self.parts})"

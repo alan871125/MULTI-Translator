@@ -9,6 +9,7 @@ from ..simple_json.extractor import SimpleJsonExtractor
 
 class RPGMakerMVExtractor(SimpleJsonExtractor):
     SUPPORTED_FILES_TYPES = ['.json']
+    additional_columns = ['attribute']
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
         stem = path.stem
@@ -31,11 +32,10 @@ class RPGMakerMVExtractor(SimpleJsonExtractor):
                 if isinstance(text, str) and text.strip():
                     out.append(TextUnit(
                         file=path.stem,
-                        id=str(item.get("id", "")),
-                        attribute=field,
+                        key=JsonPath([i, field]),
                         original=text,
                         translation=text, # Initialize translation with original text for easier editing in the table
-                        json_path=JsonPath.from_list([i, field])
+                        other_attrs={"attribute":field,}
                     ))
         return out
     def _extract_events_file(self, path: Path) -> list[TextUnit]:
@@ -54,7 +54,7 @@ class RPGMakerMVExtractor(SimpleJsonExtractor):
                 continue
             out.extend(self._extract_event_pages(
                 path, event.get("pages", []), 
-                json_path = JsonPath.from_list(['events', i, 'pages'])
+                json_path = JsonPath(['events', i, 'pages'])
             ))
         return out
 
@@ -69,7 +69,7 @@ class RPGMakerMVExtractor(SimpleJsonExtractor):
         ```
         """
         out: list[TextUnit] = []
-        json_path = json_path or JsonPath.from_list([])
+        json_path = json_path or JsonPath([])
         for item in pages:
             if not isinstance(item, dict):
                 continue
@@ -81,11 +81,10 @@ class RPGMakerMVExtractor(SimpleJsonExtractor):
                     if isinstance(param, str) and param.strip():
                         out.append(TextUnit(
                             file=path.stem,
-                            id=str(item.get("id", "")),
-                            attribute=f"CMD:{cmd_type}",
+                            key=json_path + JsonPath(current_path),
                             original=param,
                             translation=param, # Initialize translation with original text for easier editing in the table
-                            json_path=json_path + JsonPath.from_list(current_path)
+                            other_attrs={"attribute":f"CMD:{cmd_type}",}
                         ))
         return out
     
