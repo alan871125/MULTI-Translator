@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QAction, QLineEdit, QTableWidget, QDialogButtonBox
 
 from app.language import LanguagePack
 from core.translation import TranslationLevel
-from .filters import ColumnFilter, TableFilters
+from ...models.filters import ColumnFilter, TableFilters
 
 logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class SearchLineEdit(qt.QLineEdit):
 
 class SearchDialog(qt.QDialog):
     # Note: suppose the replace uses regex if the search does.
-    replace_signal = pyqtSignal(dict, str, str)  # filters, replace_text, column
+    replace_requested = pyqtSignal(dict, str, str)  # filters, replace_text, column
     def __init__(self, filters:TableFilters, parent=None):
         super().__init__(parent)
         self.filters = filters
@@ -288,4 +288,4 @@ class SearchDialog(qt.QDialog):
         filters = self.get_filters()
         replace_text = self.replace_entry.text().strip()
         # Emit the replace signal with search criteria and replacement text
-        self.replace_signal.emit(filters, replace_text, column)
+        self.replace_requested.emit(filters, replace_text, column)

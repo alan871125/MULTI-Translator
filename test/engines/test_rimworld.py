@@ -1,6 +1,6 @@
 from pathlib import Path
 from core.text_unit import TextUnit
-from engines.rimworld.extractor import RimWorldExtractor, parse_xml_to_dict
+from core.engines.rimworld.extractor import RimWorldExtractor, parse_xml_to_dict
 
 import pandas as pd
 

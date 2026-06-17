@@ -6,6 +6,9 @@ import logging
 from dotenv import load_dotenv
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTextEdit
 
+from app.models.filters import TableFilters
+from app.models.session import TranslationSession
+from app.presenter import TranslationAppPresenter
 import resources_rc
 from config import settings
 from app.gui.main_window import TranslationApp
@@ -66,8 +69,11 @@ def main():
         # let the dark mode setting take effect on Win11's TitleBar
         launch_args += ['-platform', f'windows:darkmode={darkmode}'] 
     app = QApplication(launch_args)
-    translator = TranslationApp(settings)
-    translator.show()
+    filters = TableFilters()  # Shared filters instance for all required components
+    main_window = TranslationApp(settings, filters)
+    session = TranslationSession(settings, filters)
+    presenter = TranslationAppPresenter(main_window, settings, session=session, translation_tab_widget=main_window.translation_table)
+    main_window.show()
     app.exec_()
     
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
-from utils import walk_json
+from core.json_utils import walk_json
 
 class SimpleJsonExtractor:
     SUPPORTED_FILES_TYPES = ['.json']

@@ -1,5 +1,5 @@
 import pytest
-from lru_file import LeastRecentlyUsedFiles
+from core.lru_file import LeastRecentlyUsedFiles
 
 class TestLRUFiles:
     def test_add2empty_list(self, lru:None|LeastRecentlyUsedFiles=None, file_path="file1.txt"):

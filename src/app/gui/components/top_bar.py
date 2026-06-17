@@ -7,10 +7,10 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtSvg import QSvgRenderer
 
-import engines
+import core.engines as engines
 from core.translation import TranslationLevel
 from app.settings import Settings
-from app.gui.search import TableFilters
+from app.gui.dialogs.search import TableFilters
 from app.language import LanguagePack
 from ..theme import ThemeManager
 

@@ -29,7 +29,7 @@ class TranslationDictionary:
     REQUIRED_COLUMNS = ["file", "key", "original"]
     def __init__(self, df: pd.DataFrame, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
         assert all(col in df.columns for col in self.REQUIRED_COLUMNS), f"DataFrame must contain the following columns: {self.REQUIRED_COLUMNS}"
-        self.df = df.copy()
+        self.df = df
         if "translation" in df.columns and "level" in df.columns:
             assert target_lang is not None, "Provide target_lang or rename 'translation' and 'level' columns to include the target language (e.g., ('en','en.level'), ('zh-TW','zh-TW.level'))"
             # convert to long format:
@@ -59,6 +59,7 @@ class TranslationDictionary:
         """Saves the dictionary to a CSV file."""
         file_path = Path(file_path).with_suffix(".csv")
         self.df.to_csv(file_path, index=False)
+        logger.info(f"Dictionary saved to {file_path}")
     
     @classmethod
     def load(cls, file_path: str|Path, source_lang: Optional[str] = None, target_lang: Optional[str] = None):

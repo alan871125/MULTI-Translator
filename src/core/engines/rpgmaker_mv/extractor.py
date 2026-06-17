@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
-from utils import walk_json
+from core.json_utils import walk_json
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
 from ..simple_json.extractor import SimpleJsonExtractor
 

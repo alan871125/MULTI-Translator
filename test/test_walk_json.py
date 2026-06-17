@@ -1,4 +1,4 @@
-from utils import walk_json
+from core.json_utils import walk_json
 
 def test_walk_json():
     data = {"a": 1, "b": {"c": 2}}

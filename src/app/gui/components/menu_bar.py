@@ -1,8 +1,8 @@
 import logging
 from PyQt5.QtWidgets import QMenu
 from PyQt5.QtCore import pyqtSignal
-from lru_file import LeastRecentlyUsedFiles
-from ..menu import initialize_menu
+from core.lru_file import LeastRecentlyUsedFiles
+from ..menu_utils import initialize_menu
 
 logger = logging.getLogger(__name__)
 
