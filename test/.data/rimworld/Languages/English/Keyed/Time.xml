@@ -1,56 +1,56 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <LanguageData>
   <!-- This file is copied from the original Game -->
-  <LetterDay>(Translated) (Translated) d</LetterDay>
-  <LetterHour>(Translated) (Translated) h</LetterHour>
-  <LetterMinute>(Translated) (Translated) m</LetterMinute>
-  <LetterSecond>(Translated) (Translated) s</LetterSecond>
-  <LetterYear>(Translated) (Translated) y</LetterYear>
+  <LetterDay>d</LetterDay>
+  <LetterHour>h</LetterHour>
+  <LetterMinute>m</LetterMinute>
+  <LetterSecond>s</LetterSecond>
+  <LetterYear>y</LetterYear>
   
-  <AM>(Translated) (Translated) AM</AM>
-  <PM>(Translated) (Translated) PM</PM>
+  <AM>AM</AM>
+  <PM>PM</PM>
 
-  <DaysLower>(Translated) (Translated) days</DaysLower>
-  <HoursLower>(Translated) (Translated) hours</HoursLower>
-  <SecondsLower>(Translated) (Translated) seconds</SecondsLower>
+  <DaysLower>days</DaysLower>
+  <HoursLower>hours</HoursLower>
+  <SecondsLower>seconds</SecondsLower>
 
-  <SeasonSpring>(Translated) (Translated) spring</SeasonSpring>
-  <SeasonSummer>(Translated) (Translated) summer</SeasonSummer>
-  <SeasonFall>(Translated) (Translated) fall</SeasonFall>
-  <SeasonWinter>(Translated) (Translated) winter</SeasonWinter>
-  <SeasonPermanentSummer>(Translated) (Translated) permanent summer</SeasonPermanentSummer>
-  <SeasonPermanentWinter>(Translated) (Translated) permanent winter</SeasonPermanentWinter>
+  <SeasonSpring>spring</SeasonSpring>
+  <SeasonSummer>summer</SeasonSummer>
+  <SeasonFall>fall</SeasonFall>
+  <SeasonWinter>winter</SeasonWinter>
+  <SeasonPermanentSummer>permanent summer</SeasonPermanentSummer>
+  <SeasonPermanentWinter>permanent winter</SeasonPermanentWinter>
 
-  <QuadrumAprimay>(Translated) (Translated) Aprimay</QuadrumAprimay>
-  <QuadrumJugust>(Translated) (Translated) Jugust</QuadrumJugust>
-  <QuadrumSeptober>(Translated) (Translated) Septober</QuadrumSeptober>
-  <QuadrumDecembary>(Translated) (Translated) Decembary</QuadrumDecembary>
+  <QuadrumAprimay>Aprimay</QuadrumAprimay>
+  <QuadrumJugust>Jugust</QuadrumJugust>
+  <QuadrumSeptober>Septober</QuadrumSeptober>
+  <QuadrumDecembary>Decembary</QuadrumDecembary>
 
-  <QuadrumAprimay_Short>(Translated) (Translated) Apr</QuadrumAprimay_Short>
-  <QuadrumJugust_Short>(Translated) (Translated) Jug</QuadrumJugust_Short>
-  <QuadrumSeptober_Short>(Translated) (Translated) Sep</QuadrumSeptober_Short>
-  <QuadrumDecembary_Short>(Translated) (Translated) Dec</QuadrumDecembary_Short>
+  <QuadrumAprimay_Short>Apr</QuadrumAprimay_Short>
+  <QuadrumJugust_Short>Jug</QuadrumJugust_Short>
+  <QuadrumSeptober_Short>Sep</QuadrumSeptober_Short>
+  <QuadrumDecembary_Short>Dec</QuadrumDecembary_Short>
   
-  <Born>(Translated) (Translated) Born: {0}</Born>
-  <AgeChronological>(Translated) (Translated) Chronological age: {0} years, {1} quadrums, {2} days</AgeChronological>
-  <AgeBiological>(Translated) (Translated) Biological age: {0} years, {1} quadrums, {2} days</AgeBiological>
+  <Born>Born: {0}</Born>
+  <AgeChronological>Chronological age: {0} years, {1} quadrums, {2} days</AgeChronological>
+  <AgeBiological>Biological age: {0} years, {1} quadrums, {2} days</AgeBiological>
 
   <!-- Date periods -->
-  <Period1Year>(Translated) (Translated) 1 year</Period1Year>
-  <PeriodYears>(Translated) (Translated) {0} years</PeriodYears>
-  <Period1Quadrum>(Translated) (Translated) 1 quadrum</Period1Quadrum>
-  <PeriodQuadrums>(Translated) (Translated) {0} quadrums</PeriodQuadrums>
-  <Period1Day>(Translated) (Translated) 1 day</Period1Day>
-  <PeriodDays>(Translated) (Translated) {0} days</PeriodDays>
-  <Period1Hour>(Translated) (Translated) 1 hour</Period1Hour>
-  <PeriodHours>(Translated) (Translated) {0} hours</PeriodHours>
-  <Period1Second>(Translated) (Translated) 1 second</Period1Second>
-  <PeriodSeconds>(Translated) (Translated) {0} seconds</PeriodSeconds>
+  <Period1Year>1 year</Period1Year>
+  <PeriodYears>{0} years</PeriodYears>
+  <Period1Quadrum>1 quadrum</Period1Quadrum>
+  <PeriodQuadrums>{0} quadrums</PeriodQuadrums>
+  <Period1Day>1 day</Period1Day>
+  <PeriodDays>{0} days</PeriodDays>
+  <Period1Hour>1 hour</Period1Hour>
+  <PeriodHours>{0} hours</PeriodHours>
+  <Period1Second>1 second</Period1Second>
+  <PeriodSeconds>{0} seconds</PeriodSeconds>
 
   <!-- Misc -->
-  <Started>(Translated) (Translated) Started</Started>
-  <Lasted>(Translated) (Translated) Lasted</Lasted>
-  <OccurredTimeAgo>(Translated) (Translated) occurred {0} ago</OccurredTimeAgo>
-  <TimeAgo>(Translated) (Translated) {0} ago</TimeAgo>
+  <Started>Started</Started>
+  <Lasted>Lasted</Lasted>
+  <OccurredTimeAgo>occurred {0} ago</OccurredTimeAgo>
+  <TimeAgo>{0} ago</TimeAgo>
   
 </LanguageData>
