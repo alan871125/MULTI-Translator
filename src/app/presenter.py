@@ -1,7 +1,8 @@
 from pathlib import Path
+from itertools import cycle, islice
 from typing import Literal, Optional, Sequence
 import logging
-
+from PyQt5.QtWidgets import QApplication
 from app.gui.main_window import TranslationApp
 from core.translation import Translator
 
@@ -49,6 +50,7 @@ class TranslationAppPresenter:
                 logger.warning(f"Previously open file {file_path} not found. Skipping.")
     
     def handle_tab_changed(self, index: int):
+        logger.debug("tab changed signal received for tab index: %d", index)
         if index == -1:  # No tabs are open
             self.main_window.bind_undo_redo_actions(None)
             return
@@ -97,13 +99,32 @@ class TranslationAppPresenter:
                 if failed_count > 0:
                     logger.warning(f"API translation failed for {failed_count} out of {len(_idxs)} selected rows.")
             case EditType.RESET:
-                translations = current_text = model.df.loc[idxs,'translation'].astype(str)
+                translations = model.df.loc[idxs,'original'].astype(str)
                 level = TranslationLevel.UNTRANSLATED
+            case EditType.PASTE:
+                clipboard_text = QApplication.clipboard().text()
+                if not clipboard_text:
+                    logger.warning("Clipboard is empty. Nothing to paste.")
+                    return
+                translations = list(islice(cycle(clipboard_text.split('\r\n')), len(idxs)))  # Repeat the clipboard text if there are more selected rows than lines in the clipboard
+                level = TranslationLevel.VERIFIED
             case _:
                 raise ValueError(f"Unknown EditType: {EditType}")
         share = self.main_window.show_share_translation_confirmation()
-        #TODO: fix the type hints here
         self.session.set_translations(file_path, idxs, translations=translations, level=level,share=share)
+    
+    def handle_copy_cells_request(self, file_path: str|Path, row_idxs: list[int], col_idx: int):
+        """Handles a request to copy the contents of one or more cells to the clipboard.
+        Triggered by the user selecting "Copy" from the context menu after right-clicking on a cell or selection of cells in the translation table, or by using the standard copy keyboard shortcut (e.g., Ctrl+C).
+        """
+        key = Path(file_path).absolute().as_posix()
+        if (model := self.session.models.get(key)) is None:
+            logger.warning(f"Attempted to copy cells for a file that is not open: {file_path}")
+            return
+        # Get the text of the selected cells and join them with newlines for copying to clipboard
+        cell_texts = model.df.iloc[row_idxs, col_idx].astype(str).tolist()
+        clipboard_text = "\r\n".join(cell_texts)
+        QApplication.clipboard().setText(clipboard_text)
     
     def handle_save_current_file_request(self, save_path: str|Path|None):
         """Handles a request to save the current file.
@@ -175,13 +196,17 @@ class TranslationAppPresenter:
         tab.set_level_requested.connect(
             lambda idxs, level: self.handle_set_level_request(file_path, idxs, level)
         )
-    
+        tab.copy_cells_requested.connect(
+            lambda idxs, col: self.handle_copy_cells_request(file_path, idxs, col)
+        )
+        
     def handle_close_file_request(self, index:int):
         """Handles a request to close a file.
         
         Triggered by Close File action in MenuBar
         Or by clicking the close button on a tab in the TranslationTabWidget
         """
+        logger.debug("Close file request received for tab index: %d", index)
         self.session.close_index(index)
         self.translation_tab_widget.removeTab(index)
     

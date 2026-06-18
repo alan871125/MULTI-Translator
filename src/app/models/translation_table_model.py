@@ -6,9 +6,9 @@ import pandas as pd
 from pathlib import Path
 from typing import Any, Iterable, Literal, cast, override, Optional
 
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt5.QtGui import QColor
-
+from PyQt5.QtWidgets import QUndoCommand, QUndoStack
 from config import settings
 from core.engines._base import BaseExtractor
 from core.text_unit import TextUnit
@@ -23,11 +23,11 @@ L = LanguagePack()
 class TranslationTableModel(QAbstractTableModel):
     _COLUMNS = ["file", "key", "original", "translation"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
-    # translation_changed = pyqtSignal(list[int], list[str], TranslationLevel|None)  # row index, new translation text, level
-    def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None):
+    def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
+        self.undo_stack = undo_stack
         self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS)
         self._filtered_df = None
         self._mask_indexes = None
@@ -146,10 +146,22 @@ class TranslationTableModel(QAbstractTableModel):
         original = self.filtered_df.iloc[row].get("original")
         if original is None:
             return False
+        
         idx = self.get_true_indexes([row])
-        self.set_translations(idx, [text], levels=TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED)
-
+        level = TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED
+        
+        if self.undo_stack is not None: # if not connected to a session's undo stack, apply changes directly without undo support
+            self.undo_stack.push(TranslationCommand(
+                model=self,
+                idxs=idx,
+                translations=[text],
+                levels=level,
+                description=f"Inline Edit"
+            ))
+        else:
+            self.set_translations(idx, [text], levels=level)
         return True
+    
     @override
     def flags(self, index):
         if not index.isValid():
@@ -163,20 +175,6 @@ class TranslationTableModel(QAbstractTableModel):
         except Exception:
             pass
         return flags
-
-    # def set_filters(self, filters: dict):
-    #     """
-    #     Example:
-    #     ```
-    #         filters = {
-    #             "original": {"text": "Start Game", "is_regex": False},
-    #         }
-    #     ```
-    #     """        
-    #     self.filters = filters or {}
-    #     # clear cached filtered data so it will be recalculated
-    #     self._mask_indexes = None
-    #     self.layoutChanged.emit()
 
     # ----- Filtering -----
     def on_filter_changed(self):
@@ -367,3 +365,43 @@ class TranslationTableModel(QAbstractTableModel):
         df = self.filtered_df if is_filtered else self.df
         out = df.iloc[indexes].reset_index().groupby("original").index.min()
         return pd.Index(out.values)
+
+class TranslationCommand(QUndoCommand):
+    """A command to apply a batch of changes to the DataFrame for undo/redo."""
+    def __init__(
+        self, model: TranslationTableModel,
+        idxs: pd.Index,
+        translations: Iterable[str]|str,
+        levels: Optional[TranslationLevel] = None,
+        description: str = "Batch Translation Edit",
+    ):
+        super().__init__(description)
+        self.model = model
+        self.idxs = idxs
+        self.old = model.df.loc[idxs, "translation"].copy()
+        self.old_levels = model.df.loc[idxs, "level"].copy()
+        self.new = translations
+        self.new_levels: Optional[pd.Series|TranslationLevel] = levels
+        self.description = description
+    def undo(self):
+        self.model.set_translations(self.idxs, self.old, levels=self.old_levels)
+        logger.debug("UNDO: Translation: %s", self.description)
+    def redo(self):
+        self.model.set_translations(self.idxs, self.new, levels=self.new_levels)
+        logger.debug("DO: Translation: %s", self.description)
+
+class ShareTranslationCommand(TranslationCommand):
+    """A command to share a translation to all text units with the same original text."""
+    def __init__(self, model: TranslationTableModel, idx: int, description: str = "Share Translation", max_level: TranslationLevel = TranslationLevel.API):
+        # Get all indexes with the same original text
+        same_original_idxs = model.get_idxs_same_original(idx, is_filtered=False, max_level=max_level)
+        # Get the current translation to be shared
+        current_translation = model.df.iloc[idx].translation
+        levels = model.df.iloc[idx].level
+        super().__init__(
+            model=model,
+            idxs=same_original_idxs,
+            translations=current_translation,
+            levels=levels,
+            description=description
+        )

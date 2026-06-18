@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDropEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
-    QInputDialog, QMenu, QApplication, QUndoStack, QWidget
+    QInputDialog, QMenu, QApplication, QWidget
 )
 from iod import IndexedOrderedDict
 from config import settings
@@ -24,12 +24,14 @@ class EditType(Enum):
     MANUAL = "manual"
     RESET = "reset"
     SHARE = "share"
+    PASTE = "paste"
     CHS2CHT = "chs2cht"
     CHT2CHS = "cht2chs"
 
 class TranslationTableView(QTableView):
     _COLWIDTHS = [60, 80, 500, 500]
     edit_translation_requested = pyqtSignal(list, EditType)  # row indexes, edit type
+    copy_cells_requested = pyqtSignal(list, int)  # row indexes, column index (only support single column for now)
     set_level_requested = pyqtSignal(list, TranslationLevel)  # row indexes, level
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,23 +69,31 @@ class TranslationTableView(QTableView):
     @override
     def keyPressEvent(self, event):
         key = event.key()
-        if key in (Qt.Key_Return, Qt.Key_Enter):
+        sequence = QKeySequence(event.modifiers() | key)
+        rows = self.selectionModel().selectedRows()
+        if sequence.matches(QKeySequence.Paste):
+            if len(rows) > 0:
+                idxs = [idx.row() for idx in rows]
+                self.edit_translation_requested.emit(idxs, EditType.PASTE)
+        if sequence.matches(QKeySequence.Copy):
+            col = self.selectionModel().currentIndex().column()
+            if len(rows) != 0:
+                idxs = [idx.row() for idx in rows]
+                self.copy_cells_requested.emit(idxs, col)  # Emit the column index of the selected cell
+        elif key in (Qt.Key_Return, Qt.Key_Enter):
             # If currently inline editing, let the view handle the enter key (usually commits the edit)
             if self.state() == QAbstractItemView.EditingState:
-                super().keyPressEvent(event)
-                return
-
-            # edit the selected row using the same dialog as the context menu
-            sel = self.selectionModel().selectedRows()
-            if not sel:
-                return
-            row = sel[0].row()
+                return super().keyPressEvent(event)
+            if not rows:
+                return super().keyPressEvent(event)
+            row = rows[0].row()
             model = self.model()
             if not isinstance(model, TranslationTableModel):
-                return
+                return super().keyPressEvent(event)
             self.edit_translation_requested.emit([row], EditType.MANUAL)
             return
-        super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
         
     def set_column_widths(self, colwidths: list[int]):
         for i, width in enumerate(colwidths):

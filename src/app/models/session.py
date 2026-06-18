@@ -8,7 +8,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from typing import Literal
 
 import pandas as pd
-from PyQt5.QtWidgets import QUndoCommand, QUndoStack
+from PyQt5.QtWidgets import QUndoStack
 
 from iod import IndexedOrderedDict
 
@@ -18,7 +18,7 @@ from app.translation_table import logger
 from core import engines
 from core.translation import TranslationLevel, dictionary
 from core.translation.dictionary import TranslationDictionary
-from .translation_table_model import TranslationTableModel
+from .translation_table_model import TranslationTableModel, TranslationCommand, ShareTranslationCommand
 
 logger = logging.getLogger(__name__)
 
@@ -76,15 +76,16 @@ class TranslationSession(QObject):
         file_path = Path(file_path).absolute()
         try:
             extractor = engines.extractors[self.settings.engine]()
+            key = file_path.as_posix()
+            stack = self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             model = TranslationTableModel(
                 data=extractor.extract_file(file_path), 
                 filters=self.filters,
                 file_path=file_path,
-                engine=extractor
+                engine=extractor,
+                undo_stack=stack
             )
-            key = file_path.as_posix()
             self.models[key] = model
-            self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             self.file_opened.emit(key, model)
             return model
         except json.JSONDecodeError as e:
@@ -243,43 +244,3 @@ class TranslationSession(QObject):
             return
         model.apply_dictionary(dictionary, keys=keys)
 
-class TranslationCommand(QUndoCommand):
-    """A command to apply a batch of changes to the DataFrame for undo/redo."""
-    def __init__(
-        self, model: TranslationTableModel,
-        idxs: pd.Index,
-        translations: Iterable[str]|str,
-        levels: Optional[TranslationLevel] = None,
-        description: str = "Batch Translation Edit",
-    ):
-        super().__init__(description)
-        self.model = model
-        self.idxs = idxs
-        self.old = model.df.loc[idxs, "translation"].copy()
-        self.old_levels = model.df.loc[idxs, "level"].copy()
-        self.new = translations
-        self.new_levels: Optional[pd.Series|TranslationLevel] = levels
-        self.description = description
-    def undo(self):
-        self.model.set_translations(self.idxs, self.old, levels=self.old_levels)
-        logger.debug("UNDO: Translation: %s", self.description)
-    def redo(self):
-        self.model.set_translations(self.idxs, self.new, levels=self.new_levels)
-        logger.debug("DO: Translation: %s", self.description)
-
-
-class ShareTranslationCommand(TranslationCommand):
-    """A command to share a translation to all text units with the same original text."""
-    def __init__(self, model: TranslationTableModel, idx: int, description: str = "Share Translation", max_level: TranslationLevel = TranslationLevel.API):
-        # Get all indexes with the same original text
-        same_original_idxs = model.get_idxs_same_original(idx, is_filtered=False, max_level=max_level)
-        # Get the current translation to be shared
-        current_translation = model.df.iloc[idx].translation
-        levels = model.df.iloc[idx].level
-        super().__init__(
-            model=model,
-            idxs=same_original_idxs,
-            translations=current_translation,
-            levels=levels,
-            description=description
-        )

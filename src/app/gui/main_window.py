@@ -160,7 +160,7 @@ class TranslationApp(QMainWindow):
                 pass
         
         self._current_undo_stack = stack
-        if stack:
+        if stack is not None:
             # Connect logic signals
             stack.canUndoChanged.connect(self.undo_action.setEnabled)
             stack.canRedoChanged.connect(self.redo_action.setEnabled)
