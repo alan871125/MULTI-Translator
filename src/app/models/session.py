@@ -1,4 +1,5 @@
 
+import json
 import logging
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
@@ -86,6 +87,9 @@ class TranslationSession(QObject):
             self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             self.file_opened.emit(key, model)
             return model
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON in file {file_path}: {e}")
+            # should notify the user about the error
         except Exception as e:
             logger.error(f"Failed to open file {file_path}: {e}")
     
@@ -144,7 +148,7 @@ class TranslationSession(QObject):
             description=description
         ))
         
-    def set_translations(self, file_path: str|Path, idxs: Sequence[int]|pd.Index, translations: Sequence[str]|pd.Series, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
+    def set_translations(self, file_path: str|Path, idxs: Sequence[int]|pd.Index, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
         """Set the translation for the currently selected rows. This can be used in conjunction with batch operations to set the translation of multiple rows at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
@@ -156,7 +160,7 @@ class TranslationSession(QObject):
         history.push(TranslationCommand(
             model=model,
             idxs=idxs,
-            translations=pd.Series(translations, index=idxs),
+            translations=translations,
             levels=level,
             description=f"Set Translation for {len(idxs)} rows"
         ))
@@ -244,7 +248,7 @@ class TranslationCommand(QUndoCommand):
     def __init__(
         self, model: TranslationTableModel,
         idxs: pd.Index,
-        translations: pd.Series|str,
+        translations: Iterable[str]|str,
         levels: Optional[TranslationLevel] = None,
         description: str = "Batch Translation Edit",
     ):

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 supported_engines = []              # list of engine names (strings)
 engine_modules: dict[str, ModuleType] = {}           # engine_name -> module object
-extractors: dict[str, Callable[[], BaseExtractor]] = {}  # engine_name -> Extractor class/factory
+extractors: dict[str, type[BaseExtractor]] = {}  # engine_name -> Extractor class/factory
 for finder, modname, ispkg in pkgutil.iter_modules(__path__):
     try:
         mod = importlib.import_module(f"{__name__}.{modname}")
