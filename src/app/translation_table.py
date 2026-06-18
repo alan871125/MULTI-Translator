@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, override
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QDropEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QUndoStack, QWidget
@@ -134,11 +134,13 @@ class TranslationTabWidget(QTabWidget):
     provides signals for when tabs are added or removed, as well as when the current tab changes."""
     tab_exist_signal = pyqtSignal(bool)  # file_name
     tab_save_signal = pyqtSignal(str)  # file_name
+    open_dropped_file_request = pyqtSignal(str)  # file_path
     def __init__(self, table_filters:TableFilters, parent:Optional[QWidget]=None):
         super().__init__(parent)
         self.table_filters = table_filters
         self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView
         self.dictionaries: IndexedOrderedDict[str, TranslationDictionary] = IndexedOrderedDict()  # file_name -> TranslationDictionary
+        self.setAcceptDrops(True)
     # ---------- Overrides ----------
     @override
     def addTab(self, widget: TranslationTableView, title: str): 
@@ -163,6 +165,20 @@ class TranslationTabWidget(QTabWidget):
             logger.warning("Current widget is not a TranslationTableView: %s", type(widget))
             return None
         return widget
+    @override
+    def dragEnterEvent(self, event:QDropEvent):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+    @override
+    def dropEvent(self, event:QDropEvent):
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if not Path(file_path).exists():
+                continue
+            self.open_dropped_file_request.emit(file_path)
+        
     # ---------- END of Overrides ----------
     
     def currentModel(self) -> Optional[TranslationTableModel]:

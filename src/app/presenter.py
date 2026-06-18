@@ -33,7 +33,8 @@ class TranslationAppPresenter:
         self.main_window.edit_current_file_requested.connect(self.handle_edit_current_file_request)
         self.translation_tab_widget.tabCloseRequested.connect(self.handle_close_file_request)
         self.translation_tab_widget.currentChanged.connect(self.handle_tab_changed)
-
+        self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
+        
     def restore_session(self, workspace:Optional[Path|str]=None):
         if workspace is None:
         # Load previous workspace
@@ -89,9 +90,14 @@ class TranslationAppPresenter:
             case EditType.API:
                 current_text = model.df.loc[idxs,'translation']
                 translations = self.translator.batch_translate(current_text.tolist())
+                _idxs = idxs
+                idxs, translations = zip(*[(i, trans) for i, trans in zip(idxs, translations) if trans is not None])
                 level=TranslationLevel.API
+                failed_count = len(_idxs) - len(idxs)
+                if failed_count > 0:
+                    logger.warning(f"API translation failed for {failed_count} out of {len(_idxs)} selected rows.")
             case EditType.RESET:
-                translations = current_text = model.df.loc[idxs,'translation']
+                translations = current_text = model.df.loc[idxs,'translation'].astype(str)
                 level = TranslationLevel.UNTRANSLATED
             case _:
                 raise ValueError(f"Unknown EditType: {EditType}")
