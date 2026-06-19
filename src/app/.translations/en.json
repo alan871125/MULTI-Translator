@@ -70,7 +70,9 @@
 
     "confirm_msg.share_translation": "Do you want to replace other identical entries with this translation?",
     "confirm_msg.dont_ask_again": "Don't show this again",
-
+    "confirm_msg.unsaved_changes": "File has unsaved changes",
+    "confirm_msg.unsaved_changes_desc": "<font color='#004499' size='5'>Do you want to save the changes you made to {file_name}?</font>",
+    "confirm_msg.unsaved_changes_desc2": "Your changes will be lost if you don't save them.",
     "file_dialog.select_game_file": "Select Game File",
     "file_dialog.save_translated_file": "Save Translated File",
 

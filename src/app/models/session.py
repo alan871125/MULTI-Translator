@@ -63,8 +63,11 @@ class TranslationSession(QObject):
             save_dir.mkdir(parents=True, exist_ok=True)
             save_path = (save_dir/name).with_suffix('.csv')
         dictionary.save(save_path)
+        history = self.get_history_stack(key)
+        history.setClean()
     
     def save_file(self, file_path: str|Path, save_path: Optional[str|Path] = None):
+        """Export the translated file with the engine."""
         file_path = Path(file_path).absolute()
         key = file_path.as_posix()
         if (model := self.models.get(key)) is None:

@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDropEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
-    QInputDialog, QMenu, QApplication, QWidget
+    QInputDialog, QMenu, QApplication, QWidget, QTabBar
 )
 from iod import IndexedOrderedDict
 from config import settings
@@ -137,6 +137,8 @@ class TranslationTableView(QTableView):
         idxs = [idx.row() for idx in sel]
         self.set_level_requested.emit(idxs, level)
     
+    
+    
 class TranslationTabWidget(QTabWidget):
     """A QTabWidget that manages multiple TranslationTableViews, each associated with a translation file.  
     
@@ -223,3 +225,26 @@ class TranslationTabWidget(QTabWidget):
         if index == -1:
             return None
         return self.tabs.keys()[index]
+    
+    def update_tab_save_status(self, file_path: str):
+        """Updates the tab title and close button to indicate whether there are unsaved changes."""
+        logger.debug("Updating tab save status for %s", file_path)
+        if file_path not in self.tabs:
+            return
+        index = self.indexOf(self.tabs[file_path])
+        if index == -1:
+            return
+        
+        model = self.tabs[file_path].model()
+        if not isinstance(model, TranslationTableModel) or model.undo_stack is None:
+            return
+        unsaved = not model.undo_stack.isClean()
+        
+        # Update tab text (asterisk)
+        current_title = self.tabText(index)
+        if unsaved:
+            if not current_title.endswith("*"):
+                self.setTabText(index, current_title + "*")
+        else:
+            if current_title.endswith("*"):
+                self.setTabText(index, current_title[:-1])

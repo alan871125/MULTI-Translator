@@ -199,6 +199,11 @@ class TranslationAppPresenter:
         tab.copy_cells_requested.connect(
             lambda idxs, col: self.handle_copy_cells_request(file_path, idxs, col)
         )
+        if model.undo_stack is not None:
+            model.undo_stack.cleanChanged.connect(
+                lambda: self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
+            )
+            self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
         
     def handle_close_file_request(self, index:int):
         """Handles a request to close a file.
@@ -206,6 +211,15 @@ class TranslationAppPresenter:
         Triggered by Close File action in MenuBar
         Or by clicking the close button on a tab in the TranslationTabWidget
         """
+        # check for unsaved changes and prompt user to save if needed before closing
+        tab_text = self.translation_tab_widget.tabText(index)
+        if tab_text.endswith("*"):  # Unsaved changes indicated by a "*" at the end
+            response = self.main_window.show_unsaved_changes_dialog(tab_text[:-1])
+            if response == "cancel":
+                return  # User cancelled the close action
+            elif response == "save":
+                self.handle_save_current_file_request(None)  # Save current file before closing, passing None to use default save path
+        # When response == 'discard'
         logger.debug("Close file request received for tab index: %d", index)
         self.session.close_index(index)
         self.translation_tab_widget.removeTab(index)

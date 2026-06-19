@@ -211,6 +211,29 @@ class TranslationApp(QMainWindow):
             self.settings['confirmations.share_translation'] = result
         return result
     
+    def show_unsaved_changes_dialog(self, file_name: str) -> str:
+        # Display the confirmation box
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setWindowTitle(L["confirm_msg.unsaved_changes"])
+        msg_box.setText(L["confirm_msg.unsaved_changes_desc"].format(file_name=file_name))
+        msg_box.setInformativeText(L["confirm_msg.unsaved_changes_desc2"])
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Save)
+        # Handle user selection
+        result = None
+        clicked_button = msg_box.exec()
+        if clicked_button == QMessageBox.StandardButton.Save:
+            result = "save"
+        elif clicked_button == QMessageBox.StandardButton.Discard:
+            result = "discard"
+        elif clicked_button == QMessageBox.StandardButton.Cancel:
+            result = "cancel"
+        else:
+            logger.warning("Unexpected button clicked in unsaved changes dialog: %s", clicked_button)
+            result = "cancel"
+        return result
+    
     def open_save_game_file_dialog(self, default_file_path: str) -> Optional[str]:
         # if (model := self.translation_table.currentModel()) is None:
         #     logger.warning("No active translation tab to save.")
