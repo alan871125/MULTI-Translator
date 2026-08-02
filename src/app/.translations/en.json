@@ -30,9 +30,13 @@
     "menu.file.save_game_file": "Complete Translation",
     "menu.file.save_game_file_as": "Complete Translation and Save As...",
     "menu.file.load_game_file": "Open File...",
+    "menu.file.open_directory": "Open Directory (Functionality Based on Game Engine)",
     "menu.file.recent_files": "Open Recent Files",
     "menu.file.load_workspace": "Load Workspace...",
     "menu.file.new_workspace": "New Workspace...",
+    "menu.file.import": "Import",
+    "menu.file.import.from_file": "Import from File...",
+    "menu.file.import.from_dict": "Import from Dictionary(*.csv)...",
     "menu.edit": "Edit",
     "menu.edit.undo": "Undo (Ctrl+Z)",
     "menu.edit.redo": "Redo (Ctrl+Y)",
@@ -73,7 +77,9 @@
     "confirm_msg.unsaved_changes": "File has unsaved changes",
     "confirm_msg.unsaved_changes_desc": "<font color='#004499' size='5'>Do you want to save the changes you made to {file_name}?</font>",
     "confirm_msg.unsaved_changes_desc2": "Your changes will be lost if you don't save them.",
+    "file_dialog.select_workspace_dir": "Select Workspace Directory",
     "file_dialog.select_game_file": "Select Game File",
+    "file_dialog.select_directory": "Select Directory",
     "file_dialog.save_translated_file": "Save Translated File",
 
     "statusBar.saved_success": "Game file saved successfully!"

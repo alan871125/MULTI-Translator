@@ -148,9 +148,10 @@ class SettingsDialog(QDialog):
         from core.engines import supported_engines
         workspace_tab = QWidget()
         self.layouts["workspace"] = QFormLayout(workspace_tab)
-        self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings.workspace_dir or "./", browse_type="dir")
-        self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.game_data_dir, browse_type="dir")
-        self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.user_dict_dir, browse_type="dir")
+        # use raw directories from workspace_dir directly, preventing translating replacers such as %CWD% and %WORKSPACE_DIR%
+        self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings.workspace_data.workspace_dir or "./", browse_type="dir")
+        self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.workspace_data.game_data_dir, browse_type="dir")
+        self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.workspace_data.user_dict_dir, browse_type="dir")
         self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.output_dir, browse_type="dir")
         self.widgets["workspace"]["engine"] = QComboBox()
         self.widgets["workspace"]["engine"].addItems(supported_engines)

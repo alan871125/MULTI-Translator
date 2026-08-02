@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 from typing import Optional
+from core.engines._base import BaseExtractor
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
 from core.json_utils import walk_json
 
-class SimpleJsonExtractor:
+class SimpleJsonExtractor(BaseExtractor):
     SUPPORTED_FILES_TYPES = ['.json']
     key = 'json_path'
     columns = ['file','key','original','translation']

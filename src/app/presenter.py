@@ -29,6 +29,9 @@ class TranslationAppPresenter:
     def connect_signals(self):
         """Connects signals from the view to the appropriate handler methods in the presenter."""
         self.main_window.load_file_requested.connect(self.handle_open_file_request)
+        self.main_window.load_dir_requested.connect(self.handle_open_dir_request)
+        self.main_window.import_from_file_requested.connect(self.handle_import_from_file_request)
+        self.main_window.import_from_dict_requested.connect(self.handle_import_from_dict_request)
         self.main_window.save_translation_requested.connect(self.handle_save_translation_request)  # Assuming saving also closes the file, adjust if not
         self.main_window.save_current_file_requested.connect(self.handle_save_current_file_request)
         self.main_window.edit_current_file_requested.connect(self.handle_edit_current_file_request)
@@ -45,7 +48,10 @@ class TranslationAppPresenter:
         # Load the previously open tabs from settings and attempt to restore them
         for file_path in self.settings.last_open_tabs:
             if Path(file_path).exists():
-                self.handle_open_file_request(file_path)  # Directly call the handler to open the file, which will create the model and tab
+                if Path(file_path).is_dir():
+                    self.handle_open_dir_request(file_path)  # Directly call the handler to open the directory, which will create the model and tab
+                else:
+                    self.handle_open_file_request(file_path)  # Directly call the handler to open the file, which will create the model and tab
             else:
                 logger.warning(f"Previously open file {file_path} not found. Skipping.")
     
@@ -57,6 +63,7 @@ class TranslationAppPresenter:
         file_path = self.translation_tab_widget.tabs.keys()[index]
         history = self.session.get_history_stack(file_path)
         self.main_window.bind_undo_redo_actions(history)
+        self.main_window.update_bottom_bar(file_path)  # Update the bottom bar with the current file path
         
     def handle_edit_current_file_request(self, EditType: Literal[EditType.CHS2CHT,EditType.CHT2CHS]):
         """Handles a request to edit a file."""
@@ -138,6 +145,7 @@ class TranslationAppPresenter:
             return
         current_file_path = Path(current_file_path)
         key = Path(current_file_path).absolute().as_posix()
+        #TODO: create a request container class for better type hinting
         if "{custom}" == str(save_path):
             if not (custom_path := self.main_window.open_save_game_file_dialog(key)):
                 return # User cancelled the save dialog
@@ -168,6 +176,31 @@ class TranslationAppPresenter:
         """
         self.session.set_level(file_path, row_idxs, level)
 
+    def create_translation_tab(self, path: str|Path):
+        path = Path(path).absolute()
+        # Create tab in the TranslationTabWidget
+        tab = self.translation_tab_widget.add_translation_tab(path.as_posix())
+        tab.edit_translation_requested.connect(
+            lambda idxs,edit_type: self.handle_edit_translation_request(path, idxs, edit_type)
+        )
+        tab.set_level_requested.connect(
+            lambda idxs, level: self.handle_set_level_request(path, idxs, level)
+        )
+        tab.copy_cells_requested.connect(
+            lambda idxs, col: self.handle_copy_cells_request(path, idxs, col)
+        )
+        return tab
+    
+    def handle_open_workspace_request(self, workspace_path: str|Path):
+        """Handles a request to open a workspace file.
+        
+        Triggered by Open Workspace action in MenuBar
+        Or by drag-and-dropping a workspace file into the application window (unimplemented)
+        """
+        workspace_path = Path(workspace_path).absolute()
+        assert workspace_path.exists() and workspace_path.suffix == WORKSPACE_FILE_EXTENSION, f"Provided path is not a valid workspace file: {workspace_path}"
+        self.restore_session(workspace_path)
+        
     def handle_open_file_request(self, file_path: str|Path):
         """Handles a request to open a file.
         
@@ -176,10 +209,11 @@ class TranslationAppPresenter:
         """
         # TODO: implement drag-and-drop file opening
         file_path = Path(file_path).absolute()
-        if file_path.is_dir() or file_path.suffix == WORKSPACE_FILE_EXTENSION:
-            # If it's a directory or workspace file, treat it as a workspace
+        if file_path.suffix == WORKSPACE_FILE_EXTENSION:
+            # If it's workspace file, treat it as a workspace
             return self.restore_session(file_path)
-        
+        elif file_path.is_dir():
+            return self.handle_open_dir_request(file_path)  # Directly call the handler to open the directory, which will create the model and tab
         # Create model for the file in the session
         if (model := self.session.open_file(file_path)) is None:
             return
@@ -187,18 +221,8 @@ class TranslationAppPresenter:
         dict_path = Path(self.settings.user_dict_dir) / (Path(file_path).with_suffix('.csv').name)
         if dict_path.exists():
             self.session.apply_dictionary(dict_path, file_path)
-        # Create tab in the TranslationTabWidget
-        tab = self.translation_tab_widget.add_translation_tab(file_path.as_posix())
+        tab = self.create_translation_tab(file_path)
         tab.setModel(model)
-        tab.edit_translation_requested.connect(
-            lambda idxs,edit_type: self.handle_edit_translation_request(file_path, idxs, edit_type)
-        )
-        tab.set_level_requested.connect(
-            lambda idxs, level: self.handle_set_level_request(file_path, idxs, level)
-        )
-        tab.copy_cells_requested.connect(
-            lambda idxs, col: self.handle_copy_cells_request(file_path, idxs, col)
-        )
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
                 lambda: self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
@@ -223,6 +247,44 @@ class TranslationAppPresenter:
         logger.debug("Close file request received for tab index: %d", index)
         self.session.close_index(index)
         self.translation_tab_widget.removeTab(index)
-    
 
+    def handle_open_dir_request(self, dir_path: str|Path):
+        """Handles a request to open a directory.
+        
+        Triggered by Open Directory action in MenuBar
+        Or by drag-and-dropping a directory into the application window (unimplemented)
+        """
+        dir_path = Path(dir_path).absolute()
+        assert dir_path.is_dir() and dir_path.exists(), f"Provided path is not a valid directory: {dir_path}"
+        if (model := self.session.open_dir(dir_path)) is None:
+            return
+        # Load existing user dictionary
+        dict_path = Path(self.settings.user_dict_dir) / (Path(dir_path).with_suffix('.csv').name)
+        if dict_path.exists():
+            self.session.apply_dictionary(dict_path, dir_path)
+        # Create tab in the TranslationTabWidget
+        tab = self.create_translation_tab(dir_path)
+        tab.setModel(model)
+        if model.undo_stack is not None:
+            model.undo_stack.cleanChanged.connect(
+                lambda: self.translation_tab_widget.update_tab_save_status(dir_path.as_posix())
+            )
+            self.translation_tab_widget.update_tab_save_status(dir_path.as_posix())
     
+    def handle_import_from_file_request(self, file_path: str|Path):
+        """Opens a file, reads its contents, and imports the translations into the current translation table."""
+        raise NotImplementedError("Import from file functionality is not yet implemented.")
+    
+    def handle_import_from_dict_request(self, dict_path: str|Path):
+        """Opens a dictionary file, reads its contents, and imports the translations into the current translation table."""
+        dict_path = Path(dict_path).absolute()
+        if (current_file_path := self.translation_tab_widget.get_current_file_path()) is None:
+            logger.warning("Current translation tab has no associated file path to import translations into.")
+            return
+        file_path = Path(current_file_path).absolute()
+        if dict_path.exists():
+            #TODO: Popup a dialog to confirm and select applying options (e.g. apply level)
+            
+            self.session.apply_dictionary(dict_path, file_path)
+        else:
+            logger.error(f"Dictionary file {dict_path} does not exist. Cannot import translations.")

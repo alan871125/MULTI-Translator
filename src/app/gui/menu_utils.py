@@ -32,7 +32,7 @@ def initialize_menu(
     ) -> dict[str, QMenu|QAction]:
         """Initialize menu and submenus from a *Flat* dictionary definition.  
         
-        ## Speciall indicators in the menu_def
+        ## Special indicators in the menu_def
             - key: "$n:MenuName" -> The menu item will be displayed as "MenuName" but the translation key will be based on the actual menu path. This is useful for items that need to display dynamic content like file paths.
             - value: "$separator" -> The menu item will be a separator. This is useful for visually grouping related menu items together.
             - value: "$menu" -> The menu item is a submenu placeholder, and will be initialized as an actual QMenu object. The display name will be based on the menu path. This is useful for quickly defining submenus without needing to specify display names.

@@ -88,7 +88,7 @@ class TranslationTableModel(QAbstractTableModel):
 
         save_path = save_path or Path(settings.output_dir) / self.file_path.name
         units = self.get_units()
-        self.engine.apply_translations(self.file_path, units, save_path=save_path)
+        self.engine.apply_translations(self.file_path, units, save_path=save_path, target_lang=settings.TARGET_LANG)
         logger.info(f"Saved translations to {save_path}")
 
     @override

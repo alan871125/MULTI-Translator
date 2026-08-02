@@ -77,7 +77,7 @@ class TopBar(QWidget):
     filter_clicked = pyqtSignal()
     workspace_clicked = pyqtSignal()
 
-    def __init__(self, settings, table_filters, parent=None):
+    def __init__(self, settings:Settings, table_filters:TableFilters, parent=None):
         super().__init__(parent)
         self.settings: Settings = settings
         self.table_filters: TableFilters = table_filters
@@ -119,4 +119,3 @@ class TopBar(QWidget):
         current_workspace = Path(self.settings.workspace_dir or "Default").name
         self.widgets['workspace_button'].setText(current_workspace)
         self.widgets['engine_select'].setCurrentText(self.settings.engine)
-        logger.debug('Top bar refreshed with current workspace and engine.')

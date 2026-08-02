@@ -19,8 +19,8 @@ WORKSPACE_FILE_EXTENSION = ".translation-workspace"
 DEFAULT_GLOBAL_WORKSPACE_FILE = "./default.translation-workspace"
 DEFAULT_LOCAL_WORKSPACE_FILE= "./workspace.translation-workspace"
 DEFAULT_SETTINGS_FILE = "settings.json"
-DEFAULT_GAME_DATA_DIR = "./data"
-DEFAULT_USER_DICT_DIR = "./dictionary"
+DEFAULT_GAME_DATA_DIR = "%WORKSPACE_DIR%/data"
+DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
 
 @dataclass
 class Confirmations:
@@ -112,10 +112,11 @@ class SettingsData:
 @dataclass
 class WorkspaceData:
     workspace_dir: Optional[str] = None  # None means the global default workspace
-    game_data_dir: Optional[str] = None
-    user_dict_dir: Optional[str] = None
+    game_data_dir: str = DEFAULT_GAME_DATA_DIR
+    user_dict_dir: str = DEFAULT_USER_DICT_DIR
     output_dir: str = "./output"
     engine: str = "RPG Maker MV"
+    db_path: str = "./user_dict.db"
     last_open_tabs: list[str] = field(default_factory=list)
     
     def asdict(self) -> dict:
@@ -165,7 +166,6 @@ StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_d
 class Settings(QObject):
     setting_changed = pyqtSignal(str)
     workspace_changed = pyqtSignal(str)
-    engine_changed = pyqtSignal(str)
     data: SettingsData
     workspace_data: WorkspaceData
     # type hint for static analysis, actual attributes are stored in self.data
@@ -189,15 +189,23 @@ class Settings(QObject):
             return getattr(self, item)
         except AttributeError:
             raise KeyError(f"{item} not found in SettingsData or WorkspaceData.")
+        
+    def translate_dir(self, d:str)->str:
+        d = d.replace('%WORKSPACE_DIR%', self.workspace_dir or os.getcwd())
+        d = d.replace('%CWD%', os.getcwd())
+        return Path(d).as_posix() # normalized dir
     @property
     def game_data_dir(self) -> str:
-        return self.workspace_data.game_data_dir or DEFAULT_GAME_DATA_DIR
+        return self.translate_dir(self.workspace_data.game_data_dir or DEFAULT_GAME_DATA_DIR)
     @property
     def output_dir(self) -> str:
-        return self.workspace_data.output_dir
+        return self.translate_dir(self.workspace_data.output_dir)
     @property
     def user_dict_dir(self) -> str:
-        return (Path(self.workspace_data.user_dict_dir or DEFAULT_USER_DICT_DIR)).as_posix()
+        return self.translate_dir(self.workspace_data.user_dict_dir or DEFAULT_USER_DICT_DIR)
+    @property
+    def db_path(self) -> str:
+        return self.translate_dir(self.workspace_data.db_path or "./user_dict.db")
     @property
     def confirmations(self) -> Confirmations:
         return self.data.confirmations

@@ -1,13 +1,12 @@
 import json
 import logging
 from pathlib import Path
-from dataclasses import dataclass, asdict, field
 from typing import Optional, override
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
-    QCheckBox, QFileDialog, QMainWindow, QTabWidget, QUndoStack, QWidget, 
+    QLabel,QCheckBox, QFileDialog, QMainWindow, QTabWidget, QUndoStack, QWidget, 
     QVBoxLayout, QHBoxLayout, 
     QPushButton, QMessageBox,
     QInputDialog, QDialog, QDialogButtonBox,
@@ -21,6 +20,8 @@ from app.models.translation_table_model import TranslationTableModel
 from app.translation_table import TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings
+
+from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
 from .components import TopBar, BottomPanel, RecentFilesMenu
@@ -30,15 +31,15 @@ logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
-from ..translation_table import EditType 
 
-
-    
 class TranslationApp(QMainWindow):
     edit_current_file_requested = pyqtSignal(EditType)
     save_current_file_requested = pyqtSignal(str)
     save_translation_requested = pyqtSignal()
+    load_dir_requested = pyqtSignal(str)
     load_file_requested = pyqtSignal(str)
+    import_from_file_requested = pyqtSignal(str)
+    import_from_dict_requested = pyqtSignal(str)
     
     def __init__(self, settings: Settings, filters: TableFilters):
         super().__init__()
@@ -62,7 +63,6 @@ class TranslationApp(QMainWindow):
         self.init_hotkeys()
         # 2. Register callbacks
         self.settings.setting_changed.connect(self.lru_menu.refresh)  # Refresh recent files menu when settings change
-        
         
     @override
     def closeEvent(self, event):
@@ -107,14 +107,24 @@ class TranslationApp(QMainWindow):
         # self.bottom_panel = BottomPanel(L, self)
         
         self.main_layout.addWidget(self.top_bar)
-        self.main_layout.addWidget(self.translation_table)
+        self.main_layout.addWidget(self.translation_table, 1)
         # self.main_layout.addWidget(self.bottom_panel)
+        # 5. Bottom Bar (show the current file full path)
+        self.main_layout.addStretch()  # Add stretch to push the bottom bar to the bottom
+        self.bottom_bar = QLabel()
+        self.bottom_bar.setFixedHeight(20)
+        self.bottom_bar.setStyleSheet("background-color: lightgray; padding-left: 5px;")
+        self.bottom_bar.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.main_layout.addWidget(self.bottom_bar)
         
     def init_menu_bar(self):
         self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
         menu_def = {
             "file.load_game_file": self.open_load_file_dialog,
             "file.load_workspace": self.open_load_workspace_dialog,
+            "file.open_directory": self.open_load_dir_dialog,
+            "file.import.from_file": self.open_import_from_file_dialog,
+            "file.import.from_dict": self.open_import_from_dict_dialog,
             # "file.new_workspace": self.open_load_workspace_dialog,
             "file.save_translation": self.save_translation_requested.emit,
             "file.recent_files": self.lru_menu,
@@ -126,11 +136,32 @@ class TranslationApp(QMainWindow):
             "tools.chinese_conversion.chs2cht": lambda: self.edit_current_file_requested.emit(EditType.CHS2CHT),
             "tools.chinese_conversion.cht2chs": lambda: self.edit_current_file_requested.emit(EditType.CHT2CHS),
         } 
-        menus = initialize_menu(menu_def, self.menuBar(), root_menu_name="menu", tr=L.__getitem__)
-        menus["file.save_translation"].setEnabled(False)  # Disable save translation action until a tab is loaded with a file
-        self.translation_table.tab_exist_signal.connect(lambda exist: menus["file.save_translation"].setEnabled(exist))  # Enable save action only when a tab with a loaded file exists
+        self.menus = initialize_menu(menu_def, self.menuBar(), root_menu_name="menu", tr=L.__getitem__)
         self.lru_menu.recent_file_selected.connect(self.load_file_requested.emit)  # Connect recent file selection to load file signal
+        self.settings.workspace_changed.connect(self.update_file_menu)
+        self.translation_table.tab_exist_signal.connect(self.on_tab_exist_changed)
+        self.on_tab_exist_changed(False)  # Initially disable save actions since no tab is open
         
+    def on_tab_exist_changed(self, exist: bool):
+        """Enable or disable the save translation action based on whether a tab with a loaded file exists."""
+        self.menus["file.save_translation"].setEnabled(exist)
+        self.menus["file.save_game_file"].setEnabled(exist)
+        self.menus["file.save_game_file_as"].setEnabled(exist)
+        
+    def update_file_menu(self):
+        extractor = engines.extractors[self.settings.engine]
+        if "file.open_directory" in self.menus:
+            self.menus["file.open_directory"].setEnabled(bool(extractor.SUPPORTED_DIR_TYPE))
+        else:
+            logger.error("Could not find 'file.open_directory' menu to update its enabled state.")
+        
+    def update_bottom_bar(self, file_path: Optional[str]):
+        """Update the bottom bar to show the current file path."""
+        if file_path:
+            self.bottom_bar.setText(file_path)
+        else:
+            self.bottom_bar.setText("No file loaded.")
+            
     def init_hotkeys(self):
         self.hotkeys = {
             "save": QShortcut(Qt.CTRL + Qt.Key_S, self),
@@ -172,14 +203,34 @@ class TranslationApp(QMainWindow):
             self.redo_action.setEnabled(False)
         
     def open_load_workspace_dialog(self):
-        workspace_dir = QFileDialog.getExistingDirectory(self, L["FileDialoge.select_workspace_dir"], "")
+        workspace_dir = QFileDialog.getExistingDirectory(self, L["file_dialog.select_workspace_dir"])
         if workspace_dir:
             self.settings.update_workspace(workspace_dir) # Load the selected workspace using the settings manager, which will also update recent files and refresh the top bar through signals
-            
-    def open_load_file_dialog(self):
+    
+    def get_file_filters(self) -> str:
         extractor = engines.extractors[self.settings.engine]()
         supported_types = extractor.SUPPORTED_FILES_TYPES
         file_filters = ";;".join(f"{ft.upper()} Files (*{ft})" for ft in supported_types)+f";;All Files (*.*)"
+        return file_filters
+    
+    def open_load_dir_dialog(self):
+        dir_path = QFileDialog.getExistingDirectory(self, L["file_dialog.select_directory"])
+        if dir_path:
+            self.load_dir_requested.emit(dir_path)  # Emit the signal to load the directory, which will be handled by the presenter
+    
+    def open_import_from_file_dialog(self):
+        file_filters = self.get_file_filters()
+        file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_game_file"], "", file_filters)
+        if file_path:
+            self.import_from_file_requested.emit(file_path)  # Emit the signal to import from the selected file
+            
+    def open_import_from_dict_dialog(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_translation_dictionary"], "", "CSV Files (*.csv)")
+        if file_path:
+            self.import_from_dict_requested.emit(file_path)
+            
+    def open_load_file_dialog(self):
+        file_filters = self.get_file_filters()
         file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_game_file"], "", file_filters)
         if not file_path:
             return  # User cancelled the file dialog
@@ -235,30 +286,18 @@ class TranslationApp(QMainWindow):
         return result
     
     def open_save_game_file_dialog(self, default_file_path: str) -> Optional[str]:
-        # if (model := self.translation_table.currentModel()) is None:
-        #     logger.warning("No active translation tab to save.")
-        #     return
-        # current_file = model.file_path
-        # default_name = current_file.name if current_file else "translated_file.json"
-        save_path, _ = QFileDialog.getSaveFileName(
-            self, L["file_dialog.save_translated_file"], default_file_path, 
-            "JSON Files (*.json);;All Files (*.*)"
-        )
+        if Path(default_file_path).is_dir():
+            save_path = QFileDialog.getExistingDirectory(
+                self, L["file_dialog.save_translated_file"], default_file_path
+            )
+        else:
+            save_path, _ = QFileDialog.getSaveFileName(
+                self, L["file_dialog.save_translated_file"], default_file_path, 
+                filter = self.get_file_filters()
+            )
         if not save_path:
             return  # User cancelled the save dialog
         return save_path
-    
-    # def save_game_file(self):        
-    #     if (model := self.translation_table.currentModel()) is None:
-    #         logger.warning("No active translation tab to save.")
-    #         return
-    #     try:
-    #         model.save_to_game_file()
-    #         # TODO: Implement the status bar
-    #         self.statusBar().showMessage(L["statusBar.saved_success"], 3000)
-    #     except Exception as e:
-    #         logger.exception(f"Failed to save game file: {e}")
-    #         QMessageBox.critical(self, "Save Error", f"Could not save game file:\n{e}")
     
     def open_settings(self):
         """Open settings dialog"""

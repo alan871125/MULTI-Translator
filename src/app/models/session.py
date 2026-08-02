@@ -1,14 +1,12 @@
 
 import json
 import logging
+import pandas as pd
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
-from PyQt5.QtCore import QObject, pyqtSignal
-from typing import Literal
-
-import pandas as pd
 from PyQt5.QtWidgets import QUndoStack
+from PyQt5.QtCore import QObject, pyqtSignal
 
 from iod import IndexedOrderedDict
 
@@ -16,8 +14,9 @@ from app.models.filters import TableFilters
 from app.settings import Settings
 from app.translation_table import logger
 from core import engines
-from core.translation import TranslationLevel, dictionary
+from core.translation import TranslationLevel
 from core.translation.dictionary import TranslationDictionary
+from core.translation.dictionary_database import TranslationDictionaryDatabase
 from .translation_table_model import TranslationTableModel, TranslationCommand, ShareTranslationCommand
 
 logger = logging.getLogger(__name__)
@@ -29,6 +28,7 @@ class TranslationSession(QObject):
     
     def __init__(self, settings:Settings, filters: TableFilters, parent: Optional[QObject] = None):
         super().__init__(parent)
+        self.db = TranslationDictionaryDatabase(settings.db_path)
         self.dictionaries: dict[str, TranslationDictionary] = {}
         # Use IOD to keep aligned indexes between the models/views and the undo stacks.
         self.models: IndexedOrderedDict[str, TranslationTableModel] = IndexedOrderedDict()
@@ -41,11 +41,13 @@ class TranslationSession(QObject):
         name = name or file_path.as_posix()
         dictionary = TranslationDictionary.load(file_path.with_suffix('.csv'))
         self.dictionaries[name] = dictionary
+        self.db.insert_from_dataframe(dictionary.df)
         return dictionary
     
     def unload_dictionary(self, name: str):
         if name in self.dictionaries:
             del self.dictionaries[name]
+            # TODO: Remove from database if needed
     
     def save_dictionary(self, key: str, save_path: Optional[str|Path] = None):
         if (model := self.models.get(key)) is None:
@@ -96,7 +98,31 @@ class TranslationSession(QObject):
             # should notify the user about the error
         except Exception as e:
             logger.error(f"Failed to open file {file_path}: {e}")
-    
+            
+    def open_dir(self, dir_path: str|Path) -> Optional[TranslationTableModel]:
+        dir_path = Path(dir_path).absolute()
+        extractor = engines.extractors[self.settings.engine]()
+        if not extractor.SUPPORTED_DIR_TYPE:
+            logger.error(f"The current engine '{self.settings.engine}' does not support directory extraction.")
+            return None
+        elif not extractor.SUPPORTED_DIR_TYPE.is_valid(dir_path):
+            logger.error(f"The directory {dir_path} is not a valid {extractor.SUPPORTED_DIR_TYPE}.")
+            return None
+        try:
+            key = dir_path.as_posix()
+            model = TranslationTableModel(
+                data=extractor.extract_dir(dir_path, source_lang=self.settings.SOURCE_LANG, target_lang=self.settings.TARGET_LANG), 
+                filters=self.filters,
+                file_path=dir_path,
+                engine=extractor,
+                undo_stack=self.history_stacks.setdefault(key, QUndoStack()) 
+            )
+            self.models[key] = model
+            self.file_opened.emit(key, model)
+            return model
+        except Exception as e:
+            logger.error(f"Failed to open directory {dir_path}: {e}")
+        
     def close_index(self, index: int):
         if index < 0 or index >= len(self.models):
             logger.warning(f"Attempted to close a file that is not open: {index}")
