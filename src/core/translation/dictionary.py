@@ -67,7 +67,11 @@ class TranslationDictionary:
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-        df = pd.read_csv(file_path, converters={"key": JsonPath})
+        df = pd.read_csv(
+            file_path, converters={"key": JsonPath}, 
+            # cast the columns to the correct types, preventing converting "None" to null
+            dtype={"original":str, "translation":str, "level":int, "file":str}
+        )
         return cls(df=df, source_lang=source_lang, target_lang=target_lang)
 
 class TranslationDictionaryLong:

@@ -97,7 +97,10 @@ class TranslationDictionaryDatabase:
             ON CONFLICT(file, key) DO UPDATE SET
             {set_clause};
         """
-
+        null_originals = df.original.isnull()
+        if null_originals.any():
+            logger.warning(f"Found {null_originals.sum()} rows with null 'original' values. These rows will be skipped.")
+            df = df[~null_originals]
         # Extract rows as tuples instead of dicts to match standard positional (?) placeholders
         records = [tuple(row) for row in df.itertuples(index=False)]
 
