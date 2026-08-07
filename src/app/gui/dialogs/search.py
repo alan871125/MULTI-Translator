@@ -57,7 +57,9 @@ class SearchLineEdit(qt.QLineEdit):
 
 class SearchDialog(qt.QDialog):
     # Note: suppose the replace uses regex if the search does.
-    replace_requested = pyqtSignal(dict, str, str)  # filters, replace_text, column
+    replace_requested = pyqtSignal(list, str, str)  # filters, replace_text, column
+    SEARCH_COLUMNS = ["file", "key", "original", "translation"]
+    REPLACE_START_ROW = 2  # The row index in the grid layout where the replace row starts  
     def __init__(self, filters:TableFilters, parent=None):
         super().__init__(parent)
         self.filters = filters
@@ -98,11 +100,11 @@ class SearchDialog(qt.QDialog):
             QToolButton:hover { background: #e0e0e0; }
         """)
         # Place button in Grid: row 0, col 0, spanning 2 rows initially (original & translation)
-        grid_layout.addWidget(self.fold_button, 0, 0, 2, 1)
+        grid_layout.addWidget(self.fold_button, self.REPLACE_START_ROW, 0, 2, 1)
         
         # 4. Loop to populate the two search rows
-        search_columns = ["original", "translation"]
-        for idx, col in enumerate(search_columns):
+        
+        for idx, col in enumerate(self.SEARCH_COLUMNS):
             # Form Label
             lbl = qt.QLabel(L[col], self)
             grid_layout.addWidget(lbl, idx,  1) # row idx, col 1
@@ -174,8 +176,8 @@ class SearchDialog(qt.QDialog):
         replace_button.clicked.connect(self.on_replace)
         replace_container_layout.addWidget(replace_button)
         
-        # Place the replace widget on row 2, stretching across columns 1 and 2
-        grid_layout.addWidget(self.replace_widget, 2, 1, 1, 2)
+        # Place the replace widget after the last search row, spanning 2 columns (label + entry)
+        grid_layout.addWidget(self.replace_widget, len(self.SEARCH_COLUMNS), 1, 1, 2)
         self.replace_widget.setVisible(False) 
         
         layout.addLayout(grid_layout)
@@ -207,7 +209,7 @@ class SearchDialog(qt.QDialog):
             # Snap dialog into position
             self.move(x, y)
     
-    def toggle_replace_row(self, checked, grid_layout):
+    def toggle_replace_row(self, checked, grid_layout:qt.QGridLayout):
         """Updates layout span and visibility dynamically on fold."""
         # 1. Update visibility
         self.replace_widget.setVisible(checked)
@@ -218,42 +220,42 @@ class SearchDialog(qt.QDialog):
         grid_layout.removeWidget(self.fold_button)
         
         if checked:
-            # If toggled open, stretch the button across 3 rows (0, 1, and 2)
-            grid_layout.addWidget(self.fold_button, 0, 0, 3, 1)
+            # If toggled open, stretch the button across 3 rows last three rows
+            grid_layout.addWidget(self.fold_button, self.REPLACE_START_ROW, 0, 3, 1)
         else:
-            # If toggled closed, only stretch across the 2 search rows (0 and 1)
-            grid_layout.addWidget(self.fold_button, 0, 0, 2, 1)
+            # If toggled closed, only stretch across the 2 search rows (original & translation)
+            grid_layout.addWidget(self.fold_button, self.REPLACE_START_ROW, 0, 2, 1)
             
         # 3. Force instant geometry calculation recalculation 
         self.layout().activate()
         qt.QApplication.processEvents()
         self.adjustSize()
 
-    def create_replace_options(self):
-        # 2. REPLACE LINE (Bottom Line - Foldable)
-        replace_box = qt.QWidget(self)
-        replace_box.setObjectName("ReplaceBox")
-        rb_layout = qt.QHBoxLayout(replace_box)
-        rb_layout.setContentsMargins(5, 2, 5, 2)
-        rb_layout.setSpacing(2)
+    # def create_replace_options(self):
+    #     # 2. REPLACE LINE (Bottom Line - Foldable)
+    #     replace_box = qt.QWidget(self)
+    #     replace_box.setObjectName("ReplaceBox")
+    #     rb_layout = qt.QHBoxLayout(replace_box)
+    #     rb_layout.setContentsMargins(5, 2, 5, 2)
+    #     rb_layout.setSpacing(2)
         
-        # Indent placeholder spacing underneath the upper arrow
-        indent_spacer = qt.QLabel("   ", self)
-        rb_layout.addWidget(indent_spacer)
+    #     # Indent placeholder spacing underneath the upper arrow
+    #     indent_spacer = qt.QLabel("   ", self)
+    #     rb_layout.addWidget(indent_spacer)
         
-        # Replace Label or Icon
-        replace_icon = qt.QLabel("✍️", self) # Or leave empty string if you want it blank
-        rb_layout.addWidget(replace_icon)
+    #     # Replace Label or Icon
+    #     replace_icon = qt.QLabel("✍️", self) # Or leave empty string if you want it blank
+    #     rb_layout.addWidget(replace_icon)
         
-        # Replace Input Entry
-        replace_entry = qt.QLineEdit(self)
-        replace_entry.setFrame(False)
-        replace_entry.setPlaceholderText("Replace with...")
-        rb_layout.addWidget(replace_entry)
+    #     # Replace Input Entry
+    #     replace_entry = qt.QLineEdit(self)
+    #     replace_entry.setFrame(False)
+    #     replace_entry.setPlaceholderText("Replace with...")
+    #     rb_layout.addWidget(replace_entry)
         
-        # Set Replace row to hidden initially
-        replace_box.setVisible(False)
-        return replace_box, replace_entry
+    #     # Set Replace row to hidden initially
+    #     replace_box.setVisible(False)
+    #     return replace_box, replace_entry
             
     def reset_filters(self):
         for controls in self.filter_entries.values():

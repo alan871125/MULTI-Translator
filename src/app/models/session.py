@@ -185,7 +185,8 @@ class TranslationSession(QObject):
             logger.warning(f"Attempted to set translation for a file that is not open: {file_path}")
             return
         history = self.get_history_stack(file_path)
-        idxs = model.get_true_indexes(idxs)
+        
+        idxs = pd.Index(idxs) if isinstance(idxs, Iterable) else pd.Index([idxs])
         history.beginMacro(f"Set Translation for {len(idxs)} rows")
         history.push(TranslationCommand(
             model=model,

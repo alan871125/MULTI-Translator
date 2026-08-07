@@ -9,6 +9,7 @@ from typing import Any, Iterable, Literal, cast, override, Optional
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
+from app.models.filters import ColumnFilter
 from config import settings
 from core.engines._base import BaseExtractor
 from core.text_unit import TextUnit
@@ -260,9 +261,8 @@ class TranslationTableModel(QAbstractTableModel):
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return True
 
-    def search_and_replace(self, filters: dict, replace_text: str, column: Literal['original', 'translation'] = "original"):
+    def search_and_replace(self, filters: list[ColumnFilter], replace_text: str, column: Literal['original', 'translation'] = "original"):
         """Replace translations based on search criteria. 
-        Filters is a dict of {column: {"text": str, "is_regex": bool, "match_case": bool}}.
         Replace_text is a regex pattern or plain text to replace with. 
         Column specifies which column to apply the search and replace on if both are in the filters.
         Returns the number of replacements made.
@@ -270,17 +270,15 @@ class TranslationTableModel(QAbstractTableModel):
         if column not in self.df.columns:
             return 0
         mask = self.filter_mask
-        if not mask.any():
+        if not mask.any() or not filters:
             return 0
-        if column == "original":
-            _filter = filters.get(column, filters.get("translation", {}))
-        elif column == "translation":
-            _filter = filters.get(column, {})
-        else:
-            raise ValueError("Invalid column specified for search and replace.")
-
+        for _filter in filters:
+            # Prioritizes Translation column if multiple filters are provided.
+            #TODO: consider allowing the user to specify which column to prioritize or apply the replace on.
+            if _filter.column == 'translation':
+                break
         self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
-            _filter.get("text", ""), replace_text, regex=_filter.get("is_regex", False),
+            _filter.text, replace_text, regex=_filter.is_regex, case=_filter.match_case
         )
         self._filtered_df = None # Invalidate cache
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
