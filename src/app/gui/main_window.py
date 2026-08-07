@@ -67,7 +67,7 @@ class TranslationApp(QMainWindow):
     @override
     def closeEvent(self, event):
         # save the current state of the application
-        open_tabs = self.translation_table.tabs.keys()
+        open_tabs = list(self.translation_table.tabs.keys())
         self.settings.last_open_tabs = open_tabs
         self.settings.last_open_workspace = self.settings.workspace_dir
         self.settings.save()

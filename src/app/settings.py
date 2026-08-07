@@ -152,8 +152,12 @@ class WorkspaceData:
             path = Path(path)
         if path.suffix != ".translation-workspace":
             logger.warning(f"Saving workspace settings to a file with unexpected extension: {path}. Expecting '.translation-workspace'.")
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(self.asdict(), f, indent=4, ensure_ascii=False)
+        try: # prevent breaking the existing workspace settings if saving fails
+            dumps = json.dumps(self.asdict(), indent=4, ensure_ascii=False) 
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(dumps)
+        except Exception as e:
+            logger.error(f"Error saving workspace settings to {path}: {e}")
 
     
     
