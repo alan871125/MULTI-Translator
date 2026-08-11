@@ -255,8 +255,9 @@ class TranslationTableModel(QAbstractTableModel):
         elif isinstance(levels, TranslationLevel):
             self.df.loc[idxs, "level"] = levels
         elif isinstance(levels, Iterable):
-            self.df.loc[idxs, "level"] = pd.Series(levels, index=idxs)
-
+            self.df.loc[idxs, "level"] = pd.Series(list(levels), index=idxs)
+        else:
+            logger.error(f"Invalid type for levels: {type(levels)}. Must be TranslationLevel or Iterable[TranslationLevel].")
         self._filtered_df = None # Invalidate cache
         self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
         return True
@@ -395,7 +396,7 @@ class ShareTranslationCommand(TranslationCommand):
         same_original_idxs = model.get_idxs_same_original(idx, is_filtered=False, max_level=max_level)
         # Get the current translation to be shared
         current_translation = model.df.iloc[idx].translation
-        levels = model.df.iloc[idx].level
+        levels = TranslationLevel(model.df.iloc[idx].level)
         super().__init__(
             model=model,
             idxs=same_original_idxs,

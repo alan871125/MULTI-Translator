@@ -198,7 +198,8 @@ class TranslationSession(QObject):
         if share:
             for idx in idxs:
                 history.push(ShareTranslationCommand(
-                    model, idx, description=f"Share Translation for index: {idx}"
+                    model, idx, description=f"Share Translation for index: {idx}",
+                    max_level=TranslationLevel.VERIFIED
                 ))
         history.endMacro()
         

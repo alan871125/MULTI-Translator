@@ -129,7 +129,8 @@ class TranslationAppPresenter:
             logger.warning(f"Attempted to copy cells for a file that is not open: {file_path}")
             return
         # Get the text of the selected cells and join them with newlines for copying to clipboard
-        cell_texts = model.df.iloc[row_idxs, col_idx].astype(str).tolist()
+        idxs = model.get_true_indexes(row_idxs)
+        cell_texts = model.df.iloc[idxs, col_idx].astype(str).tolist()
         clipboard_text = "\r\n".join(cell_texts)
         QApplication.clipboard().setText(clipboard_text)
     
