@@ -40,6 +40,9 @@ def rimworld_dir_iter(mod_dir:Path, subdir:Literal["Languages","Defs", "Textures
         if (mod_dir/version/subdir).exists():
             yield mod_dir/version/subdir
             return
+        if (mod_dir/subdir).exists():
+            yield mod_dir/subdir
+            return
         elif (mod_dir/fallback_version/subdir).exists():
             yield mod_dir/fallback_version/subdir
             return
@@ -325,7 +328,7 @@ class RimWorldExtractor(BaseExtractor):
     
     def export_mod_translations(self, 
         mod_root:Path|str, save_root: Path|str, text_units: list[TextUnit]|DataFrame, language:str,
-        translation_mod_fields: Optional[dict] = None, **kwargs
+        translation_mod_fields: Optional[dict] = None, about:bool=True,**kwargs
     ):
         """Export translations as a new mod.
         
@@ -377,7 +380,8 @@ class RimWorldExtractor(BaseExtractor):
         is_keyed = ~is_definjected & ~is_strings
         
         save_root = Path(save_root)
-        write_about_xml(save_root/"About/About.xml", **mod_fields)
+        if about:
+            write_about_xml(save_root/"About/About.xml", **mod_fields)
         
         for reldir in unique_reldirs:
             self._export_xml_translations(
