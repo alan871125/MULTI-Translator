@@ -170,6 +170,10 @@ class SearchDialog(qt.QDialog):
         
         replace_container_layout.addWidget(replace_box, stretch=1)
         
+        self.replace_source_checkbox = qt.QCheckBox(L["replace_from_original"], self)
+        self.replace_source_checkbox.setChecked(True)
+        replace_container_layout.addWidget(self.replace_source_checkbox)
+
         replace_button = qt.QPushButton(L["replace_all"], self)
         replace_button.setCursor(Qt.PointingHandCursor)
         replace_button.clicked.connect(self.on_replace)
@@ -285,7 +289,10 @@ class SearchDialog(qt.QDialog):
         return filters
     
     def on_replace(self):
-        column="original"  #TODO: add option to select which column to replace from
+        if self.replace_source_checkbox.isChecked():
+            column = "original"
+        else:
+            column = "translation"
         filters = self.get_filters()
         replace_text = self.replace_entry.text().strip()
         # Emit the replace signal with search criteria and replacement text
