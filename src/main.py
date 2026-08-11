@@ -3,6 +3,7 @@ import sys
 import shutil
 import traceback
 import logging
+import colorlog
 from dotenv import load_dotenv
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTextEdit
 
@@ -13,7 +14,31 @@ import resources_rc
 from config import settings
 from app.gui.main_window import TranslationApp
 
-logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
+def setup_logging():
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(
+        colorlog.ColoredFormatter(
+            "%(log_color)s[%(asctime)s][%(levelname).1s][%(name)s]%(reset)s %(message)s",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red,bg_white",
+            },
+        )
+    )
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    # Remove any existing handlers (important if basicConfig() was called elsewhere)
+    root.handlers.clear()
+
+    root.addHandler(handler)
+# Call once in main.py
+setup_logging()
+
 logger = logging.getLogger(__name__)
 
 def load_dotenv_example():

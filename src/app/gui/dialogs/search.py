@@ -17,7 +17,6 @@ from app.language import LanguagePack
 from core.translation import TranslationLevel
 from ...models.filters import ColumnFilter, TableFilters
 
-logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 

@@ -27,7 +27,6 @@ from .dialogs.search import SearchDialog
 from .components import TopBar, BottomPanel, RecentFilesMenu
 import core.engines as engines
 
-logging.basicConfig(format='[%(asctime)s][%(levelname).1s][%(name)s] %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
@@ -225,7 +224,10 @@ class TranslationApp(QMainWindow):
             self.import_from_file_requested.emit(file_path)  # Emit the signal to import from the selected file
             
     def open_import_from_dict_dialog(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_translation_dictionary"], "", "CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, L["file_dialog.select_translation_dictionary"], 
+            self.settings.user_dict_dir, "CSV Files (*.csv)"
+        )
         if file_path:
             self.import_from_dict_requested.emit(file_path)
             
