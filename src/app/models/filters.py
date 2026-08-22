@@ -1,7 +1,9 @@
 import pandas as pd
 from typing import overload, Literal
 from dataclasses import dataclass
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject
+
+from qt_utils import TypedQtSignal
 from core.translation import TranslationLevel
 
 @dataclass
@@ -27,8 +29,8 @@ class ColumnFilter:
         return bool(self.text)  # A filter is considered active if it has non-empty text
 
 class TableFilters(QObject):
-    text_filter_changed = pyqtSignal()
-    level_filter_changed = pyqtSignal(list)
+    text_filter_changed = TypedQtSignal()
+    level_filter_changed = TypedQtSignal(list)
     levels = {lv:True for lv in TranslationLevel}  # Keep track of which translation levels are currently selected for filtering
     filters: dict[str, ColumnFilter] = {}
 

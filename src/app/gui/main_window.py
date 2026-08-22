@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional, override
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QLabel,QCheckBox, QFileDialog, QMainWindow, QTabWidget, QUndoStack, QWidget, 
@@ -21,24 +21,25 @@ from app.translation_table import TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings
 
+import core.engines as engines
+from qt_utils import TypedQtSignal
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
 from .components import TopBar, BottomPanel, RecentFilesMenu
-import core.engines as engines
 
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
 
 class TranslationApp(QMainWindow):
-    edit_current_file_requested = pyqtSignal(EditType)
-    save_current_file_requested = pyqtSignal(str)
-    save_translation_requested = pyqtSignal()
-    load_dir_requested = pyqtSignal(str)
-    load_file_requested = pyqtSignal(str)
-    import_from_file_requested = pyqtSignal(str)
-    import_from_dict_requested = pyqtSignal(str)
+    edit_current_file_requested = TypedQtSignal(EditType)
+    save_current_file_requested = TypedQtSignal(str)
+    save_translation_requested = TypedQtSignal()
+    load_dir_requested = TypedQtSignal(str)
+    load_file_requested = TypedQtSignal(str)
+    import_from_file_requested = TypedQtSignal(str)
+    import_from_dict_requested = TypedQtSignal(str)
     
     def __init__(self, settings: Settings, filters: TableFilters):
         super().__init__()
@@ -147,7 +148,7 @@ class TranslationApp(QMainWindow):
         self.menus["file.save_game_file"].setEnabled(exist)
         self.menus["file.save_game_file_as"].setEnabled(exist)
         
-    def update_file_menu(self):
+    def update_file_menu(self, _:Optional[str] = None):
         extractor = engines.extractors[self.settings.engine]
         if "file.open_directory" in self.menus:
             self.menus["file.open_directory"].setEnabled(bool(extractor.SUPPORTED_DIR_TYPE))

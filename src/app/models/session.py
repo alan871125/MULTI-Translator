@@ -6,10 +6,11 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 from PyQt5.QtWidgets import QUndoStack
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject
 
 from iod import IndexedOrderedDict
 
+from qt_utils import TypedQtSignal
 from app.models.filters import TableFilters
 from app.settings import Settings
 from app.translation_table import logger
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class TranslationSession(QObject):
-    file_opened = pyqtSignal(str, TranslationTableModel)  # Signal emitted when a file is opened, with the file path and model as arguments
-    file_closed = pyqtSignal(str)  # Signal emitted when a file is closed, with the file path as an argument
+    file_opened = TypedQtSignal(str, TranslationTableModel)  # Signal emitted when a file is opened, with the file path and model as arguments
+    file_closed = TypedQtSignal(str)  # Signal emitted when a file is closed, with the file path as an argument
     
     def __init__(self, settings:Settings, filters: TableFilters, parent: Optional[QObject] = None):
         super().__init__(parent)

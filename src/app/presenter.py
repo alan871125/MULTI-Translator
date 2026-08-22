@@ -65,20 +65,20 @@ class TranslationAppPresenter:
         self.main_window.bind_undo_redo_actions(history)
         self.main_window.update_bottom_bar(file_path)  # Update the bottom bar with the current file path
         
-    def handle_edit_current_file_request(self, EditType: Literal[EditType.CHS2CHT,EditType.CHT2CHS]):
+    def handle_edit_current_file_request(self, edit_type: EditType):
         """Handles a request to edit a file."""
         file_path = self.translation_tab_widget.get_current_file_path()
         if file_path is None:
             # TODO: This case should ideally never happen because the edit action should be disabled when no file is open
             logger.warning("No file is currently open to edit.")
             return
-        match EditType:
+        match edit_type:
             case EditType.CHS2CHT:
                 self.session.chs2cht(file_path)
             case EditType.CHT2CHS:
                 self.session.cht2chs(file_path)
             case _:
-                raise ValueError(f"Unknown EditType: {EditType}")
+                raise NotImplementedError(f"Handling for EditType {edit_type} is not implemented.")
 
     def handle_edit_translation_request(self, file_path:Path|str, row_idxs: Sequence[int], EditType: EditType):
         """Handles a request to edit a translation. 

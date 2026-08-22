@@ -3,12 +3,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, override
 
-from PyQt5.QtCore import Qt, pyqtSignal, QSortFilterProxyModel, QModelIndex
+from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtGui import QDropEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QWidget, QTabBar
 )
+from qt_utils import TypedQtSignal
 from iod import IndexedOrderedDict
 from config import settings
 from core.translation import TranslationLevel, TranslationDictionary, Translator
@@ -30,9 +31,9 @@ class EditType(Enum):
     
 class TranslationTableView(QTableView):
     _COLWIDTHS = [60, 80, 500, 500]
-    edit_translation_requested = pyqtSignal(list, EditType)  # row indexes, edit type
-    copy_cells_requested = pyqtSignal(list, int)  # row indexes, column index (only support single column for now)
-    set_level_requested = pyqtSignal(list, TranslationLevel)  # row indexes, level
+    edit_translation_requested = TypedQtSignal(list, EditType)  # row indexes, edit type
+    copy_cells_requested = TypedQtSignal(list, int)  # row indexes, column index (only support single column for now)
+    set_level_requested = TypedQtSignal(list, TranslationLevel)  # row indexes, level
     def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
@@ -143,9 +144,9 @@ class TranslationTabWidget(QTabWidget):
     
     It keeps track of the open tabs and their corresponding file paths, 
     provides signals for when tabs are added or removed, as well as when the current tab changes."""
-    tab_exist_signal = pyqtSignal(bool)  # file_name
-    tab_save_signal = pyqtSignal(str)  # file_name
-    open_dropped_file_request = pyqtSignal(str)  # file_path
+    tab_exist_signal = TypedQtSignal(bool)  # file_name
+    tab_save_signal = TypedQtSignal(str)  # file_name
+    open_dropped_file_request = TypedQtSignal(str)  # file_path
     def __init__(self, table_filters:TableFilters, parent:Optional[QWidget]=None):
         super().__init__(parent)
         self.table_filters = table_filters

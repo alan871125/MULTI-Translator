@@ -6,7 +6,8 @@ from pathlib import Path
 from dataclasses import dataclass, asdict, field
 
 from typing import Any, Optional, overload, Literal
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject
+from qt_utils import TypedQtSignal
 
 from core.json_utils import JSONWithCommentsDecoder
 from core.lru_file import LeastRecentlyUsedFiles
@@ -168,8 +169,8 @@ StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_d
 
 
 class Settings(QObject):
-    setting_changed = pyqtSignal(str)
-    workspace_changed = pyqtSignal(str)
+    setting_changed = TypedQtSignal(str)
+    workspace_changed = TypedQtSignal(str)
     data: SettingsData
     workspace_data: WorkspaceData
     # type hint for static analysis, actual attributes are stored in self.data

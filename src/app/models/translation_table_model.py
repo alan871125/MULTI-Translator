@@ -4,11 +4,12 @@
 import logging
 import pandas as pd
 from pathlib import Path
-from typing import Any, Iterable, Literal, cast, override, Optional
+from typing import Any, Iterable, Literal, cast, override, Optional, overload
 
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, QSortFilterProxyModel
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
+
 from app.models.filters import ColumnFilter
 from config import settings
 from core.engines._base import BaseExtractor
@@ -178,7 +179,7 @@ class TranslationTableModel(QAbstractTableModel):
         return flags
 
     # ----- Filtering -----
-    def on_filter_changed(self):
+    def on_filter_changed(self, *args, **kwargs):
         self.beginResetModel()
         self._mask_indexes = None
         self._filtered_df = None
@@ -205,7 +206,15 @@ class TranslationTableModel(QAbstractTableModel):
         mask = self.filter_mask
         self._filtered_df = self.df[mask].reset_index(drop=True)
         return self._filtered_df
-
+    
+    def get_true_index(self, filtered_index: int) -> int:
+        """Convert a filtered row index to the true index in the original data. 
+        This is necessary because the view operates on the filtered data, but updates need to be applied to the original data.
+        """
+        if self._mask_indexes is None:
+            return filtered_index
+        return self._mask_indexes[filtered_index]
+    
     def get_true_indexes(self, indexes: Iterable[int]) -> pd.Index:
         """Convert filtered row indexes to true indexes in the original data. 
         This is necessary because the view operates on the filtered data, but updates need to be applied to the original data.
@@ -364,6 +373,55 @@ class TranslationTableModel(QAbstractTableModel):
         df = self.filtered_df if is_filtered else self.df
         out = df.iloc[indexes].reset_index().groupby("original").index.min()
         return pd.Index(out.values)
+
+class CaseInsensitiveSortProxyModel(QSortFilterProxyModel):
+    def lessThan(self, left_index, right_index):
+        # Retrieve display values for comparison
+        left_data = self.sourceModel().data(left_index, Qt.DisplayRole)
+        right_data = self.sourceModel().data(right_index, Qt.DisplayRole)
+        
+        # Convert to string and lowercase for case-insensitive comparison
+        left_str = str(left_data).lower() if left_data is not None else ""
+        right_str = str(right_data).lower() if right_data is not None else ""
+        
+        return left_str < right_str
+
+
+class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
+    """A proxy model for the TranslationTableModel to support sorting and filtering in the view."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDynamicSortFilter(True)
+        self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+    @override
+    def setSourceModel(self, sourceModel: TranslationTableModel) -> None:
+        assert isinstance(sourceModel, TranslationTableModel)
+        super().setSourceModel(sourceModel)
+    @override
+    def sourceModel(self) -> TranslationTableModel:
+        source = super().sourceModel()
+        assert isinstance(source, TranslationTableModel)
+        return source
+    def get_true_index(self, proxy_index: QModelIndex) -> QModelIndex:
+        """Convert a proxy index to the corresponding source model index."""
+        if not proxy_index.isValid():
+            return QModelIndex()
+        return self.mapToSource(proxy_index)
+    @overload
+    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[QModelIndex]) -> list[QModelIndex]: ...
+    @overload
+    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[int]) -> list[int]: ...
+    @overload
+    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[pd.Index]) -> pd.Index: ...
+    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type = QModelIndex) -> list[QModelIndex]|list[int]|pd.Index:
+        """Convert a list of proxy indexes to the corresponding source model indexes or row numbers."""
+        if dtype == QModelIndex:
+            return [self.mapToSource(idx) for idx in proxy_indexes]
+        elif dtype == int:
+            return [self.mapToSource(idx).row() for idx in proxy_indexes]
+        elif dtype == pd.Index:
+            return pd.Index([self.mapToSource(idx).row() for idx in proxy_indexes])
+        raise ValueError(f"Unsupported dtype: {dtype}. Must be QModelIndex, int, or pd.Index.")
 
 class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""

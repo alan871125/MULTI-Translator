@@ -1,20 +1,12 @@
-import json
 import logging
 import PyQt5.QtWidgets as qt
-from typing import overload, Literal
-from pathlib import Path
-from dataclasses import dataclass, asdict, field
 
-import pandas as pd
-from deep_translator import GoogleTranslator
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialogButtonBox
+from typing import Literal
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import QObject, Qt, pyqtSignal
-from PyQt5.QtGui import QDropEvent, QCursor, QIcon
-from PyQt5.QtWidgets import QAction, QLineEdit, QTableWidget, QDialogButtonBox
-
+from qt_utils import TypedQtSignal
 from app.language import LanguagePack
-from core.translation import TranslationLevel
 from ...models.filters import ColumnFilter, TableFilters
 
 logger = logging.getLogger(__name__)
@@ -56,7 +48,7 @@ class SearchLineEdit(qt.QLineEdit):
 
 class SearchDialog(qt.QDialog):
     # Note: suppose the replace uses regex if the search does.
-    replace_requested = pyqtSignal(list, str, str)  # filters, replace_text, column
+    replace_requested: TypedQtSignal[list, str, Literal["original", "translation"]] = TypedQtSignal(list, str, Literal["original", "translation"])  # filters, replace_text, column
     SEARCH_COLUMNS = ["file", "key", "original", "translation"]
     REPLACE_START_ROW = 2  # The row index in the grid layout where the replace row starts  
     def __init__(self, filters:TableFilters, parent=None):
