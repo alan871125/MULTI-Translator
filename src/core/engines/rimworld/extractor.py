@@ -381,7 +381,7 @@ class RimWorldExtractor(BaseExtractor):
         
         save_root = Path(save_root)
         if about:
-            write_about_xml(save_root/"About/About.xml", **mod_fields)
+            write_about_xml(save_root, **mod_fields)
         
         for reldir in unique_reldirs:
             self._export_xml_translations(
