@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, override
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QSortFilterProxyModel, QModelIndex
 from PyQt5.QtGui import QDropEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
@@ -14,7 +14,7 @@ from config import settings
 from core.translation import TranslationLevel, TranslationDictionary, Translator
 from .language import LanguagePack
 from .models.filters import TableFilters
-from .models.translation_table_model import TranslationTableModel
+from .models.translation_table_model import CaseInsensitiveSortProxyModel, TranslationTableModel, TranslationTableProxyModel
 
 logger = logging.getLogger(__name__)
 L = LanguagePack()
@@ -27,7 +27,7 @@ class EditType(Enum):
     PASTE = "paste"
     CHS2CHT = "chs2cht"
     CHT2CHS = "cht2chs"
-
+    
 class TranslationTableView(QTableView):
     _COLWIDTHS = [60, 80, 500, 500]
     edit_translation_requested = pyqtSignal(list, EditType)  # row indexes, edit type
@@ -60,41 +60,46 @@ class TranslationTableView(QTableView):
             hotkey.activated.connect(
                 lambda lvl=level: self.on_level_hotkey_triggered(lvl)
             )
-
+    
+    @property
+    def selected_source_rows(self)  -> list[int]:
+        """Returns the source model row indexes of the currently selected rows in the view."""
+        sel = self.selectionModel().selectedRows()
+        return self.proxy_model.get_true_indexes(sel, int)
+    
     @override
-    def setModel(self, model):
+    def setModel(self, model: TranslationTableProxyModel):
         super().setModel(model)
+        self.proxy_model = model
+        self.setSortingEnabled(True)
         self.set_column_widths(self._COLWIDTHS)
 
     @override
     def keyPressEvent(self, event):
         key = event.key()
         sequence = QKeySequence(event.modifiers() | key)
-        rows = self.selectionModel().selectedRows()
+        idxs = self.selected_source_rows
         if sequence.matches(QKeySequence.Paste):
-            if len(rows) > 0:
-                idxs = [idx.row() for idx in rows]
+            if len(idxs) > 0:
                 self.edit_translation_requested.emit(idxs, EditType.PASTE)
         if sequence.matches(QKeySequence.Copy):
             col = self.selectionModel().currentIndex().column()
-            if len(rows) != 0:
-                idxs = [idx.row() for idx in rows]
+            if len(idxs) != 0:
                 self.copy_cells_requested.emit(idxs, col)  # Emit the column index of the selected cell
         elif key in (Qt.Key_Return, Qt.Key_Enter):
             # If currently inline editing, let the view handle the enter key (usually commits the edit)
             if self.state() == QAbstractItemView.EditingState:
                 return super().keyPressEvent(event)
-            if not rows:
+            if not idxs:
                 return super().keyPressEvent(event)
-            row = rows[0].row()
             model = self.model()
             if not isinstance(model, TranslationTableModel):
                 return super().keyPressEvent(event)
-            self.edit_translation_requested.emit([row], EditType.MANUAL)
+            self.edit_translation_requested.emit([idxs[0]], EditType.MANUAL)
             return
         else:
             super().keyPressEvent(event)
-        
+            
     def set_column_widths(self, colwidths: list[int]):
         for i, width in enumerate(colwidths):
             self.setColumnWidth(i, width)
@@ -103,7 +108,7 @@ class TranslationTableView(QTableView):
         idx = self.indexAt(pos)
         if not idx.isValid():
             return
-        row = idx.row()
+        row = self.proxy_model.mapToSource(idx).row()
         model = self.model()
         if not isinstance(model, TranslationTableModel):
             return
@@ -118,8 +123,7 @@ class TranslationTableView(QTableView):
         action = menu.exec_(self.viewport().mapToGlobal(pos))
         if action is None:
             return
-        rows = self.selectionModel().selectedRows()
-        idxs = [idx.row() for idx in rows]
+        idxs = self.selected_source_rows
         if action == api_action:
             self.edit_translation_requested.emit(idxs, EditType.API)
         elif action == edit_action:
@@ -131,13 +135,8 @@ class TranslationTableView(QTableView):
             QApplication.clipboard().setText(str(original))
 
     def on_level_hotkey_triggered(self, level: TranslationLevel):
-        sel = self.selectionModel().selectedRows()
-        if not sel:
-            return
-        idxs = [idx.row() for idx in sel]
-        self.set_level_requested.emit(idxs, level)
-    
-    
+        if (idxs := self.selected_source_rows):
+            self.set_level_requested.emit(idxs, level)
     
 class TranslationTabWidget(QTabWidget):
     """A QTabWidget that manages multiple TranslationTableViews, each associated with a translation file.  
@@ -197,9 +196,11 @@ class TranslationTabWidget(QTabWidget):
         if not (current_widget := self.currentWidget()):
             return None
         model = current_widget.model()
-        if not isinstance(model, TranslationTableModel):
-            return None
-        return model
+        if isinstance(model, QSortFilterProxyModel):
+            model = model.sourceModel()
+        if isinstance(model, TranslationTableModel):
+            return model
+        return None
     
     def add_translation_tab(self, file_path: str) -> TranslationTableView:
         if file_path in self.tabs:

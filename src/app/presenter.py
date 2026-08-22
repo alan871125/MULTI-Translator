@@ -7,7 +7,7 @@ from app.gui.main_window import TranslationApp
 from core.translation import Translator
 
 from .models.session import TranslationSession
-from .models.translation_table_model import TranslationLevel
+from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel
 from .translation_table import EditType, TranslationTabWidget
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
 
@@ -208,7 +208,6 @@ class TranslationAppPresenter:
         Triggers by Open File action in MenuBar
         Or by drag-and-dropping a file into the application window (unimplemented)
         """
-        # TODO: implement drag-and-drop file opening
         file_path = Path(file_path).absolute()
         if file_path.suffix == WORKSPACE_FILE_EXTENSION:
             # If it's workspace file, treat it as a workspace
@@ -223,7 +222,9 @@ class TranslationAppPresenter:
         if dict_path.exists():
             self.session.apply_dictionary(dict_path, file_path)
         tab = self.create_translation_tab(file_path)
-        tab.setModel(model)
+        proxy_model = TranslationTableProxyModel()
+        proxy_model.setSourceModel(model)
+        tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
                 lambda: self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
@@ -265,7 +266,9 @@ class TranslationAppPresenter:
             self.session.apply_dictionary(dict_path, dir_path)
         # Create tab in the TranslationTabWidget
         tab = self.create_translation_tab(dir_path)
-        tab.setModel(model)
+        proxy_model = TranslationTableProxyModel()
+        proxy_model.setSourceModel(model)
+        tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
                 lambda: self.translation_tab_widget.update_tab_save_status(dir_path.as_posix())
