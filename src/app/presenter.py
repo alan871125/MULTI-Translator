@@ -8,7 +8,7 @@ from core.translation import Translator
 
 from .models.session import TranslationSession
 from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel
-from .translation_table import EditType, TranslationTabWidget
+from .translation_table import EditType, TranslationRequest, TranslationTabWidget
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
 
 logger = logging.getLogger(__name__)
@@ -79,23 +79,23 @@ class TranslationAppPresenter:
                 self.session.cht2chs(file_path)
             case _:
                 raise NotImplementedError(f"Handling for EditType {edit_type} is not implemented.")
-
-    def handle_edit_translation_request(self, file_path:Path|str, row_idxs: Sequence[int], EditType: EditType):
+    
+    def handle_edit_translation_request(self, file_path:Path|str, request:TranslationRequest):
         """Handles a request to edit a translation. 
         """
         key = Path(file_path).absolute().as_posix()
         if (model := self.session.models.get(key)) is None:
             logger.warning(f"Attempted to edit a translation for a file that is not open: {file_path}")
             return
-        idxs = model.get_true_indexes(row_idxs)
-        match EditType:
+        idxs = model.get_true_indexes(request.row_idxs)
+        match request.rtype:
             case EditType.MANUAL:
                 current_text = model.df.iloc[idxs[0]]['translation']  # Get the current translation of the first selected row to pre-fill the dialog
                 translations = self.main_window.open_edit_translation_dialog(current_text)
-                if translations is not None:
-                    level = TranslationLevel.VERIFIED
-                else:
+                if translations is None:
                     return
+                level = TranslationLevel.VERIFIED
+                
             case EditType.API:
                 current_text = model.df.loc[idxs,'translation']
                 translations = self.translator.batch_translate(current_text.tolist())
@@ -118,7 +118,9 @@ class TranslationAppPresenter:
             case _:
                 raise ValueError(f"Unknown EditType: {EditType}")
         share = self.main_window.show_share_translation_confirmation()
-        self.session.set_translations(file_path, idxs, translations=translations, level=level,share=share)
+        self.session.set_translations(
+            file_path, idxs, translations=translations, level=level, share=share
+        )
     
     def handle_copy_cells_request(self, file_path: str|Path, row_idxs: list[int], col_idx: int):
         """Handles a request to copy the contents of one or more cells to the clipboard.
@@ -182,11 +184,11 @@ class TranslationAppPresenter:
         # Create tab in the TranslationTabWidget
         tab = self.translation_tab_widget.add_translation_tab(path.as_posix())
         tab.edit_translation_requested.connect(
-            lambda idxs,edit_type: self.handle_edit_translation_request(path, idxs, edit_type)
+            lambda request: self.handle_edit_translation_request(path, request)
         )
-        tab.set_level_requested.connect(
-            lambda idxs, level: self.handle_set_level_request(path, idxs, level)
-        )
+        # tab.set_level_requested.connect(
+        #     lambda idxs, level: self.handle_set_level_request(path, idxs, level)
+        # )
         tab.copy_cells_requested.connect(
             lambda idxs, col: self.handle_copy_cells_request(path, idxs, col)
         )

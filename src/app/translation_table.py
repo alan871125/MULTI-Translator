@@ -1,7 +1,8 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Optional, override
+from dataclasses import dataclass
+from typing import Optional, Sequence, override, Generic, TypeVar
 
 from PyQt5.QtCore import Qt, QSortFilterProxyModel
 from PyQt5.QtGui import QDropEvent, QKeySequence
@@ -28,12 +29,21 @@ class EditType(Enum):
     PASTE = "paste"
     CHS2CHT = "chs2cht"
     CHT2CHS = "cht2chs"
-    
+
+T = TypeVar("T", bound=EditType)
+@dataclass
+class TranslationRequest(Generic[T]):
+    rtype: T
+    row_idxs: Sequence[int]
+    val: Optional[TranslationLevel|str] = None
+    # col: Optional[int|str] = None
+
 class TranslationTableView(QTableView):
     _COLWIDTHS = [60, 80, 500, 500]
-    edit_translation_requested = TypedQtSignal(list, EditType)  # row indexes, edit type
+    edit_translation_requested = TypedQtSignal(TranslationRequest)
+    # set_level_requested = TypedQtSignal(list, TranslationLevel)  # row indexes, level
     copy_cells_requested = TypedQtSignal(list, int)  # row indexes, column index (only support single column for now)
-    set_level_requested = TypedQtSignal(list, TranslationLevel)  # row indexes, level
+
     def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
@@ -80,13 +90,12 @@ class TranslationTableView(QTableView):
         key = event.key()
         sequence = QKeySequence(event.modifiers() | key)
         idxs = self.selected_source_rows
-        if sequence.matches(QKeySequence.Paste):
-            if len(idxs) > 0:
-                self.edit_translation_requested.emit(idxs, EditType.PASTE)
-        if sequence.matches(QKeySequence.Copy):
+        if sequence.matches(QKeySequence.Paste) and len(idxs) > 0:
+            # self.edit_translation_requested.emit(idxs, EditType.PASTE)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.PASTE, idxs))
+        if sequence.matches(QKeySequence.Copy) and len(idxs) > 0:
             col = self.selectionModel().currentIndex().column()
-            if len(idxs) != 0:
-                self.copy_cells_requested.emit(idxs, col)  # Emit the column index of the selected cell
+            self.copy_cells_requested.emit(idxs, col)  # Emit the column index of the selected cell
         elif key in (Qt.Key_Return, Qt.Key_Enter):
             # If currently inline editing, let the view handle the enter key (usually commits the edit)
             if self.state() == QAbstractItemView.EditingState:
@@ -96,7 +105,7 @@ class TranslationTableView(QTableView):
             model = self.model()
             if not isinstance(model, TranslationTableModel):
                 return super().keyPressEvent(event)
-            self.edit_translation_requested.emit([idxs[0]], EditType.MANUAL)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.MANUAL, [idxs[0]]))
             return
         else:
             super().keyPressEvent(event)
@@ -126,18 +135,18 @@ class TranslationTableView(QTableView):
             return
         idxs = self.selected_source_rows
         if action == api_action:
-            self.edit_translation_requested.emit(idxs, EditType.API)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.API, idxs))
         elif action == edit_action:
-            self.edit_translation_requested.emit(idxs, EditType.MANUAL)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.MANUAL, idxs))
         elif action == reset_action:
-            self.edit_translation_requested.emit(idxs, EditType.RESET)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.RESET, idxs))
         elif action == copy_action:
             original = model.data(model.index(row, model._COLUMNS.index("original")), Qt.DisplayRole)
             QApplication.clipboard().setText(str(original))
 
     def on_level_hotkey_triggered(self, level: TranslationLevel):
         if (idxs := self.selected_source_rows):
-            self.set_level_requested.emit(idxs, level)
+            self.edit_translation_requested.emit(TranslationRequest(EditType.SHARE, idxs, val=level))
     
 class TranslationTabWidget(QTabWidget):
     """A QTabWidget that manages multiple TranslationTableViews, each associated with a translation file.  
