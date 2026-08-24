@@ -6,7 +6,7 @@ import pandas as pd
 
 class TestRimWorldExtractor:
     folder_path = Path("test/.data/rimworld/Languages/English")
-    output_folder = Path("test/.output/rimworld/Languages/English")
+    output_folder = Path("test/.output/rimworld/")
     units: list[TextUnit] = []
     @classmethod
     def test_extract_mod(cls):
@@ -20,7 +20,7 @@ class TestRimWorldExtractor:
         extractor = RimWorldExtractor()
         extractor.apply_translations(self.folder_path, df, save_path=self.output_folder)
 
-        units = extractor.extract_file(self.output_folder)
+        units = extractor.extract_file(self.output_folder/"Languages/English")
         df_out = pd.DataFrame(units)
         # Verify that translations were applied correctly
         assert sum(df_out['original']!=df['translation']) == 0, "Not all translations were applied correctly."

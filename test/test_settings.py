@@ -1,12 +1,6 @@
 
 import pytest
-import os
-import sys
-# Add src to sys.path to allow imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-
 from app.settings import Settings, SettingsData, WorkspaceData
-
 def test_settings_initialization():
     # This should not raise RecursionError
     settings = Settings()
@@ -21,7 +15,8 @@ def test_settings_attribute_access():
     
     # Test access to WorkspaceData attributes via proxy
     assert settings.engine == "RPG Maker MV"
-    assert settings.output_dir == "./output"
+    assert settings.output_dir == "output" # this is the normalized value
+    assert settings.workspace_data.output_dir == "./output"
 
 def test_settings_attribute_setting():
     settings = Settings()

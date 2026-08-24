@@ -253,6 +253,8 @@ class Settings(QObject):
             ):
                 setattr(data.confirmations, splits[-1], value)
                 self.setting_changed.emit(key)  # Emit a signal when a setting is changed
+            else:
+                raise KeyError(f"{key} not found in wrapped data.")
         elif workspace_data and hasattr(workspace_data, key):
             setattr(workspace_data, key, value)
             self.workspace_changed.emit(key)  # Emit a signal when a workspace setting is changed
