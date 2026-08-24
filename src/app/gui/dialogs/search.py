@@ -3,7 +3,7 @@ import PyQt5.QtWidgets as qt
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialogButtonBox
-from typing import Literal
+from typing import Literal, override
 
 from qt_utils import TypedQtSignal
 from app.language import LanguagePack
@@ -188,7 +188,12 @@ class SearchDialog(qt.QDialog):
         # Connect Fold button actions
         self.fold_button.toggled.connect(lambda checked, gl=grid_layout: self.toggle_replace_row(checked, gl))
         self.replace_entry = replace_entry
-        
+    
+    @override
+    def accept(self) -> None:
+        self.set_filters()
+        super().accept()  # Calls standard QDialog.accept() and closes dialog
+    
     def center_on_parent(self):
         """Calculates geometry coordinates to place this dialog in the middle of its parent window."""
         if self.parentWidget():
@@ -225,33 +230,7 @@ class SearchDialog(qt.QDialog):
         self.layout().activate()
         qt.QApplication.processEvents()
         self.adjustSize()
-
-    # def create_replace_options(self):
-    #     # 2. REPLACE LINE (Bottom Line - Foldable)
-    #     replace_box = qt.QWidget(self)
-    #     replace_box.setObjectName("ReplaceBox")
-    #     rb_layout = qt.QHBoxLayout(replace_box)
-    #     rb_layout.setContentsMargins(5, 2, 5, 2)
-    #     rb_layout.setSpacing(2)
-        
-    #     # Indent placeholder spacing underneath the upper arrow
-    #     indent_spacer = qt.QLabel("   ", self)
-    #     rb_layout.addWidget(indent_spacer)
-        
-    #     # Replace Label or Icon
-    #     replace_icon = qt.QLabel("✍️", self) # Or leave empty string if you want it blank
-    #     rb_layout.addWidget(replace_icon)
-        
-    #     # Replace Input Entry
-    #     replace_entry = qt.QLineEdit(self)
-    #     replace_entry.setFrame(False)
-    #     replace_entry.setPlaceholderText("Replace with...")
-    #     rb_layout.addWidget(replace_entry)
-        
-    #     # Set Replace row to hidden initially
-    #     replace_box.setVisible(False)
-    #     return replace_box, replace_entry
-            
+    
     def reset_filters(self):
         for controls in self.filter_entries.values():
             controls["entry"].clear()
@@ -259,6 +238,9 @@ class SearchDialog(qt.QDialog):
             controls["regex_btn"].setText("🔎") # Force reset the icon text too
 
     def set_filters(self):
+        self.filters.set_filters(self.get_filters()) # emits signal only once
+        
+    def get_filters(self) -> list[ColumnFilter]:
         filters = []
         for col, controls in self.filter_entries.items():
             if not (text := controls["entry"].text().strip()):
@@ -268,16 +250,6 @@ class SearchDialog(qt.QDialog):
                 controls["regex_btn"].isChecked(), 
                 controls["case_btn"].isChecked()
             ))
-        self.filters.set_filters(filters) # emits signal only once
-        
-    def get_filters(self) -> list[ColumnFilter]:
-        filters = []
-        for col, controls in self.filter_entries.items():
-            text = controls["entry"].text().strip()
-            is_regex = controls["regex_btn"].isChecked()
-            match_case = controls["case_btn"].isChecked()
-            if text:
-                filters.append(ColumnFilter(col, text, is_regex, match_case))
         return filters
     
     def on_replace(self):
@@ -285,7 +257,7 @@ class SearchDialog(qt.QDialog):
             column = "original"
         else:
             column = "translation"
-        filters = self.get_filters()
+        filters = self.get_filters() # gets filters without setting
         replace_text = self.replace_entry.text().strip()
         # Emit the replace signal with search criteria and replacement text
         self.replace_requested.emit(filters, replace_text, column)

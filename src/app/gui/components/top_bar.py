@@ -69,6 +69,17 @@ class LevelFilterButtons(QWidget):
     def on_button_toggled(self, button:QPushButton, checked):
         lv = TranslationLevel(self.buttons.id(button))
         self.filters.set_level([lv], checked)
+        pass
+    
+    def set_source_filters(self, filters:TableFilters):
+        """Update the button states based on the provided TableFilters instance."""
+        self.filters = filters
+        from app.translation_table import TranslationTableModel
+        if isinstance(parent := filters.parent(), TranslationTableModel):
+            logger.debug(f"Updating LevelFilterButtons based on new TableFilters: {filters}, parent: {parent.file_path}")
+        for button in self.buttons.buttons():
+            lv = TranslationLevel(self.buttons.id(button))
+            button.setChecked(self.filters.levels.get(lv, True))  # Default to True if not found
 
 class TopBar(QWidget):
     """
@@ -77,25 +88,24 @@ class TopBar(QWidget):
     filter_clicked = TypedQtSignal()
     workspace_clicked = TypedQtSignal()
 
-    def __init__(self, settings:Settings, table_filters:TableFilters, parent=None):
+    def __init__(self, settings:Settings, table_filters:Optional[TableFilters]=None, parent=None):
         super().__init__(parent)
         self.settings: Settings = settings
-        self.table_filters: TableFilters = table_filters
         self.widgets = {}
-        self.init_ui()
+        self.init_ui(table_filters or TableFilters())
         
         # Connect to settings signals
         if self.settings:
             self.settings.workspace_changed.connect(self.refresh)
 
-    def init_ui(self):
+    def init_ui(self, table_filters:TableFilters):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
         self.widgets['filter_button'] = QPushButton("Filter", self)
         self.widgets['filter_button'].clicked.connect(self.filter_clicked.emit)
                 
-        self.widgets['level_filters'] = LevelFilterButtons(self.table_filters, parent=self)
+        self.widgets['level_filters'] = LevelFilterButtons(table_filters, parent=self)
         current_workspace = Path(self.settings.workspace_dir or "Default").name
         self.widgets['workspace_button'] = QPushButton(current_workspace, self)
         self.widgets['workspace_button'].clicked.connect(self.workspace_clicked.emit)
@@ -119,3 +129,8 @@ class TopBar(QWidget):
         current_workspace = Path(self.settings.workspace_dir or "Default").name
         self.widgets['workspace_button'].setText(current_workspace)
         self.widgets['engine_select'].setCurrentText(self.settings.engine)
+        
+    def set_source_filters(self, filters:TableFilters):
+        """Update the level filter buttons based on the provided TableFilters instance."""
+        self.widgets['level_filters'].set_source_filters(filters)
+        

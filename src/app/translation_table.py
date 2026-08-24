@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass
@@ -17,7 +18,6 @@ from core.translation import TranslationLevel, TranslationDictionary, Translator
 from .language import LanguagePack
 from .models.filters import TableFilters
 from .models.translation_table_model import CaseInsensitiveSortProxyModel, TranslationTableModel, TranslationTableProxyModel
-
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
@@ -34,7 +34,7 @@ T = TypeVar("T", bound=EditType)
 @dataclass
 class TranslationRequest(Generic[T]):
     rtype: T
-    row_idxs: Sequence[int]
+    row_idxs: list[int]|pd.Index
     val: Optional[TranslationLevel|str] = None
     # col: Optional[int|str] = None
 
@@ -156,9 +156,8 @@ class TranslationTabWidget(QTabWidget):
     tab_exist_signal = TypedQtSignal(bool)  # file_name
     tab_save_signal = TypedQtSignal(str)  # file_name
     open_dropped_file_request = TypedQtSignal(str)  # file_path
-    def __init__(self, table_filters:TableFilters, parent:Optional[QWidget]=None):
+    def __init__(self, parent:Optional[QWidget]=None):
         super().__init__(parent)
-        self.table_filters = table_filters
         self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView
         self.dictionaries: IndexedOrderedDict[str, TranslationDictionary] = IndexedOrderedDict()  # file_name -> TranslationDictionary
         self.setAcceptDrops(True)

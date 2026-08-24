@@ -4,13 +4,13 @@
 import logging
 import pandas as pd
 from pathlib import Path
-from typing import Any, Iterable, Literal, cast, override, Optional, overload
+from typing import Any, Iterable, Literal, Sequence, cast, override, Optional, overload
 
 from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, QSortFilterProxyModel
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
 
-from app.models.filters import ColumnFilter
+from app.models.filters import ColumnFilter, build_mask
 from config import settings
 from core.engines._base import BaseExtractor
 from core.text_unit import TextUnit
@@ -25,17 +25,17 @@ L = LanguagePack()
 class TranslationTableModel(QAbstractTableModel):
     _COLUMNS = ["file", "key", "original", "translation"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
+    
     def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
         self.undo_stack = undo_stack
         self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS)
-        self._filtered_df = None
-        self._mask_indexes = None
-        self.filters = filters if filters is not None else TableFilters()
-        self.filters.text_filter_changed.connect(self.on_filter_changed)
-        self.filters.level_filter_changed.connect(self.on_filter_changed)
+        self.filters = filters if filters is not None else TableFilters(self)
+        self._mask_cache: Optional[pd.Series] = None  # Cache for the current filter mask
+        
+        self.dataChanged.connect(self.update_filter_mask)  # Update the filter mask when data changes
         self.post_init_check()
         
     def post_init_check(self):
@@ -95,7 +95,7 @@ class TranslationTableModel(QAbstractTableModel):
 
     @override
     def rowCount(self, parent=QModelIndex()):
-        return len(self.filtered_df)
+        return len(self.df)
     @override
     def columnCount(self, parent=QModelIndex()):
         return len(self._COLUMNS)
@@ -103,26 +103,20 @@ class TranslationTableModel(QAbstractTableModel):
     def data(self, index, role=Qt.DisplayRole):
         theme = ThemeManager.theme
 
-        if not index.isValid():
+        if not (
+            index.isValid() and
+            0<=(r:=index.row())<len(self.df) and
+            0<=(c:=index.column())<len(self._COLUMNS)
+        ):
             return None
-        r = index.row()
-        c = index.column()
+        row, col = self.df.iloc[r], self._COLUMNS[c]
 
         if ((role == Qt.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
             (role == Qt.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
-            if r < 0 or r >= len(self.filtered_df):
-                return None
-            row = self.filtered_df.iloc[r]
             level = self._level_from_value(row.level)
             return QColor(ThemeManager.theme.get_level_color(level))
 
         if role in (Qt.DisplayRole, Qt.EditRole):
-            if r < 0 or r >= len(self.filtered_df):
-                return None
-            if c < 0 or c >= len(self._COLUMNS):
-                return None
-            row = self.filtered_df.iloc[r]
-            col = self._COLUMNS[c]
             if col =='key':
                 return str(row.get(col, ""))
             return row.get(col, "")
@@ -131,37 +125,35 @@ class TranslationTableModel(QAbstractTableModel):
     @override
     def setData(self, index, value, role=Qt.EditRole):
         # Support inline editing from the view for the Translation column
-        if role != Qt.EditRole or not index.isValid():
+        if not (
+            index.isValid() and
+            0<=(r:=index.row())<len(self.df) and
+            0<=(c:=index.column())<len(self._COLUMNS)
+        ):
             return False
-        row = index.row()
-        col = index.column()
         try:
-            col_name = self._COLUMNS[col]
+            if self._COLUMNS[c] != "translation":
+                return False
         except Exception:
-            return False
-        if col_name != "translation":
+            logger.error(f"Invalid column index {c} for setData.")
             return False
         text = str(value)
-        # locate original value from filtered data
-        if row < 0 or row >= len(self.filtered_df):
-            return False
-        original = self.filtered_df.iloc[row].get("original")
+        original = self.df.iloc[r].get("original")
         if original is None:
             return False
         
-        idx = self.get_true_indexes([row])
         level = TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED
         
         if self.undo_stack is not None: # if not connected to a session's undo stack, apply changes directly without undo support
             self.undo_stack.push(TranslationCommand(
                 model=self,
-                idxs=idx,
+                idxs=[r],
                 translations=[text],
                 levels=level,
                 description=f"Inline Edit"
             ))
         else:
-            self.set_translations(idx, [text], levels=level)
+            self.set_translations([r], [text], levels=level)
         return True
     
     @override
@@ -178,59 +170,38 @@ class TranslationTableModel(QAbstractTableModel):
             pass
         return flags
 
-    # ----- Filtering -----
-    def on_filter_changed(self, *args, **kwargs):
-        self.beginResetModel()
-        self._mask_indexes = None
-        self._filtered_df = None
-        self.endResetModel()
-
     @property
     def filter_mask(self) -> pd.Series:
-        if self._mask_indexes is not None:
-            mask = pd.Series([False] * len(self.df), index=self.df.index)
-            mask[self._mask_indexes] = True
+        if self._mask_cache is None:
+            self._mask_cache=self.filters.build_mask(self.df)
+        return self._mask_cache
+    
+    def _update_filter_mask_cache(self, rows: pd.Index|list[int]):
+        if self._mask_cache is None: # No cached mask to update
+            return # it will be recalculated on next access
         else:
-            mask=self.filters.build_mask(self.df)
-            self._mask_indexes = mask[mask].index
-        return mask
-
-    @property
-    def filtered_df(self) -> pd.DataFrame:
-        if not self.filters.is_filtering:
-            return self.df
-
-        if self._filtered_df is not None:
-            return self._filtered_df
-
-        mask = self.filter_mask
-        self._filtered_df = self.df[mask].reset_index(drop=True)
-        return self._filtered_df
-    
-    def get_true_index(self, filtered_index: int) -> int:
-        """Convert a filtered row index to the true index in the original data. 
-        This is necessary because the view operates on the filtered data, but updates need to be applied to the original data.
+            new_mask = self.filters.build_mask(self.df.loc[rows])
+            self._mask_cache.loc[rows] = new_mask
+            
+    def update_filter_mask(self, start_index: QModelIndex, end_index: QModelIndex, roles: Sequence[int] = []):
+        """Recaculate and update the mask at the given indexes,
+        This should be called if specific rows are updated to prevent full recalculation of the mask
         """
-        if self._mask_indexes is None:
-            return filtered_index
-        return self._mask_indexes[filtered_index]
-    
-    def get_true_indexes(self, indexes: Iterable[int]) -> pd.Index:
-        """Convert filtered row indexes to true indexes in the original data. 
-        This is necessary because the view operates on the filtered data, but updates need to be applied to the original data.
-        """
-        indexes = pd.Index(indexes)
-        if self._mask_indexes is None:
-            return indexes
-        return pd.Index(self._mask_indexes[indexes])
+        rows = pd.Index(range(start_index.row(), end_index.row() + 1))
+        logger.debug("Updating filter mask for %d rows: %d to %d", len(rows), start_index.row(), end_index.row())
+        self._update_filter_mask_cache(rows)
+
+    def clear_filter_mask(self, *args, **kwargs):
+        """Clear the cached filter mask to force recalculation on next access. 
+        This should be called whenever the filters changes"""
+        self._mask_cache = None
 
     def set_translation(self, idxs: int, text: str, level: TranslationLevel = TranslationLevel.VERIFIED):
         return self.set_translations([idxs], [text], level)
 
     def set_translations(
         self, idxs: Iterable[int], translations: Iterable[str]|str,
-        levels: Optional[Iterable[TranslationLevel]|TranslationLevel] = TranslationLevel.VERIFIED,
-        is_filtered: bool = False
+        levels: Optional[Iterable[TranslationLevel]|TranslationLevel] = TranslationLevel.VERIFIED
     ):
         """Set translations for the given indexes.
 
@@ -241,23 +212,14 @@ class TranslationTableModel(QAbstractTableModel):
             The translation(s) to set. Can be a single string for all indexes or an iterable of strings corresponding to each index.
         levels (Iterable[TranslationLevel] | TranslationLevel, optional): 
             The translation level(s) to set. Can be a single TranslationLevel for all indexes or an iterable of TranslationLevels corresponding to each index. If None, the level will not be changed. Default is TranslationLevel.VERIFIED.
-        is_filtered (bool): 
-            Whether the provided indexes are based on the filtered data. 
-            If True, the method will convert them to true indexes in the original data before applying translations. 
-            Default is False, assuming indexes are already true indexes.
         """
-
-        # transfer idxs to mask for filtered data
-        idxs = pd.Index(idxs)
-        if is_filtered:
-            assert self._mask_indexes is not None, "`is_filtered` is True but no filters are applied. Indexes are likely not pointing to the correct rows. Please check the logic or set `is_filtered` to False."
-            # Replace the **FILTERED** data with the new translations
-            idxs = self._mask_indexes[idxs]
+        if not isinstance(idxs, pd.Index):
+            idxs = pd.Index(idxs)
         if idxs.empty:
             return False
-
         if isinstance(translations, Iterable) and not isinstance(translations, str):
             translations = pd.Series(list(translations), index=idxs)
+            
         self.df.loc[idxs, "translation"] = translations
         if levels is None:
             pass
@@ -267,8 +229,8 @@ class TranslationTableModel(QAbstractTableModel):
             self.df.loc[idxs, "level"] = pd.Series(list(levels), index=idxs)
         else:
             logger.error(f"Invalid type for levels: {type(levels)}. Must be TranslationLevel or Iterable[TranslationLevel].")
-        self._filtered_df = None # Invalidate cache
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
+        # Emit dataChanged signal for the specific rows that were updated
+        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
         return True
 
     def search_and_replace(self, filters: list[ColumnFilter], replace_text: str, column: Literal['original', 'translation'] = "original"):
@@ -278,9 +240,15 @@ class TranslationTableModel(QAbstractTableModel):
         Returns the number of replacements made.
         """
         if column not in self.df.columns:
+            logger.error(f"Column '{column}' not found in DataFrame. Cannot perform search and replace.")
             return 0
-        mask = self.filter_mask
-        if not mask.any() or not filters:
+        if not filters:
+            logger.warning("No filters provided for search and replace. No replacements made.")
+            return 0
+        # TODO: Add a option to ignore the level filter under search&replace.
+        mask = build_mask(self.df, filters=filters, levels=[lv for lv, show in self.filters.levels.items() if show])
+        if not mask.any():
+            logger.info("No rows matched the search criteria. No replacements made.")
             return 0
         for _filter in filters:
             # Prioritizes Translation column if multiple filters are provided.
@@ -290,8 +258,9 @@ class TranslationTableModel(QAbstractTableModel):
         self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
             _filter.text, replace_text, regex=_filter.is_regex, case=_filter.match_case
         )
-        self._filtered_df = None # Invalidate cache
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
+        if (idxs := self.df.index[mask]).empty:
+            return 0
+        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
         return mask.sum()
 
     def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None):
@@ -312,40 +281,33 @@ class TranslationTableModel(QAbstractTableModel):
 
         # Apply translations only if the level in the dictionary is higher
         mask = dict_df[f"{settings.TARGET_LANG}.level"] > df_copy["level"]
-
+        if (idxs := self.df.index[mask]).empty:
+            return # No translations to apply
         # Update the model's data
         self.df.set_index(keys, inplace=True)
         self.df.loc[mask, "translation"] = dict_df.loc[mask, settings.TARGET_LANG]
         self.df.loc[mask, "level"] = dict_df.loc[mask, f"{settings.TARGET_LANG}.level"]
         self.df.reset_index(inplace=True)
 
-        self._filtered_df = None # Invalidate cache
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
+        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
 
-    def chs2cht(self):
-        """Convert all Chinese translations from Simplified to Traditional using OpenCC."""
+    def chinese_convertion(self, target: Literal['s','t']):
+        """Convert all Chinese translations between Simplified and Traditional using OpenCC."""
         mask = self.filter_mask
-        if not mask.any():
+        if (idxs:= self.df.index[mask]).empty:
             return
-        self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target='tw')
-        self._filtered_df = None
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
+        self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target)
+        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
 
-    def cht2chs(self):
-        """Convert all Chinese translations from Traditional to Simplified using OpenCC."""
-        mask = self.filter_mask
-        if not mask.any():
-            return
-        self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target='s')
-        self._filtered_df = None
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1))
-
+    def chs2cht(self): return self.chinese_convertion(target='t')
+    def cht2chs(self): return self.chinese_convertion(target='s')
+        
     def is_same_original_exists(self, idxes: pd.Index|list[int]|int, is_filtered: bool = True) -> bool:
         """Checks if there are any other text units with the same original text as the given indexes. 
         This is used to determine whether to show the share translation confirmation dialog."""
         if isinstance(idxes, int):
             idxes = [idxes]
-        df = self.filtered_df if is_filtered else self.df
+        df = self.df if is_filtered else self.df
         originals = df.iloc[idxes]["original"] if is_filtered else df.loc[idxes, "original"]
         for original in originals:
             if (self.df["original"] == original).sum() > 1:
@@ -357,7 +319,7 @@ class TranslationTableModel(QAbstractTableModel):
         max_level: TranslationLevel = TranslationLevel.UNTRANSLATED) -> pd.Index:
         """Get all indexes of text units that have the same original text as the given index."""
         if is_filtered:
-            original = self.filtered_df.iloc[idx]["original"]
+            original = self.df.iloc[idx]["original"]
         else:
             original = self.df.iloc[idx]["original"]
         same_original_mask = (self.df["original"] == original) & (self.df["level"] <= max_level)
@@ -366,11 +328,7 @@ class TranslationTableModel(QAbstractTableModel):
     def get_first_unique_original_idxs(self, indexes: pd.Index|list[int]|int, is_filtered: bool = True) -> pd.Index:
         """Get the first unique index for each original text among the given indexes. 
         This can be used to optimize batch operations by only applying changes to one representative text unit for each unique original text."""
-        if isinstance(indexes, int):
-            indexes = pd.Index([indexes])
-        elif isinstance(indexes, list):
-            indexes = pd.Index(indexes)
-        df = self.filtered_df if is_filtered else self.df
+        df = self.df if is_filtered else self.df
         out = df.iloc[indexes].reset_index().groupby("original").index.min()
         return pd.Index(out.values)
 
@@ -393,15 +351,41 @@ class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
         super().__init__(parent)
         self.setDynamicSortFilter(True)
         self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self._accepted_rows: Optional[set[int]] = None  # Cache of accepted source model rows for fast filtering
+    
     @override
     def setSourceModel(self, sourceModel: TranslationTableModel) -> None:
         assert isinstance(sourceModel, TranslationTableModel)
         super().setSourceModel(sourceModel)
+        self.filters = sourceModel.filters  # Bind the filters from the source model to the proxy model
+        self.filters.text_filter_changed.connect(self.invalidateFilter)
+        self.filters.level_filter_changed.connect(self.invalidateFilter)
+
     @override
     def sourceModel(self) -> TranslationTableModel:
         source = super().sourceModel()
         assert isinstance(source, TranslationTableModel)
         return source
+        
+    @override
+    def invalidateFilter(self, *args, **kwargs):
+        self.sourceModel().clear_filter_mask()
+        super().invalidateFilter()  # Trigger re-evaluation of filterAcceptsRow
+
+    @override
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        if not self.sourceModel().filters.is_filtering:
+            return True
+        return source_row in self.accepted_rows
+    
+    @property
+    def accepted_rows(self) -> set[int]:
+        """Return the set of source model row indexes that are currently accepted by the filters."""
+        if self._accepted_rows is None:
+            mask = self.sourceModel().filter_mask
+            self._accepted_rows = set(mask[mask].index)
+        return self._accepted_rows
+    
     def get_true_index(self, proxy_index: QModelIndex) -> QModelIndex:
         """Convert a proxy index to the corresponding source model index."""
         if not proxy_index.isValid():
@@ -427,7 +411,7 @@ class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""
     def __init__(
         self, model: TranslationTableModel,
-        idxs: pd.Index,
+        idxs: pd.Index|list[int],
         translations: Iterable[str]|str,
         levels: Optional[TranslationLevel] = None,
         description: str = "Batch Translation Edit",

@@ -62,8 +62,17 @@ class TranslationAppPresenter:
             return
         file_path = self.translation_tab_widget.tabs.keys()[index]
         history = self.session.get_history_stack(file_path)
+       
         self.main_window.bind_undo_redo_actions(history)
         self.main_window.update_bottom_bar(file_path)  # Update the bottom bar with the current file path
+        if (model:=self.session.models.iget(index)) is None:
+            logger.warning(f"No model found for the current tab index: {index}.")
+            return
+        elif model.file_path!=Path(file_path):
+            # This would probably happen if the tab order can change in the future.
+            raise ValueError(f"Model file path {model.file_path} does not match the expected file path {file_path} for tab index {index}.")
+        else:
+            self.main_window.top_bar.set_source_filters(model.filters)  # Refresh the level filter buttons based on the current session's filters
         
     def handle_edit_current_file_request(self, edit_type: EditType):
         """Handles a request to edit a file."""
@@ -87,7 +96,7 @@ class TranslationAppPresenter:
         if (model := self.session.models.get(key)) is None:
             logger.warning(f"Attempted to edit a translation for a file that is not open: {file_path}")
             return
-        idxs = model.get_true_indexes(request.row_idxs)
+        idxs = request.row_idxs
         match request.rtype:
             case EditType.MANUAL:
                 current_text = model.df.iloc[idxs[0]]['translation']  # Get the current translation of the first selected row to pre-fill the dialog
@@ -100,7 +109,10 @@ class TranslationAppPresenter:
                 current_text = model.df.loc[idxs,'translation']
                 translations = self.translator.batch_translate(current_text.tolist())
                 _idxs = idxs
-                idxs, translations = zip(*[(i, trans) for i, trans in zip(idxs, translations) if trans is not None])
+                idxs, translations = map(list, zip(*[
+                    (i, trans) for i, trans in zip(idxs, translations) 
+                    if trans is not None
+                ]))
                 level=TranslationLevel.API
                 failed_count = len(_idxs) - len(idxs)
                 if failed_count > 0:
@@ -122,7 +134,7 @@ class TranslationAppPresenter:
             file_path, idxs, translations=translations, level=level, share=share
         )
     
-    def handle_copy_cells_request(self, file_path: str|Path, row_idxs: list[int], col_idx: int):
+    def handle_copy_cells_request(self, file_path: str|Path, idxs: list[int], col_idx: int):
         """Handles a request to copy the contents of one or more cells to the clipboard.
         Triggered by the user selecting "Copy" from the context menu after right-clicking on a cell or selection of cells in the translation table, or by using the standard copy keyboard shortcut (e.g., Ctrl+C).
         """
@@ -131,7 +143,6 @@ class TranslationAppPresenter:
             logger.warning(f"Attempted to copy cells for a file that is not open: {file_path}")
             return
         # Get the text of the selected cells and join them with newlines for copying to clipboard
-        idxs = model.get_true_indexes(row_idxs)
         cell_texts = model.df.iloc[idxs, col_idx].astype(str).tolist()
         clipboard_text = "\r\n".join(cell_texts)
         QApplication.clipboard().setText(clipboard_text)
@@ -170,14 +181,6 @@ class TranslationAppPresenter:
             return
         key = Path(current_file_path).absolute().as_posix()
         self.session.save_dictionary(key)
-        
-    def handle_set_level_request(self, file_path:Path|str, row_idxs: Sequence[int], level: TranslationLevel):
-        """Handles a request to set the translation level for one or more translations.
-        This is typically called when the user:
-            - right-clicks a cell or selection of cells in the translation table and selects "Set Level" from the context menu.
-            - uses a batch operation to set the level of multiple translations at once.
-        """
-        self.session.set_level(file_path, row_idxs, level)
 
     def create_translation_tab(self, path: str|Path):
         path = Path(path).absolute()
@@ -186,9 +189,6 @@ class TranslationAppPresenter:
         tab.edit_translation_requested.connect(
             lambda request: self.handle_edit_translation_request(path, request)
         )
-        # tab.set_level_requested.connect(
-        #     lambda idxs, level: self.handle_set_level_request(path, idxs, level)
-        # )
         tab.copy_cells_requested.connect(
             lambda idxs, col: self.handle_copy_cells_request(path, idxs, col)
         )

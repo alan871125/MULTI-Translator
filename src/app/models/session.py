@@ -11,7 +11,6 @@ from PyQt5.QtCore import QObject
 from iod import IndexedOrderedDict
 
 from qt_utils import TypedQtSignal
-from app.models.filters import TableFilters
 from app.settings import Settings
 from app.translation_table import logger
 from core import engines
@@ -27,7 +26,7 @@ class TranslationSession(QObject):
     file_opened = TypedQtSignal(str, TranslationTableModel)  # Signal emitted when a file is opened, with the file path and model as arguments
     file_closed = TypedQtSignal(str)  # Signal emitted when a file is closed, with the file path as an argument
     
-    def __init__(self, settings:Settings, filters: TableFilters, parent: Optional[QObject] = None):
+    def __init__(self, settings:Settings, parent: Optional[QObject] = None):
         super().__init__(parent)
         self.db = TranslationDictionaryDatabase(settings.db_path)
         self.dictionaries: dict[str, TranslationDictionary] = {}
@@ -35,7 +34,6 @@ class TranslationSession(QObject):
         self.models: IndexedOrderedDict[str, TranslationTableModel] = IndexedOrderedDict()
         self.history_stacks: IndexedOrderedDict[str, QUndoStack] = IndexedOrderedDict()
         self.settings = settings
-        self.filters = filters
 
     def load_dictionary(self, file_path: str|Path, name: Optional[str] = None)-> TranslationDictionary:
         file_path = Path(file_path).absolute()
@@ -86,7 +84,7 @@ class TranslationSession(QObject):
             stack = self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             model = TranslationTableModel(
                 data=extractor.extract_file(file_path), 
-                filters=self.filters,
+                # filters=TableFilters(), # each model has its own filters, instead of sharing one instance.
                 file_path=file_path,
                 engine=extractor,
                 undo_stack=stack
@@ -113,7 +111,7 @@ class TranslationSession(QObject):
             key = dir_path.as_posix()
             model = TranslationTableModel(
                 data=extractor.extract_dir(dir_path, source_lang=self.settings.SOURCE_LANG, target_lang=self.settings.TARGET_LANG), 
-                filters=self.filters,
+                # filters=TableFilters(), # each model has its own filters, instead of sharing one instance.
                 file_path=dir_path,
                 engine=extractor,
                 undo_stack=self.history_stacks.setdefault(key, QUndoStack()) 
@@ -148,14 +146,13 @@ class TranslationSession(QObject):
         key = file_path.as_posix()
         return self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
     
-    def set_level(self, file_path: str|Path, sel: Iterable[int], level: TranslationLevel):
+    def set_level(self, file_path: str|Path, idxs: list[int]|pd.Index, level: TranslationLevel):
         """Set the translation level for the currently selected rows. This can be used in conjunction with batch operations to set the level of multiple translations at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
             logger.warning(f"Attempted to set level for a file that is not open: {file_path}")
             return
         history = self.get_history_stack(file_path)
-        idxs = model.get_true_indexes(sel)
         history.push(TranslationCommand(
             model=model,
             idxs=idxs,
@@ -163,23 +160,8 @@ class TranslationSession(QObject):
             levels=level,
             description=f"Set Level: {level.name} for {len(idxs)} rows"
         ))
-    
-    def push_translation_command(self, file_path: str|Path, idxs: Sequence[int]|pd.Index, translations: pd.Series|str, levels: Optional[TranslationLevel] = None, description: str = "Batch Translation Edit"):
-        file_path = Path(file_path).absolute().as_posix()
-        if (model := self.models.get(file_path)) is None:
-            logger.warning(f"Attempted to push a translation command for a file that is not open: {file_path}")
-            return
-        history = self.get_history_stack(file_path)
-        idxs = model.get_true_indexes(idxs)
-        history.push(TranslationCommand(
-            model=model,
-            idxs=idxs,
-            translations=translations,
-            levels=levels,
-            description=description
-        ))
         
-    def set_translations(self, file_path: str|Path, idxs: Sequence[int]|pd.Index, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
+    def set_translations(self, file_path: str|Path, idxs: list[int]|pd.Index, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
         """Set the translation for the currently selected rows. This can be used in conjunction with batch operations to set the translation of multiple rows at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
@@ -187,7 +169,6 @@ class TranslationSession(QObject):
             return
         history = self.get_history_stack(file_path)
         
-        idxs = pd.Index(idxs) if isinstance(idxs, Iterable) else pd.Index([idxs])
         history.beginMacro(f"Set Translation for {len(idxs)} rows")
         history.push(TranslationCommand(
             model=model,
@@ -232,7 +213,6 @@ class TranslationSession(QObject):
         if (model := self.models.get(file_path)) is None:
             logger.warning(f"Attempted to reset translations for a file that is not open: {file_path}")
             return
-        idxs=model.get_true_indexes(idxs)
         history = self.get_history_stack(file_path)
         history.push(TranslationCommand(
             model=model, idxs=idxs,

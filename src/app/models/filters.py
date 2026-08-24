@@ -1,10 +1,13 @@
+import logging
 import pandas as pd
-from typing import overload, Literal
+from typing import Iterable, Optional, overload, Literal
 from dataclasses import dataclass
 from PyQt5.QtCore import QObject
 
 from qt_utils import TypedQtSignal
 from core.translation import TranslationLevel
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ColumnFilter:
@@ -31,18 +34,17 @@ class ColumnFilter:
 class TableFilters(QObject):
     text_filter_changed = TypedQtSignal()
     level_filter_changed = TypedQtSignal(list)
-    levels = {lv:True for lv in TranslationLevel}  # Keep track of which translation levels are currently selected for filtering
-    filters: dict[str, ColumnFilter] = {}
-
+    def __init__(self, parent:Optional[QObject]=None):
+        super().__init__(parent)
+        self.levels = {lv:True for lv in TranslationLevel}  # Keep track of which translation levels are currently selected for filtering
+        self.filters: dict[str, ColumnFilter] = {}
+        
+    def __repr__(self):
+        return f"TableFilters(levels={list(self.levels.values())}, filters={self.filters})"
     def build_mask(self, df: pd.DataFrame):
-        level_shown = [lv for lv, show in self.levels.items() if show]
-        mask = (df['level'].isin(level_shown)) # Use isin for better performance and correctness
-
-        for col, filt in self.filters.items():
-            if col not in df.columns:
-                continue
-            mask &= filt.mask(df)
-        return mask
+        logger.debug(f"Building mask for DataFrame with {len(df)} rows using filters: {self.filters} and levels: {self.levels}")
+        return build_mask(df, filters=self.filters.values(), levels=[lv for lv, show in self.levels.items() if show])
+    
     def filter(self, df:pd.DataFrame):
         mask = self.build_mask(df)
         return df[mask].reset_index(drop=True)
@@ -76,4 +78,19 @@ class TableFilters(QObject):
         for level in levels:
             self.levels[level] = checked
         self.level_filter_changed.emit(levels)
-        
+    
+def build_mask(df: pd.DataFrame, filters: Optional[Iterable[ColumnFilter]], levels: Optional[list[TranslationLevel]]) -> pd.Series:
+    """Builds a boolean mask for the DataFrame based on the provided filters and translation levels."""
+    if filters is None and levels is None:
+        logger.warning("No filters or levels provided to build_mask; returning all True mask.")
+    elif levels is not None:
+        level_shown = set(levels)
+        mask = df['level'].isin(level_shown)  # Use isin for better performance and correctness
+    else:
+        mask = pd.Series(True, index=df.index)  # Return all True if no filters or
+    if filters is not None:
+        for filt in filters:
+            if filt.column not in df.columns:
+                continue
+            mask &= filt.mask(df)
+    return mask

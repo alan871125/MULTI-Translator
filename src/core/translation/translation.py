@@ -138,8 +138,8 @@ def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str=
         logger.error(f"Translation API error: {e}")
         return []
     return translated
-
-def batch_chinese_convertion(texts: Iterable[str], target:str='tw')-> Sequence[str]:
+ChineseType = Literal['s', 't', 'tw', 'zh-cn', 'zh-tw', 'zh-hans', 'zh-hant', 'simplified', 'traditional', 'chs', 'cht']
+def batch_chinese_convertion(texts: Iterable[str], target:ChineseType='tw')-> Sequence[str]:
     """Batch convert a sequence of Chinese texts between Simplified and Traditional variants using OpenCC.  
     
     (Loads the OpenCC converter once and applies it to all texts for better performance compared to calling chinese_convertion multiple times.)
@@ -158,7 +158,7 @@ def batch_chinese_convertion(texts: Iterable[str], target:str='tw')-> Sequence[s
     converter = opencc.OpenCC(convertion_file)
     return [converter.convert(text) for text in texts]
 
-def chinese_convertion(text:str, target:str='tw')-> str:
+def chinese_convertion(text:str, target:ChineseType='tw')-> str:
     """Convert Chinese text between Simplified and Traditional variants using OpenCC.<br>  
     
     ***Note:** This is a wrapper around `batch_chinese_convertion` for single strings for convenience.

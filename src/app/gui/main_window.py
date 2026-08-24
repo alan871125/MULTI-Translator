@@ -41,11 +41,10 @@ class TranslationApp(QMainWindow):
     import_from_file_requested = TypedQtSignal(str)
     import_from_dict_requested = TypedQtSignal(str)
     
-    def __init__(self, settings: Settings, filters: TableFilters):
+    def __init__(self, settings: Settings):
         super().__init__()
         self._current_undo_stack = None
         self.settings = settings
-        self.filters = filters
         L.set_language(self.settings.language)
         ThemeManager().set_theme(dark = settings.dark_mode) # Apply theme based on settings at startup
         # 1. Inintialize UI
@@ -78,13 +77,11 @@ class TranslationApp(QMainWindow):
         if (model := self.translation_table.currentModel()) is None:
             logger.warning("No active translation tab to apply filters to.")
             return
-        dialog = SearchDialog(self.filters, self)
+        dialog = SearchDialog(model.filters, self)
         dialog.replace_requested.connect(model.search_and_replace)  # Connect the replace signal to the model's replace method
         # Hide the replace button (hidden when only filtering)
         dialog.replace_widget.setVisible(False)  
         dialog.exec_()
-        # Apply the filters to the table model
-        dialog.set_filters()
         
     def init_ui(self):
         self.central_widget = QWidget(self)
@@ -92,12 +89,12 @@ class TranslationApp(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)
         
         # 1. Top Bar
-        self.top_bar = TopBar(self.settings, self.filters)
+        self.top_bar = TopBar(self.settings)
         self.top_bar.filter_clicked.connect(self.open_filter_menu)
         self.top_bar.workspace_clicked.connect(self.open_load_workspace_dialog)
         
         # 2. Translation Table
-        self.translation_table = TranslationTabWidget(self.filters)
+        self.translation_table = TranslationTabWidget()
         self.translation_table.setTabsClosable(True)
         # self.translation_table.tabCloseRequested.connect(self.translation_table.removeTab)
 

@@ -94,9 +94,8 @@ def main():
         # let the dark mode setting take effect on Win11's TitleBar
         launch_args += ['-platform', f'windows:darkmode={darkmode}'] 
     app = QApplication(launch_args)
-    filters = TableFilters()  # Shared filters instance for all required components
-    main_window = TranslationApp(settings, filters)
-    session = TranslationSession(settings, filters)
+    main_window = TranslationApp(settings)
+    session = TranslationSession(settings)
     presenter = TranslationAppPresenter(main_window, settings, session=session, translation_tab_widget=main_window.translation_table)
     main_window.show()
     app.exec_()
