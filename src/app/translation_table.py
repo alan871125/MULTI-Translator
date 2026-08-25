@@ -31,7 +31,7 @@ class EditType(Enum):
     CHT2CHS = "cht2chs"
 
 T = TypeVar("T", bound=EditType)
-@dataclass
+@dataclass(slots=True)
 class TranslationRequest(Generic[T]):
     rtype: T
     row_idxs: list[int]|pd.Index
@@ -120,6 +120,8 @@ class TranslationTableView(QTableView):
             return
         row = self.proxy_model.mapToSource(idx).row()
         model = self.model()
+        if isinstance(model, QSortFilterProxyModel):
+            model = model.sourceModel()
         if not isinstance(model, TranslationTableModel):
             return
         menu = QMenu(self)
