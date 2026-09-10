@@ -27,7 +27,7 @@ DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
 class Confirmations:
     share_translation: bool = False
 
-@dataclass
+@dataclass(slots=True)
 class SettingsData:
     SOURCE_LANG: str = "auto" # should be saved as language code, but can be displayed as language name in the UI
     TARGET_LANG: str = "en"   # should be saved as language code, but can be displayed as language name in the UI
@@ -110,7 +110,7 @@ class SettingsData:
         except Exception as e:
             logger.error(f"Failed to save settings to {path}: {e}")
 
-@dataclass
+@dataclass(slots=True)
 class WorkspaceData:
     workspace_dir: Optional[str] = None  # None means the global default workspace
     game_data_dir: str = DEFAULT_GAME_DATA_DIR

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field, asdict
 from .json_path import JsonPath
 from .translation.level import TranslationLevel
 
-@dataclass
+@dataclass(slots=True)
 class TextUnit:
     """ A class representing a single text unit that needs to be translated.
     

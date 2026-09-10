@@ -9,7 +9,7 @@ from core.translation import TranslationLevel
 
 logger = logging.getLogger(__name__)
 
-@dataclass
+@dataclass(slots=True)
 class ColumnFilter:
     column: str
     text: str
