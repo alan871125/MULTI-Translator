@@ -29,6 +29,8 @@ class TranslatorSettings(Protocol):
     SOURCE_LANG: str
     TARGET_LANG: str
     API: str
+    CUSTOM_API_MODEL:str
+    CUSTOM_API_URL:str
 
 class Translator:
     """A wrapper class to unify the interface of different translation providers.
@@ -42,6 +44,8 @@ class Translator:
                 * SOURCE_LANG (str)
                 * TARGET_LANG (str)
                 * API (str)
+                * CUSTOM_API_MODEL (str)
+                * CUSTOM_API_URL (str)
         """
         
         self.settings = settings
@@ -51,6 +55,8 @@ class Translator:
             source_lang=self.settings.SOURCE_LANG,
             target_lang=self.settings.TARGET_LANG,
             provider=self.settings.API,
+            model=self.settings.CUSTOM_API_MODEL,
+            base_url=self.settings.CUSTOM_API_URL
         )
     def batch_translate(self, batch: list[str]) -> Sequence[str|None]:
         return batch_translate(
@@ -58,6 +64,8 @@ class Translator:
             source_lang=self.settings.SOURCE_LANG,
             target_lang=self.settings.TARGET_LANG,
             provider=self.settings.API,
+            model=self.settings.CUSTOM_API_MODEL,
+            base_url=self.settings.CUSTOM_API_URL
         )
     def get_supported_languages(self) -> list[Language]:
         return list(get_supported_languages(self.settings.API))
@@ -81,7 +89,7 @@ def get_supported_languages(api:str, role:Optional[Literal["source", "target"]] 
     return []
     
 
-def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None) -> TranslatorProtocol|None:
+def get_translator(source_lang: str, target_lang: str, provider: str, api_key: str|None = None, **kwargs) -> TranslatorProtocol|None:
     """Helper function to get translation settings, 
     including mapping language names to codes based on the provider's supported languages."""
     # Map language names to codes based on the provider's supported languages
@@ -98,11 +106,11 @@ def get_translator(source_lang: str, target_lang: str, provider: str, api_key: s
         logger.error(f"Unsupported translation provider: {provider}")
         return None
     translator = translator_class(
-        source=source_lang, target=target_lang, api_key=api_key
+        source=source_lang, target=target_lang, api_key=api_key, **kwargs
     )
     return translator
 
-def translate(source:str, source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None)-> str|None:
+def translate(source:str, source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None, **kwargs)-> str|None:
     """Translate the source text from source_lang to target_lang using the specified provider and API key.
     
     Arguments:
@@ -115,7 +123,7 @@ def translate(source:str, source_lang:str="auto", target_lang:str="en", provider
     if not source or not source.strip():
         return None
     try:
-        translator = get_translator(source_lang, target_lang, provider, api_key)
+        translator = get_translator(source_lang, target_lang, provider, api_key, **kwargs)
         if not translator:
             return None
         translated = translator.translate(source)
@@ -124,13 +132,13 @@ def translate(source:str, source_lang:str="auto", target_lang:str="en", provider
         return None
     return translated
 
-def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None) -> Sequence[str|None]:
+def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str="en", provider:str = 'google', api_key:str|None=None, **kwargs) -> Sequence[str|None]:
     """Batch translate a sequence of source texts from source_lang to target_lang using the specified provider and API key.
     """
     if not sources:
         return []
     try:
-        translator = get_translator(source_lang, target_lang, provider, api_key)
+        translator = get_translator(source_lang, target_lang, provider, api_key, **kwargs)
         if not translator:
             return []
         translated = translator._translate_batch(sources)

@@ -25,7 +25,7 @@ DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
 
 @dataclass
 class Confirmations:
-    share_translation: bool = True
+    share_translation: bool = False
 
 @dataclass
 class SettingsData:
@@ -246,6 +246,7 @@ class Settings(QObject):
             if hasattr(data, key):
                 setattr(data, key, value)
                 self.setting_changed.emit(key)  # Emit a signal when a setting is changed
+                return
             elif (
                 len(splits:=key.split(".")) == 2 and
                 splits[0] == "confirmations" and
@@ -253,13 +254,14 @@ class Settings(QObject):
             ):
                 setattr(data.confirmations, splits[-1], value)
                 self.setting_changed.emit(key)  # Emit a signal when a setting is changed
-            else:
-                raise KeyError(f"{key} not found in wrapped data.")
-        elif workspace_data and hasattr(workspace_data, key):
+                return
+            
+        if workspace_data and hasattr(workspace_data, key):
             setattr(workspace_data, key, value)
             self.workspace_changed.emit(key)  # Emit a signal when a workspace setting is changed
-        else:
-            raise KeyError(f"{key} not found in wrapped data.")
+            return
+        
+        raise KeyError(f"{key} not found in wrapped data.")
         
     def __setattr__(self, key: str, value: Any) -> None:
         if key in ("data", "workspace_data") or hasattr(type(self), key):
