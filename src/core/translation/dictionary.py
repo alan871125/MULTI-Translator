@@ -1,9 +1,10 @@
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal, Union
 from rapidfuzz import process, fuzz
 import pandas as pd
 from ..json_path import JsonPath
+from .label import TranslationLabel
 import logging
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,50 @@ class TranslationDictionary:
         df = pd.read_csv(
             file_path, converters={"key": JsonPath}, 
             # cast the columns to the correct types, preventing converting "None" to null
-            dtype={"original":str, "translation":str, "level":int, "file":str}
+            dtype={"original":str, "translation":str, "level":int, "file":str}, keep_default_na=False
         )
         return cls(df=df, source_lang=source_lang, target_lang=target_lang)
+    
+    def check_difference(self, other:Union[pd.DataFrame, "TranslationDictionary"], self_type:Literal["old", "new"] = "old", verbose:bool = True)->dict[str, TranslationLabel]:
+        """
+        Arguments:
+            other (pd.DataFrame): The new dictionary to compare against the old one.
+            self_type (str): Whether `self` is the old dictionary or the new one. Accepts "old" or "new".
+        """
+        comments:dict[str,TranslationLabel] = {} 
+        if isinstance(other, TranslationDictionary):
+            other = other.df
+        if self_type == "old":
+            cur, new = self.df, other
+            keys_old, keys_new = set(cur["key"]), set(new["key"])
+            # 1. Mark DEPRECATED keys in old dictionary
+            keys_deprecated = keys_old - keys_new
+            for key in keys_deprecated:
+                comments[key] = TranslationLabel.DEPRECATED
+            if verbose:
+                logger.info(f"Found {len(keys_deprecated)} deprecated keys")
+        elif self_type == "new":
+            cur, new = other, self.df
+            keys_old, keys_new = set(cur["key"]), set(new["key"])
+            # 2. Mark NEW keys in new dictionary
+            keys_new_added = keys_new - keys_old
+            if verbose:
+                logger.info(f"Found {len(keys_new_added)} new keys")
+            for key in keys_new_added:
+                comments[key] = TranslationLabel.NEW
+        else:
+            raise ValueError(f"Invalid self_type: {self_type}. Must be 'old' or 'new'.")
+        # 3. Mark UPDATED keys where original text differs
+        old_org = cur.set_index("key")["original"]
+        new_org = new.set_index("key")["original"]
+        keys_both = list(keys_old & keys_new)
+        updated = old_org[keys_both] != new_org[keys_both]
+        if verbose:
+            logger.info(f"Found {updated.sum()} updated keys: {list(updated[updated].index)}")
+        for key in updated[updated].index:
+            comments[key] = TranslationLabel.UPDATED
+        return comments
+
 
 class TranslationDictionaryLong:
     # Deprecated: A translation Dictionary in long format, with columns: file, json_path, attribute, original, translation, level

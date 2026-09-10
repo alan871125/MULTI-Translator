@@ -61,6 +61,8 @@
     "attribute": "屬性",
     "original": "原文",
     "translation": "翻譯",
+    "level": "等級",
+    "comments": "註解",
     "filter": "篩選",
     "search_and_replace": "搜尋與取代",
     "search": "搜尋",

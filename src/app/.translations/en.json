@@ -65,6 +65,8 @@
     "attribute": "Attribute",
     "original": "Original",
     "translation": "Translation",
+    "level": "Level",
+    "comments": "Comments",
     "filter": "Filter",
     "search_and_replace": "Search and Replace",
     "search": "Search",

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 L = LanguagePack()
 
 class TranslationTableModel(QAbstractTableModel):
-    _COLUMNS = ["file", "key", "original", "translation"]
+    _COLUMNS = ["file", "key", "original", "translation", "comments"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
     
     def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
@@ -288,7 +288,9 @@ class TranslationTableModel(QAbstractTableModel):
         self.df.loc[mask, "translation"] = dict_df.loc[mask, settings.TARGET_LANG]
         self.df.loc[mask, "level"] = dict_df.loc[mask, f"{settings.TARGET_LANG}.level"]
         self.df.reset_index(inplace=True)
-
+        if diff_comments := dictionary.check_difference(self.df, self_type="old"):
+            labels_df = pd.DataFrame(list(diff_comments.items()), columns=["key", "comments"])
+            self.df = self.df.merge(labels_df, on="key", how="left")
         self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
 
     def chinese_convertion(self, target: Literal['s','t']):

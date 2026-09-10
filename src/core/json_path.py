@@ -17,3 +17,10 @@ class JsonPath(str):
         return JsonPath(self.parts + other.parts)  # Combine two JSON paths by merging their list representations
     def __repr__(self):
         return f"JsonPath({self.parts})"
+    def __eq__(self, other):
+        if isinstance(other, list):
+            return self.parts == other
+        else:
+            return super().__eq__(other)
+    def __hash__(self):
+        return super().__hash__()
