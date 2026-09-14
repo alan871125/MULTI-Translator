@@ -3,10 +3,9 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QButtonGroup
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtSvg import QSvgRenderer
-from qt_utils import TypedQtSignal
 import core.engines as engines
 from core.translation import TranslationLevel
 from app.settings import Settings
@@ -85,8 +84,8 @@ class TopBar(QWidget):
     """
     Top bar component containing workspace selection, engine selection, and filtering.
     """
-    filter_clicked = TypedQtSignal()
-    workspace_clicked = TypedQtSignal()
+    filter_clicked = pyqtSignal()
+    workspace_clicked = pyqtSignal()
 
     def __init__(self, settings:Settings, table_filters:Optional[TableFilters]=None, parent=None):
         super().__init__(parent)

@@ -73,9 +73,15 @@ class _BoundTypedQtSignal(typing.Generic[P]):
     def connect(self, slot: typing.Callable[P, typing.Any]) -> None:
         self._bound_signal.connect(slot)
 
-    def emit(self, *args: P.args, **kwargs: P.kwargs) -> None:
-        self._bound_signal.emit(*args, **kwargs)       
-
+    # This will cause a silence bug where the signal doesn't emit on a zero-arg signal, due to argument‑count mismatch.
+    # def emit(self, *args: P.args, **kwargs: P.kwargs) -> None:
+    #     self._bound_signal.emit(*args, **kwargs)
+    @property
+    def emit(self) -> typing.Callable[P, None]:
+        # Return the *real* pyqtBoundSignal.emit, not a wrapping function.
+        # This preserves Qt's native signal-to-signal connection semantics
+        # (correct arity trimming) when this is used as a connect() target.
+        return typing.cast(typing.Callable[P, None], self._bound_signal.emit)
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
