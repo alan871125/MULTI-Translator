@@ -27,6 +27,7 @@ class EditType(Enum):
     RESET = "reset"
     SHARE = "share"
     PASTE = "paste"
+    LEVEL = "level"
     CHS2CHT = "chs2cht"
     CHT2CHS = "cht2chs"
 
@@ -148,7 +149,7 @@ class TranslationTableView(QTableView):
 
     def on_level_hotkey_triggered(self, level: TranslationLevel):
         if (idxs := self.selected_source_rows):
-            self.edit_translation_requested.emit(TranslationRequest(EditType.SHARE, idxs, val=level))
+            self.edit_translation_requested.emit(TranslationRequest(EditType.LEVEL, idxs, val=level))
     
 class TranslationTabWidget(QTabWidget):
     """A QTabWidget that manages multiple TranslationTableViews, each associated with a translation file.  

@@ -127,6 +127,10 @@ class TranslationAppPresenter:
                     return
                 translations = list(islice(cycle(clipboard_text.split('\r\n')), len(idxs)))  # Repeat the clipboard text if there are more selected rows than lines in the clipboard
                 level = TranslationLevel.VERIFIED
+            case EditType.LEVEL:
+                assert isinstance(request.val, TranslationLevel), f"Expected request.val to be a TranslationLevel for EditType.LEVEL, got {type(request.val)}"
+                self.session.set_level(file_path, idxs, request.val)
+                return # remove the return if share should happen
             case _:
                 raise ValueError(f"Unknown EditType: {EditType}")
         share = self.main_window.show_share_translation_confirmation()
