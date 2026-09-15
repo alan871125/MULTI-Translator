@@ -166,12 +166,6 @@ class TranslationTabWidget(QTabWidget):
         self.setAcceptDrops(True)
     # ---------- Overrides ----------
     @override
-    def addTab(self, widget: TranslationTableView, title: str): 
-        # Type hinting for the widget parameter to ensure it's a TranslationTableView, which allows us to access its model and other specific methods if needed in the future.
-        assert isinstance(widget, TranslationTableView), "Only TranslationTableView instances can be added to TranslationTabWidget"
-        super().addTab(widget, title)
-        self.tab_exist_signal.emit(True)
-    @override
     def removeTab(self, index: int):
         if index < 0 or index >= self.count():
             return
@@ -220,6 +214,8 @@ class TranslationTabWidget(QTabWidget):
         new_tab = TranslationTableView(self)
         self.tabs[file_path] = new_tab
         self.addTab(new_tab, Path(file_path).name)
+        self.tab_exist_signal.emit(True)
+        self.setCurrentWidget(new_tab)
         return new_tab
     
     def focus_tab(self, file_path: str):
