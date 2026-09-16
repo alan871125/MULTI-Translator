@@ -1,7 +1,14 @@
-.vscode
+# Ignore Visual Studio Code settings and backup files
+.vscode/
+.backup/
+# Ignore AI agents documentation files
+AGENTS.MD
+CLAUDE.MD
+GEMINI.MD
+# Ignore environment variables and JSON files that may contain sensitive information or are not necessary to track
+.venv/
 .env
 *.json
-
 # Cache/Compiled files
 *.pyc
 __pycache__/
