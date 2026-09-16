@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, override
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QCloseEvent
 from PyQt5.QtWidgets import (
     QLabel,QCheckBox, QFileDialog, QMainWindow, QTabWidget, QUndoStack, QWidget, 
     QVBoxLayout, QHBoxLayout, 
@@ -64,13 +64,13 @@ class TranslationApp(QMainWindow):
         self.settings.setting_changed.connect(self.lru_menu.refresh)  # Refresh recent files menu when settings change
         
     @override
-    def closeEvent(self, event):
+    def closeEvent(self, a0: QCloseEvent):
         # save the current state of the application
         open_tabs = list(self.translation_table.tabs.keys())
         self.settings.last_open_tabs = open_tabs
         self.settings.last_open_workspace = self.settings.workspace_dir
         self.settings.save()
-        super().closeEvent(event)
+        super().closeEvent(a0)
 
     def open_filter_menu(self):
         # Popup a filter Menu with Column: entries for columns in the table.

@@ -9,6 +9,8 @@ from core.translation import TranslationLevel
 
 logger = logging.getLogger(__name__)
 
+FilterColumn = Literal["file", "key", "original", "translation", "comments"]
+
 @dataclass(slots=True)
 class ColumnFilter:
     column: str
@@ -41,14 +43,11 @@ class TableFilters(QObject):
         
     def __repr__(self):
         return f"TableFilters(levels={list(self.levels.values())}, filters={self.filters})"
+    
     def build_mask(self, df: pd.DataFrame):
         logger.debug(f"Building mask for DataFrame with {len(df)} rows using filters: {self.filters} and levels: {self.levels}")
         return build_mask(df, filters=self.filters.values(), levels=[lv for lv, show in self.levels.items() if show])
-    
-    def filter(self, df:pd.DataFrame):
-        mask = self.build_mask(df)
-        return df[mask].reset_index(drop=True)
-    
+
     @property
     def is_filtering(self):
         return not all(self.levels.values()) or any(self.filters.values())
@@ -57,7 +56,7 @@ class TableFilters(QObject):
     def get(self, column:Literal['level']) -> list[TranslationLevel]:
         ...
     @overload
-    def get(self, column:str) -> ColumnFilter|None:
+    def get(self, column:FilterColumn) -> ColumnFilter|None:
         ...
     def get(self, column:str) -> ColumnFilter|list[TranslationLevel]|None:
         if column == "level":
@@ -83,6 +82,7 @@ def build_mask(df: pd.DataFrame, filters: Optional[Iterable[ColumnFilter]], leve
     """Builds a boolean mask for the DataFrame based on the provided filters and translation levels."""
     if filters is None and levels is None:
         logger.warning("No filters or levels provided to build_mask; returning all True mask.")
+        mask = pd.Series(True, index=df.index)  # Return all True if no filters or levels are provided
     elif levels is not None:
         level_shown = set(levels)
         mask = df['level'].isin(level_shown)  # Use isin for better performance and correctness

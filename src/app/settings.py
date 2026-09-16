@@ -162,7 +162,7 @@ class WorkspaceData:
 
     
     
-StringSettings = Literal["SOURCE_LANG", "TARGET_LANG", "API", "DEEPL_API_KEY", "CUSTOM_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_MODEL", "max_workers", "language", "theme", "last_open_workspace"]
+StringSettings = Literal["SOURCE_LANG", "TARGET_LANG", "API", "DEEPL_API_KEY", "CUSTOM_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_MODEL", "language", "theme", "last_open_workspace"]
 BoolSettings = Literal["dark_mode", "restore_last_session"]
 IntSettings = Literal["max_workers"]
 StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_dir", "output_dir", "engine"]
@@ -177,6 +177,9 @@ class Settings(QObject):
     SOURCE_LANG: str 
     TARGET_LANG: str
     API: str
+    CUSTOM_API_MODEL:str
+    CUSTOM_API_URL:str
+    
     def __init__(self, settings: Optional[SettingsData|str|Path]=None, workspace: Optional[WorkspaceData|str|Path]=None):
         if isinstance(settings, (str, Path)):
             self.data: SettingsData = SettingsData.load(settings)
