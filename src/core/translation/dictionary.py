@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Optional, Literal, Union
+from typing import Optional, Literal, Union, Callable
 from rapidfuzz import process, fuzz
 import pandas as pd
 from ..json_path import JsonPath
@@ -63,13 +63,15 @@ class TranslationDictionary:
         logger.info(f"Dictionary saved to {file_path}")
     
     @classmethod
-    def load(cls, file_path: str|Path, source_lang: Optional[str] = None, target_lang: Optional[str] = None):
+    def load(cls, file_path: str|Path, source_lang: Optional[str] = None, target_lang: Optional[str] = None, key_class:Optional[Callable[[str], object]] = None):
         """Loads the dictionary from a CSV file."""
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        if key_class is None:
+            key_class = JsonPath
         df = pd.read_csv(
-            file_path, converters={"key": JsonPath}, 
+            file_path, converters={"key": key_class} if key_class else None, 
             # cast the columns to the correct types, preventing converting "None" to null
             dtype={"original":str, "translation":str, "level":int, "file":str}, keep_default_na=False
         )
@@ -152,7 +154,7 @@ class TranslationDictionaryLong:
         )
         return base_path.parent / file_name
 
-    def load_csv(self, file_path: str|Path, file_name_format: Optional[str] = None):
+    def load_csv(self, file_path: str|Path, file_name_format: Optional[str] = None, key_class=JsonPath):
         """ loads a csv file with the required columns
         Obtains the source and target languages from the file name.
         
@@ -168,7 +170,7 @@ class TranslationDictionaryLong:
         self.source_lang = match.group("source_lang")
         self.target_lang = match.group("target_lang")
         # Load the CSV file into a DataFrame
-        self.df:pd.DataFrame = pd.read_csv(file_path, converters={"key": JsonPath})
+        self.df:pd.DataFrame = pd.read_csv(file_path, converters={"key": key_class})
         
     def save_csv(self, file_path: str|Path, use_convention: bool = False):
         """Saves the current translation table to a CSV file.
