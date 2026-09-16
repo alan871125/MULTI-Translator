@@ -110,7 +110,9 @@ class TranslationDictionaryDatabase:
     
     def insert_from_translation_dictionary(self, translation_dict: TranslationDictionary):
         """Inserts records from a TranslationDictionary instance."""
-        self.insert_from_dataframe(translation_dict.df)
+        df = translation_dict.df.copy()
+        df['key'] = df['key'].astype(str)  # Ensure keys are strings for SQLite
+        self.insert_from_dataframe(df)
     
     def _update_file_timestamp(self, file_path: str|Path):
         """Updates the last modified timestamp for a given file in the FileUpdates table."""

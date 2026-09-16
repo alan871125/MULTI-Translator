@@ -40,7 +40,7 @@ class TranslationSession(QObject):
         name = name or file_path.as_posix()
         dictionary = TranslationDictionary.load(file_path.with_suffix('.csv'))
         self.dictionaries[name] = dictionary
-        self.db.insert_from_dataframe(dictionary.df)
+        self.db.insert_from_translation_dictionary(dictionary)
         return dictionary
     
     def unload_dictionary(self, name: str):
