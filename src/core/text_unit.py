@@ -1,6 +1,11 @@
+import logging
+from typing import Union, Sequence, Optional
 from dataclasses import dataclass, field, asdict
-from .json_path import JsonPath
+
+from .json_path import JsonPath, PathLike
 from .translation.level import TranslationLevel
+
+logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class TextUnit:
@@ -11,14 +16,34 @@ class TextUnit:
         key (JsonPath): The unique identifier for the text unit, used to locate units in the file (e.g., JSON path, XML tag).
         original (str): The original text that needs to be translated.
         translation (str): The translated text, initially empty.
+        level (TranslationLevel): The translation status of the text unit (e.g., untranslated, translated, reviewed).
+        other_attrs (dict): A dictionary for any additional attributes related to the text unit.
     """
     file: str
     key: JsonPath
     original: str
     translation: str = ""
     level: TranslationLevel = TranslationLevel.UNTRANSLATED
-    
-    other_attrs: dict = field(default_factory=dict)  # A dictionary to hold any additional attributes that may be needed for specific engines    
+    other_attrs: dict = field(default_factory=dict)
 
+    def __init__(
+        self,
+        file: str,
+        key: PathLike,
+        original: str,
+        translation: str = "",
+        level: TranslationLevel = TranslationLevel.UNTRANSLATED,
+        other_attrs: Optional[dict] = None,
+        # consume any additional positional arguments to avoid errors and allow syntax `TextUnit(**row)` when row contains extra columns
+        *args, 
+        **kwargs
+    ):
+        self.file = file
+        self.original = original
+        self.translation = translation
+        self.level = level
+        self.other_attrs = other_attrs if other_attrs is not None else {}
+        self.key = JsonPath(key)
+            
     def asdict(self):
         return asdict(self)
