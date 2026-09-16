@@ -4,7 +4,7 @@ https://rimworldwiki.com/wiki/Modding_Tutorials/Localization
 """
 import logging
 from pathlib import Path
-from typing import Iterator, Optional, overload, Literal
+from typing import Iterator, Optional, Literal, override
 from pandas import DataFrame
 from lxml import etree as ET
 
@@ -71,8 +71,9 @@ class ModDirType(SupportedDirType):
         return (path/"About"/"About.xml").exists()
 
 class RimWorldExtractor(BaseExtractor):
-    SUPPORTED_DIR_TYPE: SupportedDirType = ModDirType("RimworldMod")
-    SUPPORTED_FILES_TYPES: list[str] = ['.xml']
+    SUPPORTED_DIR_TYPE = ModDirType("RimworldMod")
+    SUPPORTED_FILES_TYPES = ['.xml']
+    @override
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
         if path.suffix == ".xml":
@@ -83,7 +84,7 @@ class RimWorldExtractor(BaseExtractor):
             return self.extract_dir(path)
         else:
             raise ValueError(f"Unsupported file type: {path.suffix}")
-        
+    @override
     def extract_dir(self, path: Path|str, source_lang: str='en', target_lang: str='en', **kwargs) -> list[TextUnit]:
         path = Path(path)
         assert path.is_dir(), f"Path {path} is not a directory."
@@ -295,7 +296,7 @@ class RimWorldExtractor(BaseExtractor):
             path = language_path / subfolder
             if path.exists():
                 applier(path, text_units, save_path=save_path / subfolder, **kwargs)
-
+    @override
     def apply_translations(
         self, file_path: Path|str, 
         text_units: list[TextUnit]|DataFrame, 
@@ -421,6 +422,7 @@ class RimWorldExtractor(BaseExtractor):
             # Build a ET Tree for the file
             root = ET.Element("LanguageData")
             file_name = Path(file).name
+            deftype = None # prevent deftype being unbound
             for unit in file_units.itertuples():
                 keyparts = unit.key.parts
                 translation_key = keyparts[-1]
