@@ -12,6 +12,9 @@ class SupportedDirType(ABC, str):
         ...
     def __bool__(self):
         return True
+class UnsupportedDirectoryError(Exception):
+    """Raised when a directory is not of the expected type."""
+    pass
 
 class BaseExtractor(ABC):
     SUPPORTED_DIR_TYPE: Optional[SupportedDirType] = None # see the rimworld extractor for an example

@@ -8,7 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 
 from core.json_path import JsonPath
-from ._base import BaseExtractor, SupportedDirType
+from ._base import BaseExtractor, SupportedDirType, UnsupportedDirectoryError
 from core.text_unit import TextUnit
 
 logger = logging.getLogger(__name__)
@@ -191,7 +191,7 @@ class Extractor(BaseExtractor):
     def extract_dir(self, path: str | Path, source_lang: str='en', target_lang: str='en', *args, **kwargs) -> list[TextUnit]:
         path = Path(path).absolute()
         source_lang=code2lang.get(source_lang, source_lang)
-        target_lang=code2lang.get(target_lang, 'target_lang')
+        target_lang=code2lang.get(target_lang, target_lang)
         if source_lang not in get_args(AvailableLanguage):
             logger.warning(f"Source language '{target_lang}' is not a supported language. Defaulting to 'english'. Supported languages are: {get_args(AvailableLanguage)}")
             source_lang = 'english'
@@ -202,8 +202,10 @@ class Extractor(BaseExtractor):
             raise ValueError(f"Path {path} is not a directory.")
         elif not (path/"localization"/source_lang).is_dir(): 
             raise FileNotFoundError(f"Localization folder for language '{target_lang}' not found in {path}. Expected a 'localization/{target_lang}' subfolder.")
-        if not ModDirType.is_valid(path):
-            raise ValueError(f"Unsupported directory structure for {path}. Expected a mod directory with a 'localization' folder containing language subfolders.")
+        if not (path/"descriptor.mod").exists():
+            logger.warning(f"descriptor.mod file not found in {path}. This may not be a valid CK3 mod directory. Expected a 'descriptor.mod' file in the root of the directory.")
+        elif not (path/"localization").is_dir():
+            raise UnsupportedDirectoryError(f"Unsupported directory structure for {path}. Expected a mod directory with a 'localization' folder containing language subfolders.")
         
         source_units = self._extract_lang_dir(path/"localization"/source_lang, *args, **kwargs)
         if target_lang==source_lang:
