@@ -1,3 +1,4 @@
+import types
 import typing
 from typing_extensions import ParamSpec
 from PyQt5.QtCore import pyqtSignal
@@ -23,7 +24,8 @@ def _resolve_qt_type(t: typing.Any) -> type:
         arg_types = {type(a) for a in typing.get_args(t)}
         return arg_types.pop() if len(arg_types) == 1 else object
 
-    if origin is typing.Union:  # covers Optional[X] too
+    # Support both typing.Union and Python 3.10+ types.UnionType (PEP 604: X | Y)
+    if origin in (typing.Union, getattr(types, "UnionType", typing.Union)):
         args = [a for a in typing.get_args(t) if a is not type(None)]
         return _resolve_qt_type(args[0]) if len(args) == 1 else object
 
