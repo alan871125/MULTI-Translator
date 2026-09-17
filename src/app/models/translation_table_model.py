@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Any, Iterable, Literal, Sequence, cast, override, Optional, overload
 
-from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractTableModel,QAbstractProxyModel, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
 
@@ -19,9 +19,11 @@ from app.gui.dialogs.search import TableFilters
 from app.gui.theme import ThemeManager
 from app.language import LanguagePack
 
+from app.typing import IndexLikeSequence
+
+
 logger = logging.getLogger(__name__)
 L = LanguagePack()
-
 class TranslationTableModel(QAbstractTableModel):
     _COLUMNS = ["file", "key", "original", "translation", "comments"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
@@ -31,13 +33,16 @@ class TranslationTableModel(QAbstractTableModel):
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
         self.undo_stack = undo_stack
-        self.df:pd.DataFrame = pd.DataFrame(data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS)
+        self.df:pd.DataFrame = pd.DataFrame(
+            data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS
+        ).set_index('key', drop=False)
+        self.sort(0) # Initialize order with (file, key)
         self.filters = filters if filters is not None else TableFilters(self)
         self._mask_cache: Optional[pd.Series] = None  # Cache for the current filter mask
         
-        self.dataChanged.connect(self.update_filter_mask)  # Update the filter mask when data changes
         self.post_init_check()
-        
+        self.dataChanged.connect(self.update_filter_mask)  # Update the filter mask when data changes
+    
     def post_init_check(self):
         if self.file_path is None:
             logger.warning("TranslationTableModel initialized without a file path. Some operations may not work (ie., loading/saving files).")
@@ -45,7 +50,17 @@ class TranslationTableModel(QAbstractTableModel):
             logger.warning("TranslationTableModel initialized without an engine. Some operations may not work (ie., loading/saving files).")
         if self.filters is None:
             logger.warning("TranslationTableModel initialized without filters. Filters are Initialized with default empty filters, but may be disconnected from other components.")
+        self.drop_duplicates(keep='last')  # Ensure no duplicate keys on initialization
         
+    def drop_duplicates(self, keep:Literal['first','last']='first'):
+        """Drop duplicate rows based on the 'key' column, keeping the first or last occurrence."""
+        dup = self.df.duplicated(subset='key', keep=keep)
+        if dup.any():
+            logger.error("%s duplicate keys found. Dropping duplicates, the %s will be kept.", dup.sum(), keep)
+            self.df = self.df[~dup]
+            logger.warning("The following duplicate keys were dropped: \n    %s", '\n    '.join(map(str, dup[dup].keys())))
+            self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount()-1, self.columnCount()-1))  # Emit dataChanged for the entire model
+    
     def _level_from_value(self, value):
         if isinstance(value, TranslationLevel):
             return value
@@ -67,6 +82,7 @@ class TranslationTableModel(QAbstractTableModel):
         data = pd.DataFrame(units, columns=self._COLUMNS+self._HIDDEN_COLUMNS)
 
         self.df = pd.concat([self.df, data], ignore_index=True)
+        self.drop_duplicates(keep='last')  # Ensure no duplicate keys after loading new units
 
     def get_units(self) -> list[TextUnit]:
         """Convert the internal DataFrame back into a list of TextUnit objects."""
@@ -109,17 +125,15 @@ class TranslationTableModel(QAbstractTableModel):
             0<=(c:=index.column())<len(self._COLUMNS)
         ):
             return None
-        row, col = self.df.iloc[r], self._COLUMNS[c]
 
         if ((role == Qt.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
             (role == Qt.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
-            level = self._level_from_value(row.level)
+            level = self._level_from_value(self.df.iloc[r]['level'])
             return QColor(ThemeManager.theme.get_level_color(level))
 
-        if role in (Qt.DisplayRole, Qt.EditRole):
-            if col =='key':
-                return str(row.get(col, ""))
-            return row.get(col, "")
+        value = self.df.iat[r, c]
+        if role in (Qt.DisplayRole, Qt.EditRole) and not pd.isna(value):
+            return str(value)
         return None
 
     @override
@@ -147,19 +161,19 @@ class TranslationTableModel(QAbstractTableModel):
         if self.undo_stack is not None: # if not connected to a session's undo stack, apply changes directly without undo support
             self.undo_stack.push(TranslationCommand(
                 model=self,
-                idxs=[r],
+                idxs=self.df.index[[r]],
                 translations=[text],
                 levels=level,
                 description=f"Inline Edit"
             ))
         else:
-            self.set_translations([r], [text], levels=level)
+            self.set_translations(self.df.index[[r]], [text], levels=level)
         return True
     
     @override
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemIsEnabled
+            return Qt.ItemFlags(Qt.ItemIsEnabled)
         # make items selectable and enabled; only the Translation column is editable
         col = index.column()
         flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
@@ -177,11 +191,15 @@ class TranslationTableModel(QAbstractTableModel):
         return self._mask_cache
     
     def _update_filter_mask_cache(self, rows: pd.Index|list[int]):
+        """
+        Arguments:
+            rows (pd.Index[int] | list[int]): The int row indexes in the DataFrame for which to update the filter mask.
+        """
         if self._mask_cache is None: # No cached mask to update
             return # it will be recalculated on next access
         else:
-            new_mask = self.filters.build_mask(self.df.loc[rows])
-            self._mask_cache.loc[rows] = new_mask
+            new_mask = self.filters.build_mask(self.df.iloc[rows]) # integer indexes not keys
+            self._mask_cache.iloc[rows] = new_mask
             
     def update_filter_mask(self, start_index: QModelIndex, end_index: QModelIndex, roles: Sequence[int] = []):
         """Recaculate and update the mask at the given indexes,
@@ -200,21 +218,20 @@ class TranslationTableModel(QAbstractTableModel):
         return self.set_translations([idxs], [text], level)
 
     def set_translations(
-        self, idxs: Iterable[int], translations: Iterable[str]|str,
+        self, idxs: IndexLikeSequence, translations: Iterable[str]|str,
         levels: Optional[Iterable[TranslationLevel]|TranslationLevel] = TranslationLevel.VERIFIED
     ):
         """Set translations for the given indexes.
 
         Arguments:
-        idxs (Iterable[int]): 
-            The row indexes in the filtered data for which to set translations.
-        translations (Iterable[str] | str): 
-            The translation(s) to set. Can be a single string for all indexes or an iterable of strings corresponding to each index.
-        levels (Iterable[TranslationLevel] | TranslationLevel, optional): 
-            The translation level(s) to set. Can be a single TranslationLevel for all indexes or an iterable of TranslationLevels corresponding to each index. If None, the level will not be changed. Default is TranslationLevel.VERIFIED.
+            idxs (IndexLike): 
+                The row indexes in the filtered data for which to set translations.
+            translations (Iterable[str] | str): 
+                The translation(s) to set. Can be a single string for all indexes or an iterable of strings corresponding to each index.
+            levels (Iterable[TranslationLevel] | TranslationLevel, optional): 
+                The translation level(s) to set. Can be a single TranslationLevel for all indexes or an iterable of TranslationLevels corresponding to each index. If None, the level will not be changed. Default is TranslationLevel.VERIFIED.
         """
-        if not isinstance(idxs, pd.Index):
-            idxs = pd.Index(idxs)
+        idxs = pd.Index(idxs)
         if idxs.empty:
             return False
         if isinstance(translations, Iterable) and not isinstance(translations, str):
@@ -230,10 +247,20 @@ class TranslationTableModel(QAbstractTableModel):
         else:
             logger.error(f"Invalid type for levels: {type(levels)}. Must be TranslationLevel or Iterable[TranslationLevel].")
         # Emit dataChanged signal for the specific rows that were updated
-        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
+        self.emit_df_row_changed(idxs)
         return True
-
-    def search_and_replace(self, filters: list[ColumnFilter], replace_text: str, column: Literal['original', 'translation'] = "original"):
+    
+    def emit_df_row_changed(self, idxs: pd.Index|pd.Series):
+        """Emit dataChanged signal for the specific rows that were updated in the DataFrame."""
+        if isinstance(idxs, pd.Series):
+            idxs = idxs[idxs].index  # Get the index of True values
+        if idxs.empty:
+            return 0
+        int_idxs = self.df.index.get_indexer(idxs)
+        self.dataChanged.emit(self.index(int_idxs.min(), 0), self.index(int_idxs.max(), self.columnCount() - 1))
+        return len(int_idxs)
+    
+    def search_and_replace(self, filters: dict[Literal['file', 'key', 'original', 'translation'], ColumnFilter], replace_text: str, column: Literal['original', 'translation'] = "original"):
         """Replace translations based on search criteria. 
         Replace_text is a regex pattern or plain text to replace with. 
         Column specifies which column to apply the search and replace on if both are in the filters.
@@ -245,53 +272,45 @@ class TranslationTableModel(QAbstractTableModel):
         if not filters:
             logger.warning("No filters provided for search and replace. No replacements made.")
             return 0
+        elif (_filter := filters.get(column)) is None:
+            logger.error(f"Column '{column}' not found in provided filters. Cannot perform search and replace.")
+            return 0
         # TODO: Add a option to ignore the level filter under search&replace.
-        mask = build_mask(self.df, filters=filters, levels=[lv for lv, show in self.filters.levels.items() if show])
+        mask = build_mask(self.df, filters=filters.values(), levels=[lv for lv, show in self.filters.levels.items() if show])
         if not mask.any():
             logger.info("No rows matched the search criteria. No replacements made.")
             return 0
-        for _filter in filters:
-            # Prioritizes Translation column if multiple filters are provided.
-            #TODO: consider allowing the user to specify which column to prioritize or apply the replace on.
-            if _filter.column == 'translation':
-                break
         self.df.loc[mask, "translation"] = self.df.loc[mask, column].str.replace(
             _filter.text, replace_text, regex=_filter.is_regex, case=_filter.match_case
         )
-        if (idxs := self.df.index[mask]).empty:
-            return 0
-        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
-        return mask.sum()
+        return self.emit_df_row_changed(mask)
 
-    def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None):
-        """Apply translations from the specified dictionary to the model."""
-        if keys is None:
-            keys = ["key"]
-        # We need to be careful with set_index if keys are not unique.
-        # Create copies to avoid modifying original dataframes directly until ready
-        df_copy = self.df.set_index(keys)
+    def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None) -> None:
+        keys = keys or ["key"]
         if (dict_df := dictionary.get(settings.TARGET_LANG)) is None:
             logger.warning(f"Dictionary does not contain target language '{settings.TARGET_LANG}'. No translations applied.")
             return
-        dict_df = dict_df.set_index(keys)
 
-        # Reindex the dictionary to match the model's index structure
-        # This will fill missing entries with NaN, which we can filter out.
-        dict_df = dict_df.reindex(df_copy.index)
+        level_col = f"{settings.TARGET_LANG}.level"
 
-        # Apply translations only if the level in the dictionary is higher
-        mask = dict_df[f"{settings.TARGET_LANG}.level"] > df_copy["level"]
-        if (idxs := self.df.index[mask]).empty:
-            return # No translations to apply
-        # Update the model's data
-        self.df.set_index(keys, inplace=True)
-        self.df.loc[mask, "translation"] = dict_df.loc[mask, settings.TARGET_LANG]
-        self.df.loc[mask, "level"] = dict_df.loc[mask, f"{settings.TARGET_LANG}.level"]
-        self.df.reset_index(inplace=True)
+        # Invariant: self.df is always indexed by `keys` with drop=False.
+        dict_aligned = dict_df.set_index(keys).reindex(self.df.index)
+
+        mask = dict_aligned[level_col] > self.df["level"]
+        if not mask.any():
+            return
+
+        updated_keys = self.df.index[mask]
+
+        self.df.loc[mask, "translation"] = dict_aligned.loc[mask, settings.TARGET_LANG]
+        self.df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
+
         if diff_comments := dictionary.check_difference(self.df, self_type="old"):
-            labels_df = pd.DataFrame(list(diff_comments.items()), columns=["key", "comments"])
-            self.df = self.df.merge(labels_df, on="key", how="left")
-        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
+            comments = pd.Series(diff_comments)
+            comments.index.name = self.df.index.name
+            self.df["comments"] = comments.reindex(self.df.index)
+
+        self.emit_df_row_changed(updated_keys)
 
     def chinese_convertion(self, target: Literal['s','t']):
         """Convert all Chinese translations between Simplified and Traditional using OpenCC."""
@@ -299,55 +318,69 @@ class TranslationTableModel(QAbstractTableModel):
         if (idxs:= self.df.index[mask]).empty:
             return
         self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target)
-        self.dataChanged.emit(self.index(idxs.min(), 0), self.index(idxs.max(), self.columnCount() - 1))
+        self.emit_df_row_changed(idxs)
 
     def chs2cht(self): return self.chinese_convertion(target='t')
     def cht2chs(self): return self.chinese_convertion(target='s')
         
-    def is_same_original_exists(self, idxes: pd.Index|list[int]|int, is_filtered: bool = True) -> bool:
+    def is_same_original_exists(self, idxs: IndexLikeSequence|int) -> bool:
         """Checks if there are any other text units with the same original text as the given indexes. 
         This is used to determine whether to show the share translation confirmation dialog."""
-        if isinstance(idxes, int):
-            idxes = [idxes]
-        df = self.df if is_filtered else self.df
-        originals = df.iloc[idxes]["original"] if is_filtered else df.loc[idxes, "original"]
-        for original in originals:
-            if (self.df["original"] == original).sum() > 1:
-                return True
-        return False
+        if isinstance(idxs, int):
+            original = self.df.iloc[idxs]["original"]
+            return (self.df["original"] == original).sum() > 1
+        elif not isinstance(idxs, (list, pd.Index, pd.Series, list)):
+            idxs = pd.Index(idxs)
+        originals = self.df.loc[idxs, "original"]
+        return any((self.df["original"] == original).sum() > 1 for original in originals)
 
     def get_idxs_same_original(
-        self, idx: int, is_filtered: bool = True,
+        self, idx: int|str, is_filtered: bool = True,
         max_level: TranslationLevel = TranslationLevel.UNTRANSLATED) -> pd.Index:
         """Get all indexes of text units that have the same original text as the given index."""
         if is_filtered:
-            original = self.df.iloc[idx]["original"]
+            original = self.df.loc[idx, "original"]
         else:
-            original = self.df.iloc[idx]["original"]
+            original = self.df.loc[idx, "original"]
         same_original_mask = (self.df["original"] == original) & (self.df["level"] <= max_level)
         return self.df[same_original_mask].index
 
-    def get_first_unique_original_idxs(self, indexes: pd.Index|list[int]|int, is_filtered: bool = True) -> pd.Index:
-        """Get the first unique index for each original text among the given indexes. 
-        This can be used to optimize batch operations by only applying changes to one representative text unit for each unique original text."""
-        df = self.df if is_filtered else self.df
-        out = df.iloc[indexes].reset_index().groupby("original").index.min()
-        return pd.Index(out.values)
+    # def get_first_unique_original_idxs(self, indexes: pd.Index|list[int]|int, is_filtered: bool = True) -> pd.Index:
+    #     """Get the first unique index for each original text among the given indexes. 
+    #     This can be used to optimize batch operations by only applying changes to one representative text unit for each unique original text."""
+    #     # TODO: This is unused and might be deprecated
+    #     df = self.df if is_filtered else self.df
+    #     out = df.iloc[indexes].reset_index().groupby("original").index.min()
+    #     return pd.Index(out.values)
+    
+    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+        if not (0 <= column < len(self._COLUMNS)):
+            return
 
-class CaseInsensitiveSortProxyModel(QSortFilterProxyModel):
-    def lessThan(self, left_index, right_index):
-        # Retrieve display values for comparison
-        left_data = self.sourceModel().data(left_index, Qt.DisplayRole)
-        right_data = self.sourceModel().data(right_index, Qt.DisplayRole)
+        self.layoutAboutToBeChanged.emit()
         
-        # Convert to string and lowercase for case-insensitive comparison
-        left_str = str(left_data).lower() if left_data is not None else ""
-        right_str = str(right_data).lower() if right_data is not None else ""
+        col_name = self._COLUMNS[column]
+        ascending = (order == Qt.AscendingOrder)
         
-        return left_str < right_str
+        # Fast vector sorting using pandas string methods
+        # Use key to perform case-insensitive sort without altering actual data
+        if col_name == 'key':
+            self.df.sort_index(ascending=ascending, inplace=True, ignore_index=False)
+        else:
+            self.df.sort_values(
+                by=(col_name),
+                ascending=ascending,
+                inplace=True,
+                key=lambda col: col.astype(str).str.casefold(),
+                ignore_index=False # keep the index
+            )
+        
+        # Clear filter mask cache since index order changed
+        self.clear_filter_mask()
 
+        self.layoutChanged.emit()
 
-class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
+class TranslationTableProxyModel(QSortFilterProxyModel):
     """A proxy model for the TranslationTableModel to support sorting and filtering in the view."""
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -356,13 +389,20 @@ class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
         self._accepted_rows: Optional[set[int]] = None  # Cache of accepted source model rows for fast filtering
     
     @override
-    def setSourceModel(self, sourceModel: TranslationTableModel) -> None:
+    def setSourceModel(self, sourceModel: QAbstractItemModel) -> None:
+        """
+        Arguments:
+            sourceModel (TranslationTableModel): The source model to be set for this proxy model. Must be an instance of TranslationTableModel.
+        """
         assert isinstance(sourceModel, TranslationTableModel)
         super().setSourceModel(sourceModel)
-        self.filters = sourceModel.filters  # Bind the filters from the source model to the proxy model
+        
+    def set_translation_table_model(self, model: TranslationTableModel):
+        """Set the source model for this proxy model. This is a convenience method to ensure type safety."""
+        self.setSourceModel(model)
+        self.filters = model.filters  # Bind the filters from the source model to the proxy model
         self.filters.text_filter_changed.connect(self.invalidateFilter)
         self.filters.level_filter_changed.connect(self.invalidateFilter)
-
     @override
     def sourceModel(self) -> TranslationTableModel:
         source = super().sourceModel()
@@ -378,7 +418,8 @@ class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
         if not self.sourceModel().filters.is_filtering:
             return True
-        return source_row in self.accepted_rows
+        df_index = self.sourceModel().df.index[source_row]
+        return df_index in self.accepted_rows
     
     @property
     def accepted_rows(self) -> set[int]:
@@ -393,27 +434,18 @@ class TranslationTableProxyModel(CaseInsensitiveSortProxyModel):
         if not proxy_index.isValid():
             return QModelIndex()
         return self.mapToSource(proxy_index)
-    @overload
-    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[QModelIndex]) -> list[QModelIndex]: ...
-    @overload
-    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[int]) -> list[int]: ...
-    @overload
-    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type[pd.Index]) -> pd.Index: ...
-    def get_true_indexes(self, proxy_indexes: Iterable[QModelIndex], dtype: type = QModelIndex) -> list[QModelIndex]|list[int]|pd.Index:
-        """Convert a list of proxy indexes to the corresponding source model indexes or row numbers."""
-        if dtype == QModelIndex:
-            return [self.mapToSource(idx) for idx in proxy_indexes]
-        elif dtype == int:
-            return [self.mapToSource(idx).row() for idx in proxy_indexes]
-        elif dtype == pd.Index:
-            return pd.Index([self.mapToSource(idx).row() for idx in proxy_indexes])
-        raise ValueError(f"Unsupported dtype: {dtype}. Must be QModelIndex, int, or pd.Index.")
+    
+    @override
+    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+        # Delegate sorting directly to the pandas-backed source model
+        if self.sourceModel():
+            self.sourceModel().sort(column, order)
 
 class TranslationCommand(QUndoCommand):
     """A command to apply a batch of changes to the DataFrame for undo/redo."""
     def __init__(
         self, model: TranslationTableModel,
-        idxs: pd.Index|list[int],
+        idxs: IndexLikeSequence,
         translations: Iterable[str]|str,
         levels: Optional[TranslationLevel] = None,
         description: str = "Batch Translation Edit",
@@ -421,8 +453,8 @@ class TranslationCommand(QUndoCommand):
         super().__init__(description)
         self.model = model
         self.idxs = idxs
-        self.old = model.df.loc[idxs, "translation"].copy()
-        self.old_levels = model.df.loc[idxs, "level"].copy()
+        self.old = model.df.loc[idxs]["translation"].copy()
+        self.old_levels = model.df.loc[idxs]["level"].copy()
         self.new = translations
         self.new_levels: Optional[pd.Series|TranslationLevel] = levels
         self.description = description
@@ -435,12 +467,12 @@ class TranslationCommand(QUndoCommand):
 
 class ShareTranslationCommand(TranslationCommand):
     """A command to share a translation to all text units with the same original text."""
-    def __init__(self, model: TranslationTableModel, idx: int, description: str = "Share Translation", max_level: TranslationLevel = TranslationLevel.API):
+    def __init__(self, model: TranslationTableModel, idx: int|str, description: str = "Share Translation", max_level: TranslationLevel = TranslationLevel.API):
         # Get all indexes with the same original text
         same_original_idxs = model.get_idxs_same_original(idx, is_filtered=False, max_level=max_level)
         # Get the current translation to be shared
-        current_translation = model.df.iloc[idx].translation
-        levels = TranslationLevel(model.df.iloc[idx].level)
+        current_translation = model.df.loc[idx]['translation']
+        levels = TranslationLevel(model.df.loc[idx]['level'])
         super().__init__(
             model=model,
             idxs=same_original_idxs,
@@ -448,3 +480,19 @@ class ShareTranslationCommand(TranslationCommand):
             levels=levels,
             description=description
         )
+
+@overload
+def get_source_indexes(model:QAbstractProxyModel, proxy_indexes: Iterable[QModelIndex], dtype: type[QModelIndex]) -> list[QModelIndex]: ...
+@overload
+def get_source_indexes(model:QAbstractProxyModel, proxy_indexes: Iterable[QModelIndex], dtype: type[int]) -> list[int]: ...
+@overload
+def get_source_indexes(model:QAbstractProxyModel, proxy_indexes: Iterable[QModelIndex], dtype: type[pd.Index]) -> pd.Index: ...
+def get_source_indexes(model:QAbstractProxyModel, proxy_indexes: Iterable[QModelIndex], dtype: type = QModelIndex) -> list[QModelIndex]|list[int]|pd.Index:
+    """Convert a list of proxy indexes to the corresponding source model indexes or row numbers."""
+    if dtype == QModelIndex:
+        return [model.mapToSource(idx) for idx in proxy_indexes]
+    elif dtype == int:
+        return [model.mapToSource(idx).row() for idx in proxy_indexes]
+    elif dtype == pd.Index:
+        return pd.Index([model.mapToSource(idx).row() for idx in proxy_indexes])
+    raise ValueError(f"Unsupported dtype: {dtype}. Must be QModelIndex, int, or pd.Index.")

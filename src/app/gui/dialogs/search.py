@@ -3,15 +3,18 @@ import PyQt5.QtWidgets as qt
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialogButtonBox
-from typing import Literal, override
+from typing import Literal, override, get_args
 
 from qt_utils import TypedQtSignal
 from app.language import LanguagePack
+from app.typing import SearchableColumn
 from ...models.filters import ColumnFilter, TableFilters
-
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
+# For Propper type hinting of the signal
+SEARCH_COLUMNS = ("file", "key", "original", "translation")
+assert all(col in get_args(SearchableColumn) for col in SEARCH_COLUMNS), "SEARCH_COLUMNS must match SearchableColumn type"
 class SearchLineEdit(qt.QLineEdit):
     padding=1
     def __init__(self, parent=None):
@@ -30,9 +33,10 @@ class SearchLineEdit(qt.QLineEdit):
 
         self.setStyleSheet("QToolButton { border: none; padding: 0px background:transparent; }") # Remove extra padding around the button
         self.update_button_position()
-        
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
+    
+    @override
+    def resizeEvent(self, a0):
+        super().resizeEvent(a0)
         self.update_button_position()
         
     def update_button_position(self):
@@ -48,8 +52,9 @@ class SearchLineEdit(qt.QLineEdit):
 
 class SearchDialog(qt.QDialog):
     # Note: suppose the replace uses regex if the search does.
-    replace_requested: TypedQtSignal[list, str, Literal["original", "translation"]] = TypedQtSignal(list, str, Literal["original", "translation"])  # filters, replace_text, column
-    SEARCH_COLUMNS = ["file", "key", "original", "translation"]
+    replace_requested: TypedQtSignal[dict[SearchableColumn, ColumnFilter], str, Literal["original", "translation"]] = TypedQtSignal(dict, str, Literal["original", "translation"])  # filters, replace_text, column
+    SEARCH_COLUMNS =  SEARCH_COLUMNS
+    
     REPLACE_START_ROW = 2  # The row index in the grid layout where the replace row starts  
     def __init__(self, filters:TableFilters, parent=None):
         super().__init__(parent)
@@ -238,18 +243,18 @@ class SearchDialog(qt.QDialog):
             controls["regex_btn"].setText("🔎") # Force reset the icon text too
 
     def set_filters(self):
-        self.filters.set_filters(self.get_filters()) # emits signal only once
+        self.filters.set_filters(self.get_filters().values()) # emits signal only once
         
-    def get_filters(self) -> list[ColumnFilter]:
-        filters = []
+    def get_filters(self) -> dict[SearchableColumn, ColumnFilter]:
+        filters = {}
         for col, controls in self.filter_entries.items():
             if not (text := controls["entry"].text().strip()):
                 continue
-            filters.append(ColumnFilter(
+            filters[col] = ColumnFilter(
                 col, text, 
                 controls["regex_btn"].isChecked(), 
                 controls["case_btn"].isChecked()
-            ))
+            )
         return filters
     
     def on_replace(self):

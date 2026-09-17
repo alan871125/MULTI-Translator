@@ -112,7 +112,7 @@ class TranslationDictionary:
         keys_both = list(keys_old & keys_new)
         updated = old_org[keys_both] != new_org[keys_both]
         if verbose:
-            logger.info(f"Found {updated.sum()} updated keys: {list(updated[updated].index)}")
+            logger.info(f"Found {updated.sum()} updated keys: {updated[updated].index.astype(str).tolist()}")
         for key in updated[updated].index:
             comments[key] = TranslationLabel.UPDATED
         return comments

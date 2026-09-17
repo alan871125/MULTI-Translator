@@ -13,12 +13,12 @@ from iod import IndexedOrderedDict
 from qt_utils import TypedQtSignal
 from app.settings import Settings
 from app.translation_table import logger
+from app.typing import IndexLikeSequence
 from core import engines
 from core.translation import TranslationLevel
 from core.translation.dictionary import TranslationDictionary
 from core.translation.dictionary_database import TranslationDictionaryDatabase
 from .translation_table_model import TranslationTableModel, TranslationCommand, ShareTranslationCommand
-
 logger = logging.getLogger(__name__)
 
 
@@ -146,7 +146,7 @@ class TranslationSession(QObject):
         key = file_path.as_posix()
         return self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
     
-    def set_level(self, file_path: str|Path, idxs: list[int]|pd.Index, level: TranslationLevel):
+    def set_level(self, file_path: str|Path, idxs: IndexLikeSequence, level: TranslationLevel):
         """Set the translation level for the currently selected rows. This can be used in conjunction with batch operations to set the level of multiple translations at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
@@ -161,7 +161,7 @@ class TranslationSession(QObject):
             description=f"Set Level: {level.name} for {len(idxs)} rows"
         ))
         
-    def set_translations(self, file_path: str|Path, idxs: list[int]|pd.Index, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
+    def set_translations(self, file_path: str|Path, idxs: IndexLikeSequence, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
         """Set the translation for the currently selected rows. This can be used in conjunction with batch operations to set the translation of multiple rows at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
@@ -207,7 +207,7 @@ class TranslationSession(QObject):
             )
         history.endMacro()
     
-    def reset_translations(self, file_path: str|Path, idxs: list[int]|pd.Index):
+    def reset_translations(self, file_path: str|Path, idxs: IndexLikeSequence):
         """Reset the translations of the specified rows back to their original text."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:

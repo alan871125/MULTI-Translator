@@ -10,6 +10,7 @@ from .models.session import TranslationSession
 from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel
 from .translation_table import EditType, TranslationRequest, TranslationTabWidget
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
+from .typing import IndexLikeSequence
 
 logger = logging.getLogger(__name__)
 
@@ -99,14 +100,14 @@ class TranslationAppPresenter:
         idxs = request.row_idxs
         match request.rtype:
             case EditType.MANUAL:
-                current_text = model.df.iloc[idxs[0]]['translation']  # Get the current translation of the first selected row to pre-fill the dialog
+                current_text = model.df.loc[idxs, 'translation'][0]  # Get the current translation of the first selected row to pre-fill the dialog
                 translations = self.main_window.open_edit_translation_dialog(current_text)
                 if translations is None:
                     return
                 level = TranslationLevel.VERIFIED
                 
             case EditType.API:
-                current_text = model.df.loc[idxs,'translation']
+                current_text = model.df.loc[idxs, 'translation']
                 translations = self.translator.batch_translate(current_text.tolist())
                 _idxs = idxs
                 idxs, translations = map(list, zip(*[
@@ -138,7 +139,7 @@ class TranslationAppPresenter:
             file_path, idxs, translations=translations, level=level, share=share
         )
     
-    def handle_copy_cells_request(self, file_path: str|Path, idxs: list[int], col_idx: int):
+    def handle_copy_cells_request(self, file_path: str|Path, idxs: IndexLikeSequence, col_idx: int):
         """Handles a request to copy the contents of one or more cells to the clipboard.
         Triggered by the user selecting "Copy" from the context menu after right-clicking on a cell or selection of cells in the translation table, or by using the standard copy keyboard shortcut (e.g., Ctrl+C).
         """
@@ -147,7 +148,8 @@ class TranslationAppPresenter:
             logger.warning(f"Attempted to copy cells for a file that is not open: {file_path}")
             return
         # Get the text of the selected cells and join them with newlines for copying to clipboard
-        cell_texts = model.df.iloc[idxs, col_idx].astype(str).tolist()
+        col = model.df.columns[col_idx]
+        cell_texts = model.df.loc[idxs, col].astype(str).tolist()
         clipboard_text = "\r\n".join(cell_texts)
         QApplication.clipboard().setText(clipboard_text)
     
@@ -229,7 +231,7 @@ class TranslationAppPresenter:
             self.session.apply_dictionary(dict_path, file_path)
         tab = self.create_translation_tab(file_path)
         proxy_model = TranslationTableProxyModel()
-        proxy_model.setSourceModel(model)
+        proxy_model.set_translation_table_model(model)
         tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
@@ -273,7 +275,7 @@ class TranslationAppPresenter:
         # Create tab in the TranslationTabWidget
         tab = self.create_translation_tab(dir_path)
         proxy_model = TranslationTableProxyModel()
-        proxy_model.setSourceModel(model)
+        proxy_model.set_translation_table_model(model)
         tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(

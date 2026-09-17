@@ -63,7 +63,7 @@ class TableFilters(QObject):
             return [lv for lv, show in self.levels.items() if show]
         return self.filters.get(column)
 
-    def set_filters(self, filters:list[ColumnFilter]):
+    def set_filters(self, filters:Iterable[ColumnFilter]):
         self.filters.clear() # Clear old filters first
         for filt in filters:
             self.filters[filt.column] = filt
