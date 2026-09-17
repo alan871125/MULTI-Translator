@@ -123,19 +123,30 @@ def delocalized_path(path: str | Path) -> str:
     """
     Converts a localization file path to a format string used as a unified key between source and target languages.
     
-    
-    For example, "localization/english/something_l_english.yml" becomes "localization/{lang}/something_l_{lang}.yml"
+    Arguments:
+        path (str | Path): The path to the localization file.
+    Returns: 
+        str: A format string representing the delocalized path, where the language part is replaced with `{lang}`.
+            Three possible return cases:
+            - Valid localization path: localization/<language>/<subdir>/<file>_l_<language>.yml
+            - Invalid localization path but valid file name: <file>_l_<language>.yml
+            - Invalid localization path and invalid file name: <file>.yml
     """
     path = Path(path)
-    try:
-        file_name = path.name
-        lang = path.parent.name
-        assert is_available_language(lang), f"Language {lang} is not a valid language."
-        assert path.parent.parent.name == "localization", f"Path {path} is not a valid localization file path."
-    except Exception as e:
-        raise ValueError(f"Path {path} is not a valid CK3 mod directory structure.")
-    
-    return "localization/{lang}/" + file_name.replace(f"_l_{lang}", "_l_{lang}")
+       
+    lang_pattern = '|'.join(get_args(AvailableLanguage))
+    loc_pattern = rf"localization/(?P<lang>{lang_pattern})/(?P<subdir>([^\"/]+/)*)?(?P<file_prefix>[^/]*_)?l_(?P=lang)\.yml$"
+    file_pattern = rf"(?P<file_prefix>[^/]*_)?l_(?P<lang>{lang_pattern})\.yml$"
+    regex = re.compile(loc_pattern)
+    if m:=regex.search(path.as_posix()):
+        subdir = m.group("subdir")
+        file_prefix = m.group("file_prefix") or ""
+        return f"localization/{{lang}}/{subdir}{file_prefix}l_{{lang}}.yml"
+    elif m:=re.compile(file_pattern).search(path.name):
+        logger.warning(f"File {path} is not in a localization subdirectory. The game may not be able to recognize the localization file. Expected a 'localization/<language>/' subfolder.")
+        file_prefix = m.group("file_prefix") or ""
+        return f"{file_prefix}l_{{lang}}.yml"
+    return path.name
     
 
 def merge_units(source_units: dict[str, TextUnit], target_units: dict[str, TextUnit]) -> list[TextUnit]:
@@ -177,7 +188,7 @@ class Extractor(BaseExtractor):
     def _extract_lang_dir(self, lang_dir: Path, max_workers:Optional[int]=None) -> dict[str, dict[str, TextUnit]]:
         text_units = {}
         with ThreadPoolExecutor(max_workers) as executor:
-            future_to_file = {executor.submit(self._extract_file, file_path): file_path for file_path in lang_dir.glob("*.yml")}
+            future_to_file = {executor.submit(self._extract_file, file_path): file_path for file_path in lang_dir.rglob("*.yml")}
             for future in as_completed(future_to_file):
                 file_path = future_to_file[future]
                 try:
