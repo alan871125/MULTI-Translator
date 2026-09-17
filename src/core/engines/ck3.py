@@ -2,14 +2,12 @@ import re
 import logging
 from pathlib import Path
 from typing import Optional, Literal, TypeGuard, override, get_args
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pandas import DataFrame
-import logging
-
-from concurrent.futures import ThreadPoolExecutor, as_completed, ProcessPoolExecutor
 
 from core.json_path import JsonPath
-from ._base import BaseExtractor, SupportedDirType, UnsupportedDirectoryError
 from core.text_unit import TextUnit
+from ._base import BaseExtractor, SupportedDirType, UnsupportedDirectoryError
 
 logger = logging.getLogger(__name__)
 name = 'Crusader Kings III'
@@ -41,7 +39,7 @@ def parse_yml(path: str | Path) -> dict[str, str]:
     
     path = Path(path)
     # get the language from the file name, which should be in the format l_<language>.yml
-    if (m := re.search(r'(?<![a-z])l_([a-z_]+)\.yml$', str(path))):
+    if (m := _YML_LANG_NAME_REGEX.search(str(path))):
         language = m.group(1)
     else:
         language = None
@@ -72,7 +70,6 @@ def parse_yml_txt(txt:str)->dict[AvailableLanguage, dict[str, str]]:
     # \s+              : Whitespace before value
     # "(.*)"           : Group 2 -> Double-quoted value string
     # (?:\s*#.*)?$     : Optional trailing comments starting with #
-    kv_pattern = re.compile(r'^\s*([\w\.-]+)(?::\d*)?\s+"(.*)"(?:\s*#.*)?$')
 
     for line in txt.splitlines():
         # Remove trailing carriage returns and whitespace
@@ -90,7 +87,7 @@ def parse_yml_txt(txt:str)->dict[AvailableLanguage, dict[str, str]]:
             continue
             
         # Match Key-Value pairs
-        match = kv_pattern.match(line)
+        match = _KV_PATTERN.match(line)
         if match and current_lang:
             key, value = match.groups()
             # Unescape explicit escaped quotes inside strings if present
@@ -119,6 +116,12 @@ class ModDirType(SupportedDirType):
         path = Path(path)
         return (path/"descriptor.mod").exists() and (path/"localization").is_dir()
 
+_LANG_PATTERN = '|'.join(get_args(AvailableLanguage))
+_LOC_REGEX = re.compile(rf"localization/(?P<lang>{_LANG_PATTERN})/(?P<subdir>([^\"/]+/)*)?(?P<file_prefix>[^/]*_)?l_(?P=lang)\.yml$")
+_FILE_REGEX = re.compile(rf"(?P<file_prefix>[^/]*_)?l_(?P<lang>{_LANG_PATTERN})\.yml$")
+_YML_LANG_NAME_REGEX = re.compile(r'(?<![a-z])l_([a-z_]+)\.yml$')
+_KV_PATTERN = re.compile(r'^\s*([\w\.-]+)(?::\d*)?\s+"(.*)"(?:\s*#.*)?$')
+
 def delocalized_path(path: str | Path) -> str:
     """
     Converts a localization file path to a format string used as a unified key between source and target languages.
@@ -133,17 +136,12 @@ def delocalized_path(path: str | Path) -> str:
             - Invalid localization path and invalid file name: <file>.yml
     """
     path = Path(path)
-       
-    lang_pattern = '|'.join(get_args(AvailableLanguage))
-    loc_pattern = rf"localization/(?P<lang>{lang_pattern})/(?P<subdir>([^\"/]+/)*)?(?P<file_prefix>[^/]*_)?l_(?P=lang)\.yml$"
-    file_pattern = rf"(?P<file_prefix>[^/]*_)?l_(?P<lang>{lang_pattern})\.yml$"
-    regex = re.compile(loc_pattern)
-    if m:=regex.search(path.as_posix()):
-        subdir = m.group("subdir")
+    if m := _LOC_REGEX.search(path.as_posix()):
+        subdir = m.group("subdir") or ""
         file_prefix = m.group("file_prefix") or ""
         return f"localization/{{lang}}/{subdir}{file_prefix}l_{{lang}}.yml"
-    elif m:=re.compile(file_pattern).search(path.name):
-        logger.warning(f"File {path} is not in a localization subdirectory. The game may not be able to recognize the localization file. Expected a 'localization/<language>/' subfolder.")
+    elif m := _FILE_REGEX.search(path.name):
+        logger.warning(f"File {path} is not in a localization subdirectory. Expected 'localization/<language>/' subfolder.")
         file_prefix = m.group("file_prefix") or ""
         return f"{file_prefix}l_{{lang}}.yml"
     return path.name
@@ -218,27 +216,17 @@ class Extractor(BaseExtractor):
         elif not (path/"localization").is_dir():
             raise UnsupportedDirectoryError(f"Unsupported directory structure for {path}. Expected a mod directory with a 'localization' folder containing language subfolders.")
         
-        source_units = self._extract_lang_dir(path/"localization"/source_lang, *args, **kwargs)
-        if target_lang==source_lang:
-            res:list[TextUnit] = []
-            for units in source_units.values():
-                res.extend(list(units.values()))
-            return res
-        else:
-            target_units = self._extract_lang_dir(path/"localization"/target_lang, *args, **kwargs)
-            # Merge source and target units by file path
-            merged_units = []
+        source_units = self._extract_lang_dir(path / "localization" / source_lang, *args, **kwargs)
+        if target_lang == source_lang:
+            return [unit for units in source_units.values() for unit in units.values()]
+
+        target_units = self._extract_lang_dir(path / "localization" / target_lang, *args, **kwargs)
+        
+        merged_units: list[TextUnit] = []
+        for file_path in (source_units.keys() | target_units.keys()):
+            merged_units.extend(merge_units(source_units.get(file_path, {}), target_units.get(file_path, {})))
             
-            file_paths = source_units.keys() | target_units.keys()
-            with ProcessPoolExecutor() as executor:
-                future_to_file = {executor.submit(merge_units, source_units.get(file_path, {}), target_units.get(file_path, {})): file_path for file_path in file_paths}
-                for future in as_completed(future_to_file):
-                    file_path = future_to_file[future]
-                    try:
-                        merged_units.extend(future.result())
-                    except Exception as e:
-                        logger.error(f"Error merging units for file {file_path}: {e}")
-            return merged_units
+        return merged_units
             
     def _apply_file(self, file_path: str | Path, text_units: list[TextUnit]|DataFrame, target_lang: AvailableLanguage, save_path: Optional[Path|str] = None, **kwargs) -> bool:  
         file_path = Path(file_path).absolute()
