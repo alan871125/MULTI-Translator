@@ -53,7 +53,7 @@ def parse_yml(path: str | Path) -> dict[str, str]:
         logging.error(f"Language in the file name ({language}) does not match the language in the file content ({_language}). The game may not be able to recognize the localization file.")
     return parsed_data[_language]
 
-def parse_yml_txt(txt:str)->dict[AvailableLanguage, dict[str, str]]:
+def parse_yml_txt(txt:str)->dict[str, dict[str, str]]:
     """
     Parses Paradox localization format into a nested dictionary:
     { "l_english": { "KEY": "Value text" } }
@@ -78,11 +78,10 @@ def parse_yml_txt(txt:str)->dict[AvailableLanguage, dict[str, str]]:
         # Skip blank lines or comment-only lines
         if not line or line.strip().startswith('#'):
             continue
-            
-        # Match language header (e.g. "l_english:")
-        if line.strip().endswith(':'):
-            assert line.strip().startswith('l_'), f"Unexpected line format: {line}"
-            current_lang = line.strip()[2:-1]
+        if not result and (
+            (m:= _LANG_REGEX.search(line)) is not None and
+            (current_lang := m.group("lang")) is not None
+        ):
             result[current_lang] = {}
             continue
             
@@ -117,6 +116,7 @@ class ModDirType(SupportedDirType):
         return (path/"descriptor.mod").exists() and (path/"localization").is_dir()
 
 _LANG_PATTERN = '|'.join(get_args(AvailableLanguage))
+_LANG_REGEX = re.compile(rf"l_(?P<lang>{_LANG_PATTERN})[\.yml$|:]")
 _LOC_REGEX = re.compile(rf"localization/(?P<lang>{_LANG_PATTERN})/(?P<subdir>([^\"/]+/)*)?(?P<file_prefix>[^/]*_)?l_(?P=lang)\.yml$")
 _FILE_REGEX = re.compile(rf"(?P<file_prefix>[^/]*_)?l_(?P<lang>{_LANG_PATTERN})\.yml$")
 _YML_LANG_NAME_REGEX = re.compile(r'(?<![a-z])l_([a-z_]+)\.yml$')
