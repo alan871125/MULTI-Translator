@@ -22,7 +22,7 @@ from app.language import LanguagePack
 from app.settings import Settings
 
 import core.engines as engines
-from qt_utils import TypedQtSignal
+from pyqt5_extentions.core import TypedQtSignal
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog

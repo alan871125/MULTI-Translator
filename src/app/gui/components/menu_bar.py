@@ -2,7 +2,7 @@ import logging
 from PyQt5.QtWidgets import QMenu
 
 from core.lru_file import LeastRecentlyUsedFiles
-from qt_utils import TypedQtSignal
+from pyqt5_extentions.core import TypedQtSignal
 from ..menu_utils import initialize_menu
 
 logger = logging.getLogger(__name__)

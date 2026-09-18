@@ -4,7 +4,7 @@ from typing import Iterable, Optional, overload, Literal
 from dataclasses import dataclass
 from PyQt5.QtCore import QObject
 
-from qt_utils import TypedQtSignal
+from pyqt5_extentions.core import TypedQtSignal
 from core.translation import TranslationLevel
 
 logger = logging.getLogger(__name__)
