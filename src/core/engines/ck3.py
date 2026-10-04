@@ -108,10 +108,10 @@ def write_yaml(language:AvailableLanguage, data: dict, file_path: Path):
             # the version number is not needed, so we can just write the key without it
             f.write(f'  {key}: "{escaped_value}"\n')
 
-class ModDirType(SupportedDirType):
-    """A type that represents a valid Rimworld mod directory, which contains a `About/About.xml` file."""
-    @classmethod
-    def is_valid(cls, path: Path|str) -> bool:
+class CK3ModDirType(SupportedDirType):
+    """A type that represents a valid CK3 mod directory, which contains a `About/About.xml` file."""
+    MSG_FORMAT = "Directory {path} is not a valid CK3 mod directory. Expected a 'descriptor.mod' file and a 'localization' folder."
+    def is_valid(self, path: Path|str) -> bool:
         path = Path(path)
         return (path/"descriptor.mod").exists() and (path/"localization").is_dir()
 
@@ -162,7 +162,7 @@ def merge_units(source_units: dict[str, TextUnit], target_units: dict[str, TextU
     return merged
 
 class Extractor(BaseExtractor):
-    SUPPORTED_DIR_TYPE = ModDirType('CK3 Mod Directory')
+    SUPPORTED_DIR_TYPE = CK3ModDirType('CK3 Mod Directory')
     SUPPORTED_FILES_TYPES = [".yml"]
 
     @staticmethod
@@ -202,7 +202,7 @@ class Extractor(BaseExtractor):
         source_lang=code2lang.get(source_lang, source_lang)
         target_lang=code2lang.get(target_lang, target_lang)
         if source_lang not in get_args(AvailableLanguage):
-            logger.warning(f"Source language '{target_lang}' is not a supported language. Defaulting to 'english'. Supported languages are: {get_args(AvailableLanguage)}")
+            logger.warning(f"Source language '{source_lang}' is not a supported language. Defaulting to 'english'. Supported languages are: {get_args(AvailableLanguage)}")
             source_lang = 'english'
         if target_lang not in get_args(AvailableLanguage):
             logger.warning(f"Target language '{target_lang}' is not a supported language. Defaulting to 'english'. Supported languages are: {get_args(AvailableLanguage)}")
@@ -210,7 +210,7 @@ class Extractor(BaseExtractor):
         if not path.is_dir():
             raise ValueError(f"Path {path} is not a directory.")
         elif not (path/"localization"/source_lang).is_dir(): 
-            raise FileNotFoundError(f"Localization folder for language '{target_lang}' not found in {path}. Expected a 'localization/{target_lang}' subfolder.")
+            raise FileNotFoundError(f"Localization folder for language '{source_lang}' not found in {path}. Expected a 'localization/{source_lang}' subfolder.")
         if not (path/"descriptor.mod").exists():
             logger.warning(f"descriptor.mod file not found in {path}. This may not be a valid CK3 mod directory. Expected a 'descriptor.mod' file in the root of the directory.")
         elif not (path/"localization").is_dir():
