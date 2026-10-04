@@ -59,10 +59,11 @@ class TranslationSession(QObject):
                 target_lang=self.settings.TARGET_LANG
             )
         if save_path is None:
-            name = Path(key).stem
-            save_dir = Path(self.settings.user_dict_dir)
-            save_dir.mkdir(parents=True, exist_ok=True)
-            save_path = (save_dir/name).with_suffix('.csv')
+            if Path(key).is_dir(): # This prevents the dir path having a dot in its name being truncated by the method `with_suffix`
+                save_path = Path(self.settings.user_dict_dir) / (Path(key).name+".csv")
+            else:
+                save_path = Path(self.settings.user_dict_dir) / (Path(key).with_suffix('.csv').name)
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         dictionary.save(save_path)
         history = self.get_history_stack(key)
         history.setClean()
