@@ -7,7 +7,7 @@ from dataclasses import dataclass, asdict, field
 
 from typing import Any, Optional, overload, Literal
 from PyQt5.QtCore import QObject
-from pyqt5_extentions.core import TypedQtSignal
+from pyqt5_extensions.core import TypedQtSignal
 
 from core.json_utils import JSONWithCommentsDecoder
 from core.lru_file import LeastRecentlyUsedFiles

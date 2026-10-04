@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialogButtonBox
 from typing import Literal, override, get_args
 
-from pyqt5_extentions.core import TypedQtSignal
+from pyqt5_extensions.core import TypedQtSignal
 from app.language import LanguagePack
 from app.typing import SearchableColumn
 from ...models.filters import ColumnFilter, TableFilters

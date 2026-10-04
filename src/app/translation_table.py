@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
     QInputDialog, QMenu, QApplication, QWidget, QTabBar
 )
-from pyqt5_extentions.core import TypedQtSignal
+from pyqt5_extensions.core import TypedQtSignal
 from iod import IndexedOrderedDict
 from core.translation import TranslationLevel, TranslationDictionary
 from .language import LanguagePack

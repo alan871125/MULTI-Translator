@@ -10,7 +10,7 @@ from PyQt5.QtCore import QObject
 
 from iod import IndexedOrderedDict
 
-from pyqt5_extentions.core import TypedQtSignal
+from pyqt5_extensions.core import TypedQtSignal
 from app.settings import Settings
 from app.translation_table import logger
 from app.typing import IndexLikeSequence
