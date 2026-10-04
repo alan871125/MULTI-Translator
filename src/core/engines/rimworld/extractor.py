@@ -63,15 +63,15 @@ def rimworld_dir_iter(mod_dir:Path, subdir:Literal["Languages","Defs", "Textures
             elif (lang_dir:=(mod_dir/li.text/subdir)).exists():
                 yield lang_dir
 
-class ModDirType(SupportedDirType):
+class RimworldModDirType(SupportedDirType):
     """A type that represents a valid Rimworld mod directory, which contains a `About/About.xml` file."""
-    @classmethod
-    def is_valid(cls, path: Path|str) -> bool:
+    MSG_FORMAT = "Directory {path} is not a valid {self}. Expected an 'About/About.xml' file."
+    def is_valid(self, path: Path|str) -> bool:
         path = Path(path)
         return (path/"About"/"About.xml").exists()
 
 class RimWorldExtractor(BaseExtractor):
-    SUPPORTED_DIR_TYPE = ModDirType("RimworldMod")
+    SUPPORTED_DIR_TYPE = RimworldModDirType("RimworldMod")
     SUPPORTED_FILES_TYPES = ['.xml']
     @override
     def extract_file(self, path: Path|str) -> list[TextUnit]:
@@ -88,7 +88,7 @@ class RimWorldExtractor(BaseExtractor):
     def extract_dir(self, path: Path|str, source_lang: str='en', target_lang: str='en', **kwargs) -> list[TextUnit]:
         path = Path(path)
         assert path.is_dir(), f"Path {path} is not a directory."
-        if ModDirType.is_valid(path): # Note: This is actually already checked in the session
+        if self.SUPPORTED_DIR_TYPE.is_valid(path): # Note: This is actually already checked in the session
             return self.extract_mod(path, source_lang=source_lang, target_lang=target_lang, **kwargs)
         elif path.name == "Definjected" or path.name == "Keyed":
             return self._extract_xml_folder(path, root_dir=path.name)
