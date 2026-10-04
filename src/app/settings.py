@@ -186,10 +186,14 @@ class Settings(QObject):
         else:
             self.data: SettingsData = settings or SettingsData()
 
-        if isinstance(workspace, (str, Path)):
+        if isinstance(workspace, WorkspaceData):
+            self.workspace_data: WorkspaceData = workspace
+        elif isinstance(workspace, (str, Path)):
             self.workspace_data: WorkspaceData = WorkspaceData.load(workspace)
+        elif self.data.restore_last_session and self.data.last_open_workspace:
+            self.workspace_data: WorkspaceData = WorkspaceData.load(self.data.last_open_workspace)
         else:
-            self.workspace_data: WorkspaceData = workspace or WorkspaceData()
+            self.workspace_data: WorkspaceData = WorkspaceData()
         super().__init__()
     # We look up the attribute string on the dataclass
     def __getitem__(self, item: str) -> Any:

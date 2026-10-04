@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import (
 )
 from pyqt5_extentions.core import TypedQtSignal
 from iod import IndexedOrderedDict
-from config import settings
 from core.translation import TranslationLevel, TranslationDictionary
 from .language import LanguagePack
 from .models.translation_table_model import TranslationTableModel

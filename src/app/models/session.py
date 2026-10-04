@@ -84,6 +84,7 @@ class TranslationSession(QObject):
             stack = self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             model = TranslationTableModel(
                 data=extractor.extract_file(file_path), 
+                settings=self.settings,
                 # filters=TableFilters(), # each model has its own filters, instead of sharing one instance.
                 file_path=file_path,
                 engine=extractor,
@@ -111,6 +112,7 @@ class TranslationSession(QObject):
             key = dir_path.as_posix()
             model = TranslationTableModel(
                 data=extractor.extract_dir(dir_path, source_lang=self.settings.SOURCE_LANG, target_lang=self.settings.TARGET_LANG), 
+                settings=self.settings,
                 # filters=TableFilters(), # each model has its own filters, instead of sharing one instance.
                 file_path=dir_path,
                 engine=extractor,

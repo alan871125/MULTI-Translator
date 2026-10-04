@@ -4,15 +4,16 @@ import shutil
 import traceback
 import logging
 import colorlog
+import argparse
 from dotenv import load_dotenv
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTextEdit
 
+import resources_rc
+from app.gui.main_window import TranslationApp
 from app.models.filters import TableFilters
 from app.models.session import TranslationSession
 from app.presenter import TranslationAppPresenter
-import resources_rc
-from config import settings
-from app.gui.main_window import TranslationApp
+from app.settings import Settings, DEFAULT_SETTINGS_FILE, DEFAULT_GLOBAL_WORKSPACE_FILE
 
 def setup_logging():
     handler = colorlog.StreamHandler()
@@ -86,14 +87,28 @@ def exception_hook(exc_type, exc_value, exc_traceback):
 
 # Assign the custom hook to the system interceptor
 sys.excepthook = exception_hook
+def parse_args(*args):
+    parser = argparse.ArgumentParser(description="General Game Translation Tool")
+    parser.add_argument("-w", "--workspace", type=str, required=False, help="Path to the workspace file to open on startup")
+    parser.add_argument("--restore", action="store_true", help="Restore the last opend workspace on startup")
+    parsed_args = parser.parse_args(args)
+    if parsed_args.workspace and parsed_args.restore:
+        logger.warning("Both --workspace and --restore flags provided. --workspace will take precedence.")
+        parsed_args.restore = False  # Ignore restore if workspace is provided
+    return parsed_args
 
 def main():
     load_dotenv_example()  # Load environment variables from .env file
-    launch_args = sys.argv
+    parsed_args = parse_args(*sys.argv[1:])  # Parse command-line arguments
+    sys_args = sys.argv
+    settings = Settings(
+        settings=DEFAULT_SETTINGS_FILE, 
+        workspace=parsed_args.workspace or DEFAULT_GLOBAL_WORKSPACE_FILE
+    )
     if (darkmode := int(settings.dark_mode)):
         # let the dark mode setting take effect on Win11's TitleBar
-        launch_args += ['-platform', f'windows:darkmode={darkmode}'] 
-    app = QApplication(launch_args)
+        sys_args += ['-platform', f'windows:darkmode={darkmode}'] 
+    app = QApplication(sys_args)
     main_window = TranslationApp(settings)
     session = TranslationSession(settings)
     presenter = TranslationAppPresenter(main_window, settings, session=session, translation_tab_widget=main_window.translation_table)

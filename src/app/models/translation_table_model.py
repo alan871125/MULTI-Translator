@@ -11,7 +11,7 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
 
 from app.models.filters import ColumnFilter, build_mask
-from config import settings
+from app.settings import Settings
 from core.engines._base import BaseExtractor
 from core.text_unit import TextUnit
 from core.translation import TranslationDictionary, TranslationLevel, batch_chinese_convertion
@@ -28,7 +28,7 @@ class TranslationTableModel(QAbstractTableModel):
     _COLUMNS = ["file", "key", "original", "translation", "comments"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
     
-    def __init__(self, data=None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
+    def __init__(self, data=None, settings:Optional[Settings] = None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
@@ -39,7 +39,7 @@ class TranslationTableModel(QAbstractTableModel):
         self.sort(0) # Initialize order with (file, key)
         self.filters = filters if filters is not None else TableFilters(self)
         self._mask_cache: Optional[pd.Series] = None  # Cache for the current filter mask
-        
+        self.settings = settings or Settings()  # Use provided settings or default settings
         self.post_init_check()
         self.dataChanged.connect(self.update_filter_mask)  # Update the filter mask when data changes
     
@@ -104,9 +104,9 @@ class TranslationTableModel(QAbstractTableModel):
             logger.error("Cannot save: file_path or engine not set.")
             return
 
-        save_path = save_path or Path(settings.output_dir) / self.file_path.name
+        save_path = save_path or Path(self.settings.output_dir) / self.file_path.name
         units = self.get_units()
-        self.engine.apply_translations(self.file_path, units, save_path=save_path, target_lang=settings.TARGET_LANG)
+        self.engine.apply_translations(self.file_path, units, save_path=save_path, target_lang=self.settings.TARGET_LANG)
         logger.info(f"Saved translations to {save_path}")
 
     @override
@@ -159,6 +159,7 @@ class TranslationTableModel(QAbstractTableModel):
         level = TranslationLevel.VERIFIED if text else TranslationLevel.UNTRANSLATED
         
         if self.undo_stack is not None: # if not connected to a session's undo stack, apply changes directly without undo support
+            # TODO: maybe we want it to be handled by the TranslationSession?
             self.undo_stack.push(TranslationCommand(
                 model=self,
                 idxs=self.df.index[[r]],
@@ -287,11 +288,11 @@ class TranslationTableModel(QAbstractTableModel):
 
     def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None) -> None:
         keys = keys or ["key"]
-        if (dict_df := dictionary.get(settings.TARGET_LANG)) is None:
-            logger.warning(f"Dictionary does not contain target language '{settings.TARGET_LANG}'. No translations applied.")
+        if (dict_df := dictionary.get(self.settings.TARGET_LANG)) is None:
+            logger.warning(f"Dictionary does not contain target language '{self.settings.TARGET_LANG}'. No translations applied.")
             return
 
-        level_col = f"{settings.TARGET_LANG}.level"
+        level_col = f"{self.settings.TARGET_LANG}.level"
 
         # Invariant: self.df is always indexed by `keys` with drop=False.
         dict_aligned = dict_df.set_index(keys).reindex(self.df.index)
@@ -302,7 +303,7 @@ class TranslationTableModel(QAbstractTableModel):
 
         updated_keys = self.df.index[mask]
 
-        self.df.loc[mask, "translation"] = dict_aligned.loc[mask, settings.TARGET_LANG]
+        self.df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
         self.df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
 
         if diff_comments := dictionary.check_difference(self.df, self_type="old"):
@@ -412,6 +413,7 @@ class TranslationTableProxyModel(QSortFilterProxyModel):
     @override
     def invalidateFilter(self, *args, **kwargs):
         self.sourceModel().clear_filter_mask()
+        self._accepted_rows = None  # Clear the cache of accepted rows
         super().invalidateFilter()  # Trigger re-evaluation of filterAcceptsRow
 
     @override

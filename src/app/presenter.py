@@ -41,10 +41,7 @@ class TranslationAppPresenter:
         self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
         
     def restore_session(self, workspace:Optional[Path|str]=None):
-        if workspace is None:
-        # Load previous workspace
-            self.settings.load_last_open_workspace()
-        elif Path(workspace).exists():
+        if workspace is not None and Path(workspace).exists():
             self.settings.update_workspace(workspace)
         # Load the previously open tabs from settings and attempt to restore them
         for file_path in self.settings.last_open_tabs:
@@ -100,7 +97,7 @@ class TranslationAppPresenter:
         idxs = request.row_idxs
         match request.rtype:
             case EditType.MANUAL:
-                current_text = model.df.loc[idxs, 'translation'][0]  # Get the current translation of the first selected row to pre-fill the dialog
+                current_text = model.df.loc[idxs, 'translation'].iloc[0]  # Get the current translation of the first selected row to pre-fill the dialog
                 translations = self.main_window.open_edit_translation_dialog(current_text)
                 if translations is None:
                     return
@@ -269,7 +266,10 @@ class TranslationAppPresenter:
         if (model := self.session.open_dir(dir_path)) is None:
             return
         # Load existing user dictionary
-        dict_path = Path(self.settings.user_dict_dir) / (Path(dir_path).with_suffix('.csv').name)
+        if dir_path.is_dir(): # This prevents the dir path having a dot in its name being truncated by the method `with_suffix`
+            dict_path = Path(self.settings.user_dict_dir) / (dir_path.name+".csv")
+        else:
+            dict_path = Path(self.settings.user_dict_dir) / (Path(dir_path).with_suffix('.csv').name)
         if dict_path.exists():
             self.session.apply_dictionary(dict_path, dir_path)
         # Create tab in the TranslationTabWidget
