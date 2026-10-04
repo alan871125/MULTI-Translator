@@ -1,6 +1,3 @@
-
-
-
 import logging
 import pandas as pd
 from pathlib import Path
@@ -9,6 +6,8 @@ from typing import Any, Iterable, Literal, Sequence, cast, override, Optional, o
 from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractTableModel,QAbstractProxyModel, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QUndoCommand, QUndoStack
+
+from pyqt5_extensions.core import TypedQtSignal
 
 from app.models.filters import ColumnFilter, build_mask
 from app.settings import Settings

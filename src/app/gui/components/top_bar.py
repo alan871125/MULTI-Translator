@@ -1,12 +1,15 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Hashable, Optional
 
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QButtonGroup
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QIcon, QPainter, QPixmap
+from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont
 from PyQt5.QtSvg import QSvgRenderer
-import core.engines as engines
+
+from pyqt5_extensions.widgets import PieChartWidget
+
+from core.engines import supported_engines
 from core.translation import TranslationLevel
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
@@ -79,7 +82,23 @@ class LevelFilterButtons(QWidget):
         for button in self.buttons.buttons():
             lv = TranslationLevel(self.buttons.id(button))
             button.setChecked(self.filters.levels.get(lv, True))  # Default to True if not found
-
+            
+class ProgressPieChart(PieChartWidget):
+    """A pie chart widget to visualize translation progress."""
+    def __init__(self, parent=None):
+        super().__init__(num_segments=len(TranslationLevel)-1, sum_proportion=None, parent=parent)
+        self.setFixedSize(50, 50)  # Set a fixed size for the pie chart
+        self.setToolTip("Translation Progress")
+        
+        self.set_style(bar_width=10, center_label=True, center_label_font=QFont("Arial", 8, QFont.Bold))
+        self.level_map = {lv: i for i, lv in enumerate(TranslationLevel) if lv != TranslationLevel.UNTRANSLATED}
+        self.SEGMENT_COLORS = [ThemeManager.theme.get_level_color(lv) for lv in TranslationLevel if lv!= TranslationLevel.UNTRANSLATED]
+        
+    def update_values(self, counts:dict[Hashable, int]):
+        """Update the pie chart based on the provided counts of translation levels."""
+        values = [counts.get(lv, 0) for lv in TranslationLevel if lv!= TranslationLevel.UNTRANSLATED]
+        self.set_values(values)
+        
 class TopBar(QWidget):
     """
     Top bar component containing workspace selection, engine selection, and filtering.
@@ -90,7 +109,6 @@ class TopBar(QWidget):
     def __init__(self, settings:Settings, table_filters:Optional[TableFilters]=None, parent=None):
         super().__init__(parent)
         self.settings: Settings = settings
-        self.widgets = {}
         self.init_ui(table_filters or TableFilters())
         
         # Connect to settings signals
@@ -101,35 +119,34 @@ class TopBar(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        self.widgets['filter_button'] = QPushButton("Filter", self)
-        self.widgets['filter_button'].clicked.connect(self.filter_clicked.emit)
+        self.filter_button = QPushButton("Filter", self)
+        self.filter_button.clicked.connect(self.filter_clicked.emit)
                 
-        self.widgets['level_filters'] = LevelFilterButtons(table_filters, parent=self)
+        self.lv_buttons = LevelFilterButtons(table_filters, parent=self)
         current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.widgets['workspace_button'] = QPushButton(current_workspace, self)
-        self.widgets['workspace_button'].clicked.connect(self.workspace_clicked.emit)
+        self.workspace_button = QPushButton(current_workspace, self)
+        self.workspace_button.clicked.connect(self.workspace_clicked.emit)
         
-        self.widgets['engine_select'] = QComboBox()
-        self.widgets['engine_select'].addItems(engines.supported_engines)
-        self.widgets['engine_select'].setCurrentText(self.settings.engine)
-        self.widgets['engine_select'].currentTextChanged.connect(
+        self.engine_combo_box = QComboBox()
+        self.engine_combo_box.addItems(supported_engines)
+        self.engine_combo_box.setCurrentText(self.settings.engine)
+        self.engine_combo_box.currentTextChanged.connect(
             lambda text: setattr(self.settings, 'engine', text)
         )
-        
-        for widget in self.widgets.values():
-            layout.addWidget(widget)
+        self.progress_chart = ProgressPieChart(self)
+        layout.addWidget(self.filter_button)
+        layout.addWidget(self.lv_buttons)
+        layout.addWidget(self.engine_combo_box)
+        layout.addWidget(self.workspace_button)
+        layout.addWidget(self.progress_chart)
             
-    @property
-    def lv_buttons(self)-> LevelFilterButtons:
-        return self.widgets['level_filters']
-    
     def refresh(self, *args, **kwargs):
         """Refresh the UI state from settings."""
         current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.widgets['workspace_button'].setText(current_workspace)
-        self.widgets['engine_select'].setCurrentText(self.settings.engine)
+        self.workspace_button.setText(current_workspace)
+        self.engine_combo_box.setCurrentText(self.settings.engine)
         
     def set_source_filters(self, filters:TableFilters):
         """Update the level filter buttons based on the provided TableFilters instance."""
-        self.widgets['level_filters'].set_source_filters(filters)
+        self.lv_buttons.set_source_filters(filters)
         

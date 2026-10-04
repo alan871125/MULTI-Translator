@@ -1,5 +1,6 @@
 from pathlib import Path
 from itertools import cycle, islice
+from pyexpat import model
 from typing import Literal, Optional, Sequence
 import logging
 from PyQt5.QtWidgets import QApplication
@@ -7,7 +8,7 @@ from app.gui.main_window import TranslationApp
 from core.translation import Translator
 
 from .models.session import TranslationSession
-from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel
+from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel, TranslationTableModel
 from .translation_table import EditType, TranslationRequest, TranslationTabWidget
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
 from .typing import IndexLikeSequence
@@ -23,6 +24,7 @@ class TranslationAppPresenter:
         self.translation_tab_widget: TranslationTabWidget = translation_tab_widget
         self.translator = Translator(settings)
         self.main_window:TranslationApp = main_window
+        self._current_model: Optional[TranslationTableModel] = None  # Keep track of the current model for the active tab
         self.connect_signals()
         if self.settings.restore_last_session:
             self.restore_session()  # Restore session before connecting signals to ensure the UI
@@ -71,7 +73,34 @@ class TranslationAppPresenter:
             raise ValueError(f"Model file path {model.file_path} does not match the expected file path {file_path} for tab index {index}.")
         else:
             self.main_window.top_bar.set_source_filters(model.filters)  # Refresh the level filter buttons based on the current session's filters
+        self._rebind_current_model(model)  # Unbind the previous model's signals
         
+    def _rebind_current_model(self, model: Optional[TranslationTableModel]=None):
+        """Rebind the current model to the presenter. 
+        Updates the binded widgets (e.g., progress pie chart) based on the new model's data.
+        Arguments:
+            model: The new TranslationTableModel to bind. If None, unbinds the current model.
+        """
+        if self._current_model is not None:
+            try:
+                self._current_model.dataChanged.disconnect(self._update_progress_chart)
+            except (TypeError, RuntimeError):
+                pass
+            self._current_model = None
+        if model is not None:
+            self._current_model = model
+            self._current_model.dataChanged.connect(self._update_progress_chart)
+            self.main_window.top_bar.progress_chart._sum = len(model.df) # this allows the pie chart to display in completness percentage 
+        # TODO: add an additional level_changed signal to the model if the dataChanged triggers too often and hinders the performance
+        self._update_progress_chart()  # Update the progress chart based on the new model's data
+        
+    def _update_progress_chart(self):
+        if self._current_model is not None:
+            level_counts = self._current_model.df.level.value_counts().to_dict()
+            self.main_window.top_bar.progress_chart.update_values(level_counts)
+        else:
+            self.main_window.top_bar.progress_chart.update_values({})
+            
     def handle_edit_current_file_request(self, edit_type: EditType):
         """Handles a request to edit a file."""
         file_path = self.translation_tab_widget.get_current_file_path()
