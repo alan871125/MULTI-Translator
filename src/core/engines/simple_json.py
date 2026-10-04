@@ -1,18 +1,19 @@
 import json
 from pathlib import Path
 from typing import Optional
-from core.engines._base import BaseExtractor
+from ._base import BaseExtractor
+from ._registry import registered_extractor
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
 from core.json_utils import walk_json
 
+@registered_extractor(name='Simple JSON')
 class SimpleJsonExtractor(BaseExtractor):
     SUPPORTED_FILES_TYPES = ['.json']
     key = 'json_path'
     columns = ['file','key','original','translation']
     def extract_file(self, path: Path|str) -> list[TextUnit]:
         path = Path(path)
-        stem = path.stem
         out: list[TextUnit] = []
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -26,12 +27,12 @@ class SimpleJsonExtractor(BaseExtractor):
                 ))
         return out
     
-    def apply_translations(
+    def apply_translations( # type: ignore (ignores missing target_lang argument)
         self, file_path: Path|str, 
         text_units: list[TextUnit], 
         save_path: Optional[Path|str] = None,
         **kwargs
-    ):
+    ): 
         """Applies translations from a list of TextUnit objects back into the JSON file, saving the result to a new file if save_path is provided. """
         file_path = Path(file_path)
         with open(file_path, "r", encoding="utf-8") as f:
