@@ -5,19 +5,44 @@ from abc import ABC, abstractmethod
 from core.text_unit import TextUnit
 logger = logging.getLogger(__name__)
 
-class SupportedDirType(ABC, str):
-    @classmethod
+class SupportedDirType(ABC):
+    MSG_FORMAT = "Directory {path} is not a valid {self}."
+    def __init__(self, name: Optional[str] = None):
+        self.name = name or self.__class__.__name__
     @abstractmethod
-    def is_valid(cls, path: Path|str) -> bool:
+    def is_valid(self, path: Path|str) -> bool:
         ...
-    def __bool__(self):
+    def check(self, path: Path|str) -> bool:
+        if not self.is_valid(path):
+            logger.error(self.MSG_FORMAT.format(path=path, self=str(self)))
+            return False
         return True
+
+    def __bool__(self) -> bool:
+        return True
+    def __str__(self):
+        return self.name
+class SupportedDirInvalidType(SupportedDirType):
+    """A type that represents no supported directory type."""
+    MSG_FORMAT = "The current engine does not support directory extraction."
+    def is_valid(self, path: Path|str) -> bool:
+        return False
+    def __bool__(self):
+        return False
+class SubDirCheckType(SupportedDirType):
+    """A simple implementation of SupportedDirType that checks if a directory exists."""
+    MSG_FORMAT = "Directory {path} does not contain the required subdirectory '{subdir}'."
+    def __init__(self, *subdirs: str):
+        self.subdirs = subdirs
+    def is_valid(self, path: Path|str) -> bool:
+        return all((Path(path)/s).exists() for s in self.subdirs)
+
 class UnsupportedDirectoryError(Exception):
     """Raised when a directory is not of the expected type."""
-    pass
+    ...
 
 class BaseExtractor(ABC):
-    SUPPORTED_DIR_TYPE: Optional[SupportedDirType] = None # see the rimworld extractor for an example
+    SUPPORTED_DIR_TYPE: SupportedDirType = SupportedDirInvalidType() # see the rimworld extractor for an example
     SUPPORTED_FILES_TYPES: Sequence[str] = []  # List of supported file extensions (e.g., ['.json', '.xml'])
     additional_columns: Sequence[str] = []  # List of additional column names that the extractor may use in the TextUnit's other_attrs
     @abstractmethod

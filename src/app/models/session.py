@@ -103,11 +103,7 @@ class TranslationSession(QObject):
     def open_dir(self, dir_path: str|Path) -> Optional[TranslationTableModel]:
         dir_path = Path(dir_path).absolute()
         extractor = engines.extractors[self.settings.engine]()
-        if not extractor.SUPPORTED_DIR_TYPE:
-            logger.error(f"The current engine '{self.settings.engine}' does not support directory extraction.")
-            return None
-        elif not extractor.SUPPORTED_DIR_TYPE.is_valid(dir_path):
-            logger.error(f"The directory {dir_path} is not a valid {extractor.SUPPORTED_DIR_TYPE}.")
+        if not extractor.SUPPORTED_DIR_TYPE.check(dir_path):
             return None
         try:
             key = dir_path.as_posix()
