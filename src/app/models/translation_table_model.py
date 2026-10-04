@@ -160,6 +160,7 @@ class TranslationTableModel(QAbstractTableModel):
         
         if self.undo_stack is not None: # if not connected to a session's undo stack, apply changes directly without undo support
             # TODO: maybe we want it to be handled by the TranslationSession?
+            self.undo_stack.beginMacro("Inline Edit Translation")
             self.undo_stack.push(TranslationCommand(
                 model=self,
                 idxs=self.df.index[[r]],
@@ -167,6 +168,12 @@ class TranslationTableModel(QAbstractTableModel):
                 levels=level,
                 description=f"Inline Edit"
             ))
+            _idx = self.df.index[r]
+            self.undo_stack.push(ShareTranslationCommand(
+                self, self.df.index[r], description=f"Share Translation for index: {_idx}",
+                max_level=TranslationLevel.VERIFIED
+            ))
+            self.undo_stack.endMacro()
         else:
             self.set_translations(self.df.index[[r]], [text], levels=level)
         return True
