@@ -58,6 +58,7 @@
     "button.dictionary.tooltip": "Show dictionary translated entries",
     "button.api.tooltip": "Show API translated entries",
     "button.verified.tooltip": "Show verified entries",
+    "button.locked.tooltip": "Show locked entries (no need to translate)",
 
     "file": "File",
     "key": "KEY",

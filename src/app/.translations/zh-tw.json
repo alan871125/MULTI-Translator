@@ -55,6 +55,7 @@
     "button.dictionary.tooltip": "顯示[辭典翻譯]",
     "button.api.tooltip": "顯示[API翻譯]",
     "button.verified.tooltip": "顯示[完成翻譯]",
+    "button.locked.tooltip": "顯示[鎖定翻譯] (無需翻譯)",
     "file": "檔案",
     "key": "KEY",
     "id": "ID",
