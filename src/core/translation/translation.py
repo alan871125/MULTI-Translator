@@ -99,6 +99,8 @@ def get_translator(source_lang: str, target_lang: str, provider: str, api_key: s
             api_key = os.getenv("DEEPL_API_KEY")
         elif provider == 'Custom API (LLM)' and not api_key: 
             api_key = os.getenv("CUSTOM_API_KEY")
+        else:
+            kwargs.pop("base_url", None)  # Remove base_url from kwargs to avoid passing it twice
     else:
         logger.error(f"Unsupported translation provider: {provider}")
         return None
