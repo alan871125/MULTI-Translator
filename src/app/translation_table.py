@@ -114,9 +114,10 @@ class TranslationTableView(QTableView):
                 return super().keyPressEvent(e)
             if not idxs:
                 return super().keyPressEvent(e)
-            model = self.model()
-            if not isinstance(model, TranslationTableModel):
-                return super().keyPressEvent(e)
+            # Removed the check for model type here, as we want to allow editing regardless of the model type. The model should handle whether editing is allowed or not.
+            # model = self.model()
+            # if not isinstance(model, TranslationTableModel):
+            #     return super().keyPressEvent(e)
             self.edit_translation_requested.emit(TranslationRequest(EditType.MANUAL, idxs[:1]))
             return
         else:
