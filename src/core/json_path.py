@@ -15,8 +15,12 @@ Supports:
 """
 
 import re
-from typing import Iterable, Iterator, Union, Literal, Sequence
+from typing import Any, Hashable, Iterable, Iterator, Union, Literal, Sequence, Protocol, runtime_checkable
 
+@runtime_checkable
+class DictLike(Protocol):
+    def __getitem__(self, key: Hashable): ...
+    
 PathLike = Union["JsonPath", str, Sequence[Union[str, int]]]  # A type hint for anything that can be converted to a JsonPath
 
 # One compiled regex, reused for every parse call. Alternation order matters:
@@ -130,7 +134,6 @@ class JsonPath:
     def __repr__(self) -> str:
         return f"JsonPath({self._parts!r})"
     
-    
     def as_property_str(self) -> str:
         if self.__str_cache is None:
             self.__str_cache = _render(self._parts, "property")
@@ -141,6 +144,16 @@ class JsonPath:
 
     def __str__(self) -> str:
         return self.as_property_str()
+
+    def fetch(self, data: DictLike)-> Any:
+        """fetch the value at this path from a dict-like object, or return None if any part is missing."""
+        current = data
+        for part in self._parts:
+            if isinstance(current, DictLike):
+                current = current[part]
+            else:
+                return None
+        return current
 
 def _render(parts: Iterable[Union[str, int]], str_type: str) -> str:
     if str_type == 'array':
