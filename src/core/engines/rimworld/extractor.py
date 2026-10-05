@@ -112,7 +112,6 @@ class RimWorldExtractor(BaseExtractor):
                     file=path.relative_to(root_dir).as_posix(),
                     key=JsonPath(json_prefix + [key]),
                     original=text,
-                    translation=text, # Initialize translation with original text for easier editing in the table
                 ))
         return out
     
@@ -145,7 +144,6 @@ class RimWorldExtractor(BaseExtractor):
             file="Strings/" + path.name,
             key=JsonPath(json_prefix + [i]),
             original=line.strip(),
-            translation=line.strip(), # Initialize translation with original text for easier editing in the table
         ) for i, line in enumerate(lines) if line.strip()]
         return out
     

@@ -23,7 +23,6 @@ class SimpleJsonExtractor(BaseExtractor):
                     file=path.stem,
                     key=JsonPath(json_path),
                     original=value,
-                    translation=value, # Initialize translation with original text for easier editing in the table
                 ))
         return out
     

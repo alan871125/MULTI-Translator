@@ -176,7 +176,7 @@ class Extractor(BaseExtractor):
             return text_units
         else:
             path_key = delocalized_path(path) if delocalize_path else path.as_posix()
-            text_units = {key: TextUnit(path_key, (key,), value, value) for key, value in parsed_data.items()}
+            text_units = {key: TextUnit(path_key, (key,), value) for key, value in parsed_data.items()}
         return text_units
     
     @override

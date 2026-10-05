@@ -15,14 +15,14 @@ class TextUnit:
         file (str): The name of the file containing the text unit.
         key (JsonPath): The unique identifier for the text unit, used to locate units in the file (e.g., JSON path, XML tag).
         original (str): The original text that needs to be translated.
-        translation (str): The translated text, initially empty.
+        translation (Optional[str]): The translated text. If not provided, it defaults to the original text.
         level (TranslationLevel): The translation status of the text unit (e.g., untranslated, translated, reviewed).
         other_attrs (dict): A dictionary for any additional attributes related to the text unit.
     """
     file: str
     key: JsonPath
     original: str
-    translation: str = ""
+    translation: str
     level: TranslationLevel = TranslationLevel.UNTRANSLATED
     other_attrs: dict = field(default_factory=dict)
 
@@ -31,7 +31,7 @@ class TextUnit:
         file: str,
         key: PathLike,
         original: str,
-        translation: str = "",
+        translation: Optional[str] = None,
         level: TranslationLevel = TranslationLevel.UNTRANSLATED,
         other_attrs: Optional[dict] = None,
         # consume any additional positional arguments to avoid errors and allow syntax `TextUnit(**row)` when row contains extra columns
@@ -40,7 +40,7 @@ class TextUnit:
     ):
         self.file = file
         self.original = original
-        self.translation = translation
+        self.translation = translation or original
         self.level = level
         self.other_attrs = other_attrs if other_attrs is not None else {}
         self.key = JsonPath(key)

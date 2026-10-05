@@ -69,7 +69,6 @@ class RPGMakerMVExtractor(BaseExtractor):
                         file=path.stem,
                         key=JsonPath([path.stem, i, field]),
                         original=text,
-                        translation=text, # Initialize translation with original text for easier editing in the table
                         other_attrs={"attribute":field,}
                     ))
         return out
@@ -92,7 +91,6 @@ class RPGMakerMVExtractor(BaseExtractor):
                 file=path.stem,
                 key=JsonPath([path.stem, "displayName"]),
                 original=display_name,
-                translation=display_name, # Initialize translation with original text for easier editing in the table
             ))
         
         for i,event in enumerate(data.get("events", [])):
@@ -137,7 +135,6 @@ class RPGMakerMVExtractor(BaseExtractor):
                             file=path.stem,
                             key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 3, *translatable_path._parts)),
                             original=v,
-                            translation=v,
                             other_attrs={"attribute":f"CMD:{cmd_type}","plugin":plugin,"method":method}
                         ))
                 elif cmd_type == "ControlVariables":
@@ -162,7 +159,6 @@ class RPGMakerMVExtractor(BaseExtractor):
                                     file=path.stem,
                                     key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 4)),
                                     original=operand_value,
-                                    translation=operand_value,
                                     other_attrs={"attribute":f"CMD:{cmd_type}",}
                                 ))
                             else:
@@ -176,7 +172,6 @@ class RPGMakerMVExtractor(BaseExtractor):
                                 file=path.stem,
                                 key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', *current_path)),
                                 original=param,
-                                translation=param, # Initialize translation with original text for easier editing in the table
                                 other_attrs={"attribute":f"CMD:{cmd_type}",}
                             ))
         return out
