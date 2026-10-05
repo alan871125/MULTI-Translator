@@ -8,7 +8,7 @@ from core.json_path import JsonPath
 from core.text_unit import TextUnit
 from core.json_utils import walk_json
 
-from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES
+from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES, PLUGIN_HANDLERS
 from ..simple_json import apply_json_path
 from .._registry import registered_extractor
 from .._base import SubDirCheckType, BaseExtractor
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def _json_dump_worker(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-        
+
 @registered_extractor(name='RPG Maker MV')
 class RPGMakerMVExtractor(BaseExtractor):
     DATA_SUBDIR = "www/data"
@@ -87,6 +87,14 @@ class RPGMakerMVExtractor(BaseExtractor):
         out: list[TextUnit] = []
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        if display_name := data.get("displayName"):
+            out.append(TextUnit(
+                file=path.stem,
+                key=JsonPath([path.stem, "displayName"]),
+                original=display_name,
+                translation=display_name, # Initialize translation with original text for easier editing in the table
+            ))
+        
         for i,event in enumerate(data.get("events", [])):
             if not isinstance(event, dict):
                 continue
@@ -121,16 +129,56 @@ class RPGMakerMVExtractor(BaseExtractor):
                     (params := command.get("parameters"))
                 ):
                     continue
-                for param, current_path, parent in walk_json(params):
-                    if isinstance(param, str) and param.strip():
+                if cmd_type == "PluginCommand":
+                    plugin, method, _, method_kwargs = params[:4]
+                    if (translatable_path := PLUGIN_HANDLERS.get((plugin, method))) is not None:
+                        v = translatable_path.fetch(method_kwargs)
                         out.append(TextUnit(
                             file=path.stem,
-                            key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', *current_path)),
-                            original=param,
-                            translation=param, # Initialize translation with original text for easier editing in the table
-                            other_attrs={"attribute":f"CMD:{cmd_type}",}
+                            key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 3, *translatable_path._parts)),
+                            original=v,
+                            translation=v,
+                            other_attrs={"attribute":f"CMD:{cmd_type}","plugin":plugin,"method":method}
                         ))
-
+                elif cmd_type == "ControlVariables":
+                    # This command can contain translatable text when the game uses texts like \v[1] to display text stored in variables.
+                    # start_id, end_id, operator, operand_type, operand_value = params[:5]
+                    match params:
+                        case [start_id, end_id, 0, 4, str() as operand_value]:
+                            # Identifying translatable text in ControlVariables command is quite tricky. I assume:
+                            # 1. Single variable assignment (start_id == end_id)
+                            # 2. The operand is a string (operand_type == 4)
+                            # 3. The string is enclosed in backticks (e.g., `Translatable Text`) or quotes or Chinese quotes.
+                            # Note: This is a heuristic and may not cover all cases. Further refinement may be needed based on actual game data.
+                            if operand_value[0] == '$':# Skip variable references like $gameVariables.value(1)
+                                continue 
+                            elif start_id==end_id and (
+                                operand_value.startswith("`") and operand_value.endswith("`") or
+                                operand_value.startswith('"') and operand_value.endswith('"') or
+                                operand_value.startswith("'") and operand_value.endswith("'") or
+                                operand_value.startswith('「') and operand_value.endswith('」')
+                            ):
+                                out.append(TextUnit(
+                                    file=path.stem,
+                                    key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 4)),
+                                    original=operand_value,
+                                    translation=operand_value,
+                                    other_attrs={"attribute":f"CMD:{cmd_type}",}
+                                ))
+                            else:
+                                pass
+                        case _:
+                            pass
+                else:
+                    for param, current_path, parent in walk_json(params):
+                        if isinstance(param, str) and param.strip():
+                            out.append(TextUnit(
+                                file=path.stem,
+                                key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', *current_path)),
+                                original=param,
+                                translation=param, # Initialize translation with original text for easier editing in the table
+                                other_attrs={"attribute":f"CMD:{cmd_type}",}
+                            ))
         return out
     
     @override
