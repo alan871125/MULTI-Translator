@@ -126,8 +126,9 @@ class TranslationAppPresenter:
         idxs = request.row_idxs
         match request.rtype:
             case EditType.MANUAL:
+                original_text = model.df.loc[idxs, 'original'].iloc[0]  # Get the original text of the first selected row to pre-fill the dialog
                 current_text = model.df.loc[idxs, 'translation'].iloc[0]  # Get the current translation of the first selected row to pre-fill the dialog
-                translations = self.main_window.open_edit_translation_dialog(current_text)
+                translations = self.main_window.open_edit_translation_dialog(original_text, current_text)
                 if translations is None:
                     return
                 level = TranslationLevel.VERIFIED

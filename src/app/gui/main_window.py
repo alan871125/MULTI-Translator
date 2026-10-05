@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
 )
 
 from app.gui.dialogs.settings import SettingsDialog
+from app.gui.dialogs.translation import TranslationDialog
 from app.gui.theme import ThemeManager
-from app.gui.dialogs.search import TableFilters
 from app.models.translation_table_model import TranslationTableModel
 from app.translation_table import TranslationTabWidget
 from app.language import LanguagePack
@@ -236,10 +236,10 @@ class TranslationApp(QMainWindow):
             return  # User cancelled the file dialog
         self.load_file_requested.emit(file_path)  # Emit the signal to load the file, which will be handled by the presenter
 
-    def open_edit_translation_dialog(self, current_text: str) -> Optional[str]:
-        text, ok = QInputDialog.getText(self, "Edit Translation", "Translation:", text=current_text)
-        if ok:
-            return text
+    def open_edit_translation_dialog(self, original: str, translation: str) -> Optional[str]:
+        dialog = TranslationDialog(self.settings, original, translation, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            return dialog.translation
         return None
 
     def show_share_translation_confirmation(self)-> bool:
