@@ -120,6 +120,8 @@ class SearchDialog(qt.QDialog):
             entry = SearchLineEdit(self)
             entry.setFrame(False)
             entry.setText(initial_text)
+            entry.buttons["case"].setChecked(filter_data.match_case if filter_data else False)
+            entry.buttons["regex"].setChecked(filter_data.is_regex if filter_data else False)
             box_layout.addWidget(entry)
             #TODO: move to theme?
             search_box.setStyleSheet("""
@@ -168,7 +170,8 @@ class SearchDialog(qt.QDialog):
         replace_container_layout.addWidget(replace_box, stretch=1)
         
         self.replace_source_checkbox = qt.QCheckBox(L["replace_from_original"], self)
-        self.replace_source_checkbox.setChecked(True)
+        self.replace_source_checkbox.setChecked(False)
+        self.replace_source_checkbox.setToolTip(L['replace_from_original.tooltip'])
         replace_container_layout.addWidget(self.replace_source_checkbox)
 
         replace_button = qt.QPushButton(L["replace_all"], self)
