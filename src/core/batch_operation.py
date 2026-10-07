@@ -5,15 +5,16 @@ Arguments in operation classes are Uppercase INTENTIONALY to show greater distin
 
 """
 import yaml
-from typing import Annotated, Literal, Union, Protocol
-from pydantic import BaseModel, Field, RootModel
+from typing import Annotated, Literal, Optional, Union, Protocol
+from pydantic import BaseModel, Field, RootModel, ValidationError
 import pandas as pd
 
-# class BatchOperation(Protocol):
-#     """Protocol for batch operations that can be applied to a pandas Series."""
-#     OP: str
-#     def __call__(self, series: pd.Series) -> pd.Series: ...
-
+class BatchOperationProtocol(Protocol):
+    """Protocol for batch operations that can be applied to a pandas Series."""
+    @property
+    def OP(self) -> str: ...
+    def __call__(self, series: pd.Series) -> pd.Series: ...
+type BatchOperation = BatchOperationProtocol
 class PatternReplacer(BaseModel):
     """An operation to replace text patterns in a pandas Series using regex or simple string replacement.
     
@@ -29,7 +30,7 @@ class PatternReplacer(BaseModel):
     OP: Literal["REPLACE"] = "REPLACE"
     PATTERNS: dict[str, str]
     REGEX: bool = False  
-    CASE: bool = False  
+    CASE: Optional[bool] = None  
     def __call__(self, series: pd.Series) -> pd.Series:
         for pattern, replacement in self.PATTERNS.items():
             # series.str.replace instead of series.replace to ensure substring replacements
@@ -70,7 +71,9 @@ class PyFormatRegexReplacer(BaseModel):
         def repl_func(match):
             group_dict = match.groupdict()
             for k, v in group_dict.items():
-                if (v_repl := self.SUBPATTERNS.get(k, {}).get(v))  is None:
+                if v is None:
+                    v_repl = ''
+                elif (v_repl := self.SUBPATTERNS.get(k, {}).get(v))  is None:
                     # Get the replacement from subpatterns if it exists
                     v_repl = self.SUBPATTERNS.get(k, {}).get(v.lower(), v)
                 group_dict[k] = v_repl            
@@ -103,13 +106,26 @@ class WhitespaceTrimer(BaseModel):
 
 
 # Discriminator union: Pydantic inspects 'OP' to decide which model to parse
-BatchOperation = Annotated[
+TranslationOperation = Annotated[
     Union[PatternReplacer, PyFormatRegexReplacer, WhitespaceTrimer],
     Field(discriminator="OP"),
 ]
-
+class BatchYamlFormatError(Exception):
+    """Custom exception for errors in the batch YAML format."""
+    pass
 # Parse as a list of discriminated union items
-BatchPatternList = RootModel[list[BatchOperation]]
-def load_yaml(yaml_repr: str) -> list[BatchOperation]:
+BatchPatternList = RootModel[list[TranslationOperation]]
+def load_yaml(yaml_repr: str) -> list[TranslationOperation]:
     """Reads a YAML string containing batch patterns and returns a list of BatchPattern objects."""
-    return BatchPatternList.model_validate(yaml.safe_load(yaml_repr)).root
+    try:
+        return BatchPatternList.model_validate(yaml.safe_load(yaml_repr)).root
+    except ValidationError as e:
+        raise BatchYamlFormatError(f"Invalid batch YAML format spotted: {e}") from e
+
+def load_json(json_repr: str) -> list[TranslationOperation]:
+    import json
+    """Reads a JSON string containing batch patterns and returns a list of BatchPattern objects."""
+    try:
+        return BatchPatternList.model_validate(json.loads(json_repr)).root
+    except ValidationError as e:
+        raise BatchYamlFormatError(f"Invalid batch JSON format spotted: {e}") from e
