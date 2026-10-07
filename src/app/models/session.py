@@ -18,6 +18,7 @@ from core import engines
 from core.translation import TranslationLevel
 from core.translation.dictionary import TranslationDictionary
 from core.translation.dictionary_database import TranslationDictionaryDatabase
+from core.batch_operation import BatchOperation
 from .translation_table_model import TranslationTableModel, TranslationCommand, ShareTranslationCommand
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,8 @@ class TranslationSession(QObject):
             description=f"Set Translation for {len(idxs)} rows"
         ))
         if share:
-            for idx in idxs:
+            # Drop duplicates to avoid sharing the same translation multiple times for the same original text
+            for idx in model.df.loc[idxs].drop_duplicates('original', keep='last').index:
                 history.push(ShareTranslationCommand(
                     model, idx, description=f"Share Translation for index: {idx}",
                     max_level=TranslationLevel.VERIFIED
@@ -254,4 +256,23 @@ class TranslationSession(QObject):
             logger.warning(f"Attempted to apply a dictionary to a file that is not open: {target}")
             return
         model.apply_dictionary(dictionary, keys=keys)
+        
+    def apply_batch_operation(self, target: str|Path, *ops: BatchOperation):
+        """Apply a batch operation to the session. This can be used to perform multiple operations on the translation tables, such as setting translations, sharing translations, or applying dictionaries."""
+        if not (model := self.models.get(Path(target).absolute().as_posix())):
+            logger.warning(f"Attempted to apply a batch operation to a file that is not open: {target}")
+            return
+        df = model.df
+        translations = df["translation"]
+        for op in ops:
+            translations = op(translations)
+        
+        idxs = df.index[df["translation"] != translations]
+        history = self.get_history_stack(target)
+        history.push(TranslationCommand(
+            model=model, idxs=idxs,
+            translations=translations[idxs],
+            levels=TranslationLevel.PARTIAL,
+        ))
+            
 

@@ -46,6 +46,8 @@
     "menu.tools.chinese_conversion": "Chinese Conversion(CHS ⇌ CHT)",
     "menu.tools.chinese_conversion.chs2cht": "Simplified to Traditional",
     "menu.tools.chinese_conversion.cht2chs": "Traditional to Simplified",
+    "menu.tools.batch_operation": "Batch Operations",
+    "menu.tools.batch_operation.load_yaml": "Load Batch File(*.yaml)...",
 
     "right_click.translate_with_api": "Translate with API",
     "right_click.edit_translation": "Edit Translation",
@@ -83,6 +85,7 @@
     "confirm_msg.unsaved_changes_desc2": "Your changes will be lost if you don't save them.",
     "file_dialog.select_workspace_dir": "Select Workspace Directory",
     "file_dialog.select_game_file": "Select Game File",
+    "file_dialog.select_file": "Select File",
     "file_dialog.select_directory": "Select Directory",
     "file_dialog.save_translated_file": "Save Translated File",
 

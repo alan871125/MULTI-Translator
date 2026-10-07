@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional, override
+from typing import Optional, override, Literal
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence, QCloseEvent
@@ -26,6 +26,7 @@ from pyqt5_extensions.core import TypedQtSignal
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
+from .dialogs.dictionary_import import ImportDictionaryDialog
 from .components import TopBar, BottomPanel, RecentFilesMenu
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,8 @@ class TranslationApp(QMainWindow):
     load_dir_requested = TypedQtSignal(str)
     load_file_requested = TypedQtSignal(str)
     import_from_file_requested = TypedQtSignal(str)
-    import_from_dict_requested = TypedQtSignal(str)
+    import_from_dict_requested = TypedQtSignal(Path, list[str])
+    batch_operation_requested = TypedQtSignal(Path)  # Signal to request batch operations with a list of operation dicts
     
     def __init__(self, settings: Settings):
         super().__init__()
@@ -117,11 +119,11 @@ class TranslationApp(QMainWindow):
     def init_menu_bar(self):
         self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
         menu_def = {
-            "file.load_game_file": self.open_load_file_dialog,
+            "file.load_game_file": self.request_load_file,
             "file.load_workspace": self.open_load_workspace_dialog,
-            "file.open_directory": self.open_load_dir_dialog,
-            "file.import.from_file": self.open_import_from_file_dialog,
-            "file.import.from_dict": self.open_import_from_dict_dialog,
+            "file.open_directory": self.request_load_dir,
+            "file.import.from_file": self.request_import_from_file,
+            "file.import.from_dict": self.request_import_from_dict,
             # "file.new_workspace": self.open_load_workspace_dialog,
             "file.save_translation": self.save_translation_requested.emit,
             "file.recent_files": self.lru_menu,
@@ -130,8 +132,11 @@ class TranslationApp(QMainWindow):
             "settings": self.open_settings,
             "edit.undo": self.undo_action,
             "edit.redo": self.redo_action,
+            # Consider moving chinese conversion to batch operations as well
             "tools.chinese_conversion.chs2cht": lambda: self.edit_current_file_requested.emit(EditType.CHS2CHT),
             "tools.chinese_conversion.cht2chs": lambda: self.edit_current_file_requested.emit(EditType.CHT2CHS),
+            "tools.batch_operation.load_yaml": lambda: self.request_batch_operation("yaml"),
+            "tools.batch_operation.load_json": lambda: self.request_batch_operation("json"),
         } 
         self.menus = initialize_menu(menu_def, self.menuBar(), root_menu_name="menu", tr=L.__getitem__)
         self.lru_menu.recent_file_selected.connect(self.load_file_requested.emit)  # Connect recent file selection to load file signal
@@ -210,32 +215,50 @@ class TranslationApp(QMainWindow):
         file_filters = ";;".join(f"{ft.upper()} Files (*{ft})" for ft in supported_types)+f";;All Files (*.*)"
         return file_filters
     
-    def open_load_dir_dialog(self):
+    def request_load_dir(self):
         dir_path = QFileDialog.getExistingDirectory(self, L["file_dialog.select_directory"])
         if dir_path:
             self.load_dir_requested.emit(dir_path)  # Emit the signal to load the directory, which will be handled by the presenter
     
-    def open_import_from_file_dialog(self):
+    def request_import_from_file(self):
         file_filters = self.get_file_filters()
         file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_game_file"], "", file_filters)
         if file_path:
             self.import_from_file_requested.emit(file_path)  # Emit the signal to import from the selected file
-            
-    def open_import_from_dict_dialog(self):
-        file_path, _ = QFileDialog.getOpenFileName(
+
+    def request_import_from_dict(self):
+        """This is a function to potientially replace:
+        open_import_from_dict_dialog+presenter.handle_import_from_dict_request
+        presenter.handle_import_from_dict_request will only be called if a file is selected
+        """
+        path, _ = QFileDialog.getOpenFileName(
             self, L["file_dialog.select_translation_dictionary"], 
             self.settings.user_dict_dir, "CSV Files (*.csv)"
         )
-        if file_path:
-            self.import_from_dict_requested.emit(file_path)
-            
-    def open_load_file_dialog(self):
+        if path and (file_path:= Path(path)).exists():
+            # Show a dialog to select which columns to use as keys
+            dialog = ImportDictionaryDialog(self)
+            if dialog.exec_() == QDialog.Accepted:
+                self.import_from_dict_requested.emit(file_path, dialog.keys)
+            else:
+                logger.info("Import dictionary operation cancelled.")
+
+    def request_load_file(self):
         file_filters = self.get_file_filters()
         file_path, _ = QFileDialog.getOpenFileName(self, L["file_dialog.select_game_file"], "", file_filters)
         if not file_path:
             return  # User cancelled the file dialog
         self.load_file_requested.emit(file_path)  # Emit the signal to load the file, which will be handled by the presenter
 
+    def request_batch_operation(self, file_extention: Literal['yaml', 'json']):
+        """Request a batch operation of the specified type ('yaml' or 'json')."""
+        if file_extention == 'yaml': 
+            _filter = "YAML Files (*.yaml *.yml)"
+        elif file_extention == 'json':
+            _filter = "JSON Files (*.json)"
+        file_path,_ = QFileDialog.getOpenFileName(self, L["file_dialog.select_file"], "", _filter)
+        self.batch_operation_requested.emit(Path(file_path))
+    
     def open_edit_translation_dialog(self, original: str, translation: str) -> Optional[str]:
         dialog = TranslationDialog(self.settings, original, translation, parent=self)
         if dialog.exec_() == QDialog.Accepted:
@@ -298,7 +321,7 @@ class TranslationApp(QMainWindow):
         if not save_path:
             return  # User cancelled the save dialog
         return save_path
-    
+
     def open_settings(self):
         """Open settings dialog"""
         dialog = SettingsDialog(self.settings, self)
@@ -313,4 +336,3 @@ class TranslationApp(QMainWindow):
             ThemeManager().set_theme(dark = self.settings.dark_mode)
         else:
             logger.debug("Settings dialog cancelled")
-

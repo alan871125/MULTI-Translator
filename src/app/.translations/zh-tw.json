@@ -45,6 +45,8 @@
     "menu.tools.chinese_conversion": "簡繁轉換 (CHS ⇌ CHT)",
     "menu.tools.chinese_conversion.chs2cht": "簡 ⇒ 繁",
     "menu.tools.chinese_conversion.cht2chs": "繁 ⇒ 簡",
+    "menu.tools.batch_operation": "批量操作",
+    "menu.tools.batch_operation.load_yaml": "載入批量操作檔(*.yaml)...",
     "right_click.translate_with_api": "翻譯：使用API",
     "right_click.edit_translation": "翻譯：編輯",
     "right_click.reset_translation": "翻譯：重製",
@@ -78,6 +80,7 @@
     "confirm_msg.unsaved_changes_desc2": "這些未儲存的變更將會遺失。",
     "file_dialog.select_workspace_dir": "選擇工作區路徑",
     "file_dialog.select_game_file": "選擇遊戲文件",
+    "file_dialog.select_file": "選擇文件",
     "file_dialog.select_directory": "選擇路徑",
     "file_dialog.save_translated_file": "儲存翻譯文件",
     "statusBar.saved_success": "檔案保存成功！"

@@ -1,12 +1,10 @@
 from pathlib import Path
 from itertools import cycle, islice
-from pyexpat import model
 from typing import Literal, Optional, Sequence
 import logging
 from PyQt5.QtWidgets import QApplication
 from app.gui.main_window import TranslationApp
 from core.translation import Translator
-
 from .models.session import TranslationSession
 from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel, TranslationTableModel
 from .translation_table import EditType, TranslationRequest, TranslationTabWidget
@@ -38,6 +36,7 @@ class TranslationAppPresenter:
         self.main_window.save_translation_requested.connect(self.handle_save_translation_request)  # Assuming saving also closes the file, adjust if not
         self.main_window.save_current_file_requested.connect(self.handle_save_current_file_request)
         self.main_window.edit_current_file_requested.connect(self.handle_edit_current_file_request)
+        self.main_window.batch_operation_requested.connect(self.handle_batch_operations_request)
         self.translation_tab_widget.tabCloseRequested.connect(self.handle_close_file_request)
         self.translation_tab_widget.currentChanged.connect(self.handle_tab_changed)
         self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
@@ -134,6 +133,8 @@ class TranslationAppPresenter:
                 level = TranslationLevel.VERIFIED
                 
             case EditType.API:
+                # Drop text with duplicated original values to avoid sending the same text wasting API calls/tokens and overwriting
+                idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index
                 current_text = model.df.loc[idxs, 'translation']
                 translations = self.translator.batch_translate(current_text.tolist())
                 _idxs = idxs
@@ -141,6 +142,7 @@ class TranslationAppPresenter:
                     (i, trans) for i, trans in zip(idxs, translations) 
                     if trans is not None
                 ]))
+                
                 level=TranslationLevel.API
                 failed_count = len(_idxs) - len(idxs)
                 if failed_count > 0:
@@ -214,6 +216,26 @@ class TranslationAppPresenter:
             return
         key = Path(current_file_path).absolute().as_posix()
         self.session.save_dictionary(key)
+    
+    def handle_batch_operations_request(self, file_path: Path):
+        """Given a file path to a YAML or JSON file containing batch operations, 
+        this method reads the file and applies the operations to the current translation table.
+        """
+        from core import batch_operation
+        # Open a file dialog to select the YAML file containing the batch operations
+        if (current_file_path :=self.translation_tab_widget.get_current_file_path()) is None:
+            logger.warning("Current translation tab has no associated file path to generate default save path.")
+            return
+        if file_path.suffix in ['.yaml', '.yml']:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                yaml_content = f.read()
+            self.session.apply_batch_operation(current_file_path, *batch_operation.load_yaml(yaml_content))
+        elif file_path.suffix == '.json':
+            with open(file_path, 'r', encoding='utf-8') as f:
+                json_content = f.read()
+            self.session.apply_batch_operation(current_file_path, *batch_operation.load_json(json_content))
+        else:
+            logger.error(f"Unsupported batch file extension: {file_path.suffix}. Only 'yaml' and 'json' are currently supported.")
 
     def create_translation_tab(self, path: str|Path):
         path = Path(path).absolute()
@@ -317,16 +339,12 @@ class TranslationAppPresenter:
         """Opens a file, reads its contents, and imports the translations into the current translation table."""
         raise NotImplementedError("Import from file functionality is not yet implemented.")
     
-    def handle_import_from_dict_request(self, dict_path: str|Path):
+    def handle_import_from_dict_request(self, dict_path: Path, keys: list[str]):
         """Opens a dictionary file, reads its contents, and imports the translations into the current translation table."""
         dict_path = Path(dict_path).absolute()
         if (current_file_path := self.translation_tab_widget.get_current_file_path()) is None:
             logger.warning("Current translation tab has no associated file path to import translations into.")
             return
         file_path = Path(current_file_path).absolute()
-        if dict_path.exists():
-            #TODO: Popup a dialog to confirm and select applying options (e.g. apply level)
-            
-            self.session.apply_dictionary(dict_path, file_path)
-        else:
-            logger.error(f"Dictionary file {dict_path} does not exist. Cannot import translations.")
+        logger.info(f"Importing translations from {dict_path} into {file_path} using keys: {keys}")
+        self.session.apply_dictionary(dict_path, file_path, keys)

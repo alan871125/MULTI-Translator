@@ -130,7 +130,8 @@ class TranslationTableModel(QAbstractTableModel):
             level = self._level_from_value(self.df.iloc[r]['level'])
             return QColor(ThemeManager.theme.get_level_color(level))
 
-        value = self.df.iat[r, c]
+        # value = self.df.iat[r, c] # this will break if the column order changes, so we use the column name instead
+        value = self.df.iloc[r][self._COLUMNS[c]]
         if role in (Qt.DisplayRole, Qt.EditRole) and not pd.isna(value):
             return str(value)
         return None
@@ -297,20 +298,31 @@ class TranslationTableModel(QAbstractTableModel):
         if (dict_df := dictionary.get(self.settings.TARGET_LANG)) is None:
             logger.warning(f"Dictionary does not contain target language '{self.settings.TARGET_LANG}'. No translations applied.")
             return
-
         level_col = f"{self.settings.TARGET_LANG}.level"
+        if keys!=["key"]: 
+            # self.df is indexed by 'key'. We need to align them based on the specified keys.
+            df = self.df.set_index(keys)
+            dict_unique = dict_df.drop_duplicates(keys,keep='last').set_index(keys)
+            dict_aligned = dict_unique.reindex(df.index)
+            mask = dict_aligned[level_col] > df["level"]
+            if not mask.any():
+                return
+            df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
+            df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
+            self.df = df.reset_index().set_index('key', drop=False)
+            updated_keys = self.df.index[mask]
+        else:
+            # Invariant: self.df is always indexed by `keys` with drop=False.
+            dict_aligned = dict_df.set_index(keys).reindex(self.df.index)
 
-        # Invariant: self.df is always indexed by `keys` with drop=False.
-        dict_aligned = dict_df.set_index(keys).reindex(self.df.index)
+            mask = dict_aligned[level_col] > self.df["level"]
+            if not mask.any():
+                return
 
-        mask = dict_aligned[level_col] > self.df["level"]
-        if not mask.any():
-            return
+            updated_keys = self.df.index[mask]
 
-        updated_keys = self.df.index[mask]
-
-        self.df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
-        self.df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
+            self.df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
+            self.df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
 
         if diff_comments := dictionary.check_difference(self.df, self_type="old"):
             comments = pd.Series(diff_comments)
