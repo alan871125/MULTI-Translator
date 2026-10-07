@@ -1,11 +1,12 @@
 
 import os
+import json
 import opencc
 import logging
 from typing import Literal, Protocol, Iterable, Sequence, Optional, Iterable
 
 from deep_translator.base import Language
-
+from deep_translator.openai import OpenAITranslator
 from ._providers import providers
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,45 @@ class Translator:
         )
     def get_supported_languages(self) -> list[Language]:
         return list(get_supported_languages(self.settings.API))
+    
+    def line_batch_translate(self, lines:list[str]):
+        """(EXPERIMENTAL) Translate a sequence of lines as a whole, yet preserving formatting, decided by the llm model"""
+        # TODO: THIS IS EXPERIMENTAL
+        system_prompt = (
+            "You are a professional translator specializing in {engine_name} games."
+            "You will be provided several lines of text in JSON format." 
+            "Please translate the text from the lines as a whole in to {target_lang}."
+            "Preserve any {engine_name} specifi formatting, special characters, and placeholders in the original text."
+            "Output the translated text in PURE JSON format with no markdown, maintaining the same structure as the input."
+        )
+        
+        translation_prompt =  "Source JSON:\n{text}\nTranslated JSON:\n"
+        if self.settings.API!= "Custom API (LLM)":
+            logger.error(f"line_batch_translate is designed for Custom API (LLM) provider. Current provider is {self.settings.API}.")
+            return None
+        
+        # translator = get_translator(source_lang, target_lang, self.settings.API, api_key=os.getenv("CUSTOM_API_KEY"), model=self.settings.CUSTOM_API_MODEL, base_url=self.settings.CUSTOM_API_URL)
+        translator = OpenAITranslator(
+            model=self.settings.CUSTOM_API_MODEL, 
+            api_key=os.getenv("CUSTOM_API_KEY"), 
+            base_url=self.settings.CUSTOM_API_URL,
+            source=self.settings.SOURCE_LANG, target=self.settings.TARGET_LANG
+        )
+        if not translator:
+            logger.error(f"Failed to get translator for provider {self.settings.API}.")
+            return None
+        try:
+            translated_json = translator.translate(json.dumps(lines, ensure_ascii=False, indent=2), system_prompt=system_prompt, main_prompt=translation_prompt)
+            if translated_json is None:
+                return None
+            try:
+                return json.loads(translated_json)
+            except Exception as e:
+                logger.error(f"Error parsing translated JSON: {e}")
+                return [translated_json] * len(lines) # Return the raw translated text in a list if JSON parsing fails
+        except Exception as e:
+            logger.error(f"Error during line_batch_translate: {e}")
+            return None
         
 def get_supported_languages(api:str, role:Optional[Literal["source", "target"]] = None) -> Iterable[Language]:
     """

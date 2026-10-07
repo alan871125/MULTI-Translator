@@ -53,6 +53,7 @@
     "right_click.edit_translation": "Edit Translation",
     "right_click.reset_translation": "Reset Translation",
     "right_click.copy_original": "Copy Original Text",
+    "right_click.translate_as_batch": "(EXPERIMENTAL) Translate Batch as a Whole",
 
     "button.untranslated.tooltip": "Show untranslated entries",
     "button.heuristic.tooltip": "Show heuristic translated entries",

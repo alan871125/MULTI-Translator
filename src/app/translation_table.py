@@ -21,6 +21,7 @@ L = LanguagePack()
 
 class EditType(Enum):
     API = "api"
+    API_BATCH = "api_batch"
     MANUAL = "manual"
     RESET = "reset"
     SHARE = "share"
@@ -144,6 +145,7 @@ class TranslationTableView(QTableView):
         edit_action =  menu.addAction(L['right_click.edit_translation'])
         reset_action = menu.addAction(L['right_click.reset_translation'])
         copy_action =  menu.addAction(L['right_click.copy_original'])
+        translate_as_batch_action = menu.addAction(L['right_click.translate_as_batch'])
 
         # Execute the menu at the cursor position and get the selected action
         action = menu.exec_(self.viewport().mapToGlobal(pos))
@@ -160,6 +162,8 @@ class TranslationTableView(QTableView):
         elif action == copy_action:
             original = model.data(model.index(idx.row(), model._COLUMNS.index("original")), Qt.DisplayRole)
             QApplication.clipboard().setText(str(original))
+        elif action == translate_as_batch_action:
+            self.edit_translation_requested.emit(TranslationRequest(EditType.API_BATCH, idxs))
 
     def on_level_hotkey_triggered(self, level: TranslationLevel):
         if (idxs := self.selected_source_indexes):

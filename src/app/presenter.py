@@ -147,6 +147,18 @@ class TranslationAppPresenter:
                 failed_count = len(_idxs) - len(idxs)
                 if failed_count > 0:
                     logger.warning(f"API translation failed for {failed_count} out of {len(_idxs)} selected rows.")
+            case EditType.API_BATCH:
+                current_text = model.df.loc[idxs, 'translation']
+                translations = self.translator.line_batch_translate(current_text.tolist())
+                if translations is None:
+                    logger.warning("Batch API translation failed. No translations returned.")
+                    return
+                _idxs = idxs
+                idxs, translations = map(list, zip(*[
+                    (i, trans) for i, trans in zip(idxs, translations) 
+                    if trans is not None
+                ]))
+                level=TranslationLevel.API
             case EditType.RESET:
                 translations = model.df.loc[idxs,'original'].astype(str)
                 level = TranslationLevel.UNTRANSLATED

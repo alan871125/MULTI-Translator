@@ -51,6 +51,7 @@
     "right_click.edit_translation": "翻譯：編輯",
     "right_click.reset_translation": "翻譯：重製",
     "right_click.copy_original": "複製原文",
+    "right_click.translate_as_batch": "(實驗性) 合併進行翻譯",
     "button.untranslated.tooltip": "顯示[未翻譯]",
     "button.heuristic.tooltip": "顯示[啟發式翻譯]",
     "button.partial.tooltip": "顯示[部分翻譯]",
