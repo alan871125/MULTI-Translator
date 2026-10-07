@@ -137,6 +137,7 @@ class TranslationApp(QMainWindow):
             "tools.chinese_conversion.cht2chs": lambda: self.edit_current_file_requested.emit(EditType.CHT2CHS),
             "tools.batch_operation.load_yaml": lambda: self.request_batch_operation("yaml"),
             "tools.batch_operation.load_json": lambda: self.request_batch_operation("json"),
+            "tools.share_top_translations": lambda: self.edit_current_file_requested.emit(EditType.SHARE_TOP_LV),
         } 
         self.menus = initialize_menu(menu_def, self.menuBar(), root_menu_name="menu", tr=L.__getitem__)
         self.lru_menu.recent_file_selected.connect(self.load_file_requested.emit)  # Connect recent file selection to load file signal

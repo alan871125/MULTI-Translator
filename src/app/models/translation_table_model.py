@@ -338,7 +338,34 @@ class TranslationTableModel(QAbstractTableModel):
             return
         self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target)
         self.emit_df_row_changed(idxs)
-
+        
+    def share_top_lv_translations(self, max_level: TranslationLevel = TranslationLevel.VERIFIED):
+        """Share the translation of the given indexes to all other text units with the same original text, if the translation level is higher than the existing ones."""
+        # get the df sorted by original,level
+        df_sorted = self.df.sort_values(["original", "level"], )
+        # drop duplicates based on original, keeping the highest level translation
+        df_top_unique = df_sorted.drop_duplicates(subset="original", keep="last")
+        # Push share translation command:
+        df_candidates = self.df[self.df["level"] < max_level].set_index('original')
+        df_aligned = df_top_unique.set_index('original').reindex(df_candidates.index, fill_value=None)
+        mask = df_aligned["level"] > df_candidates["level"]
+        if not mask.any():
+            logger.info("No translations to share: no higher level translations found.")
+            return
+        idxs_to_update = pd.Index(df_candidates[mask].key)
+        translations_to_update = df_aligned.loc[mask, "translation"]
+        levels_to_update = df_aligned.loc[mask, "level"]
+        if self.undo_stack is not None:
+            self.undo_stack.push(TranslationCommand(
+                model=self,
+                idxs=idxs_to_update,
+                translations=translations_to_update,
+                levels=levels_to_update,
+                description=f"Share Top Level Translations (max_level={max_level.name})"
+            ))
+        else:
+            self.set_translations(idxs_to_update, translations_to_update, levels_to_update)
+        
     def chs2cht(self): return self.chinese_convertion(target='t')
     def cht2chs(self): return self.chinese_convertion(target='s')
         
@@ -467,7 +494,7 @@ class TranslationCommand(QUndoCommand):
         self, model: TranslationTableModel,
         idxs: IndexLikeSequence,
         translations: Iterable[str]|str,
-        levels: Optional[TranslationLevel] = None,
+        levels:  Optional[Iterable[TranslationLevel]|TranslationLevel] = None,
         description: str = "Batch Translation Edit",
     ):
         super().__init__(description)
@@ -476,7 +503,7 @@ class TranslationCommand(QUndoCommand):
         self.old = model.df.loc[idxs]["translation"].copy()
         self.old_levels = model.df.loc[idxs]["level"].copy()
         self.new = translations
-        self.new_levels: Optional[pd.Series|TranslationLevel] = levels
+        self.new_levels: Optional[Iterable[TranslationLevel]|TranslationLevel] = levels
         self.description = description
     def undo(self):
         self.model.set_translations(self.idxs, self.old, levels=self.old_levels)

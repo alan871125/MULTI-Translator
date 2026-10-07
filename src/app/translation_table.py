@@ -29,7 +29,7 @@ class EditType(Enum):
     LEVEL = "level"
     CHS2CHT = "chs2cht"
     CHT2CHS = "cht2chs"
-
+    SHARE_TOP_LV = "share_top_lv" #TODO: possibly move this elsewhere
 T = TypeVar("T", bound=EditType)
 @dataclass(slots=True)
 class TranslationRequest(Generic[T]):

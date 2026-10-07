@@ -112,6 +112,14 @@ class TranslationAppPresenter:
                 self.session.chs2cht(file_path)
             case EditType.CHT2CHS:
                 self.session.cht2chs(file_path)
+            case EditType.SHARE_TOP_LV:
+                model = self.session.models.get(file_path)
+                if model is None:
+                    logger.warning(f"Attempted to share top level translations for a file that is not open: {file_path}")
+                    return
+                # TODO: move to edit_file_request
+                model.share_top_lv_translations()
+                return
             case _:
                 raise NotImplementedError(f"Handling for EditType {edit_type} is not implemented.")
     
