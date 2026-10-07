@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 from typing import Iterable, Optional, overload, Literal
 from dataclasses import dataclass
+from re import PatternError
 from PyQt5.QtCore import QObject
 
 from pyqt5_extensions.core import TypedQtSignal
@@ -27,7 +28,11 @@ class ColumnFilter:
         else:
             series = data
         series = series.astype(str) # ensure strings
-        mask = series.str.contains(self.text, case=self.match_case, regex=self.is_regex, na=False)
+        try:
+            mask = series.str.contains(self.text, case=self.match_case, regex=self.is_regex, na=False)
+        except PatternError as e:
+            logger.error(f"Invalid regex pattern '{self.text}' for column '{self.column}': {e}")
+            mask = pd.Series(False, index=series.index)  # Return all False if regex is invalid
         return mask
     
     def __bool__(self):
