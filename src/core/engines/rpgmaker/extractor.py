@@ -127,6 +127,14 @@ class RPGMakerMVExtractor(BaseExtractor):
                     (params := command.get("parameters"))
                 ):
                     continue
+                if cmd_type == "ShowText": # only in rpg maker mz
+                    if len(params)==4 and  isinstance((speaker := params[4]), str) and speaker.strip():
+                        out.append(TextUnit(
+                            file=path.stem,
+                            key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 4)),
+                            original=speaker,
+                            other_attrs={"attribute":f"CMD:{cmd_type}",}
+                        ))
                 if cmd_type == "PluginCommand":
                     plugin, method, _, method_kwargs = params[:4]
                     if (translatable_path := PLUGIN_HANDLERS.get((plugin, method))) is not None:
@@ -147,7 +155,10 @@ class RPGMakerMVExtractor(BaseExtractor):
                             # 2. The operand is a string (operand_type == 4)
                             # 3. The string is enclosed in backticks (e.g., `Translatable Text`) or quotes or Chinese quotes.
                             # Note: This is a heuristic and may not cover all cases. Further refinement may be needed based on actual game data.
-                            if operand_value[0] == '$':# Skip variable references like $gameVariables.value(1)
+                            if (
+                                not operand_value or      # Skip empty strings
+                                operand_value[0] == '$' # Skip variable references like $gameVariables.value(1)
+                            ):
                                 continue 
                             elif start_id==end_id and (
                                 operand_value.startswith("`") and operand_value.endswith("`") or

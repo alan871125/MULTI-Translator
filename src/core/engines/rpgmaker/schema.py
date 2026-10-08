@@ -5,6 +5,7 @@ from core.json_path import JsonPath
 TRANSLATION_FIELDS = {
     "Actors": ["name", "nickname", "profile"],
     "Armors": ["name", "description"],
+    "Weapons": ["name", "description"],
     "Items":  ["name", "description"],
     "Classes": ["name"],
     "Enemies": ["name"],
@@ -13,6 +14,7 @@ TRANSLATION_FIELDS = {
 
 # Represents the event codes that contain translatable text in RPG Maker event data (found in CommonEvents.json and Map*.json event data).
 EVENT_TRANSLATION_CODES = {
+    101: "ShowText",
     102: "ShowChoices",
     108: "Comment",
     401: "Text",
