@@ -13,29 +13,28 @@ This is a translation editor designed to help game or mod translators to easily 
   - Save and restore your translation progress.
 - **Translation Dictionary**: 
   - Save translations as dictionaries
-  - Easily update files by loading existing dictionaries
+  - Easily update files by importing existing dictionaries
 - **Translation Tools and APIs**:
   - Translation API Supports:
-    - Google (Free)
+    - Google Translation(Free)
     - DeepL (API key required)
     - Any Custom LLM API (API Key required)
   - Chinese Converstions (CHT<->CHS)
+- **Game Engine Support**:
+  - RPG Maker MV/MZ
+  - RimWorld
+  - Paradox Games (Crusader Kings III)
+  - Simple JSON (extracts any strings found)
+  - *Add more custom file support by defining your own translaiton extractors*
+- **Batch Processing**
+  - Batch Regex Replacements
 ### Planning Features
-- Batch Processing
 - UI Enhancements
 - Engine(Game) Support Expansion
 - Heuristic Translation
 
 See the [To-do list](./TODO.MD) for more details.
 
-## Current Engine (Game) Support
-- Supported
-  - [X] Simple JSON: (extracts any strings found)
-  - [X] RPG Maker MV
-  - [X] RimWorld
-- Planning
-  - [ ] Paradox Games (Crusader Kings III)
-- *Add more custom file support by defining your own translaiton extractors*
 
 ## How to Start (Dev)
 ### Requirements
@@ -54,3 +53,9 @@ python build.py
 ```python
 python src/main.py
 ```
+
+
+Common translation API endpoints:
+- Google AI Studio: https://generativelanguage.googleapis.com/v1beta/openai/ ([Get Free API key](https://aistudio.google.com/api-keys))
+- OpenAI: https://api.openai.com/v1/chat/completions
+- OpenRouter: https://api.openrouter.ai/v1/chat/completions
