@@ -2,12 +2,12 @@ import logging
 from pathlib import Path
 from typing import Hashable, Optional
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QButtonGroup
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont
-from PyQt5.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QButtonGroup
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon, QPainter, QPixmap, QFont
+from PySide6.QtSvg import QSvgRenderer
 
-from pyqt5_extensions.widgets import PieChartWidget
+from qt_extensions.widgets import PieChartWidget
 
 from core.engines import supported_engines
 from core.translation import TranslationLevel
@@ -27,7 +27,7 @@ def create_color_icon(color:str, size:int=24) -> QIcon:
     """Creates a circular icon of the specified color and size."""
     svg_data = BUTTON.format(color=color)
     pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.transparent)  # Start with a transparent pixmap
+    pixmap.fill(Qt.GlobalColor.transparent)  # Start with a transparent pixmap
     renderer = QSvgRenderer(bytearray(svg_data, encoding='utf-8'))
     painter = QPainter(pixmap)
     renderer.render(painter)
@@ -90,7 +90,7 @@ class ProgressPieChart(PieChartWidget):
         self.setFixedSize(50, 50)  # Set a fixed size for the pie chart
         self.setToolTip("Translation Progress")
         
-        self.set_style(bar_width=10, center_label=True, center_label_font=QFont("Arial", 8, QFont.Bold))
+        self.set_style(bar_width=10, center_label=True, center_label_font=QFont("Arial", 8, QFont.Weight.Bold))
         self.level_map = {lv: i for i, lv in enumerate(TranslationLevel) if lv != TranslationLevel.UNTRANSLATED}
         self.SEGMENT_COLORS = [ThemeManager.theme.get_level_color(lv) for lv in TranslationLevel if lv!= TranslationLevel.UNTRANSLATED]
         
@@ -103,8 +103,8 @@ class TopBar(QWidget):
     """
     Top bar component containing workspace selection, engine selection, and filtering.
     """
-    filter_clicked = pyqtSignal()
-    workspace_clicked = pyqtSignal()
+    filter_clicked = Signal()
+    workspace_clicked = Signal()
 
     def __init__(self, settings:Settings, table_filters:Optional[TableFilters]=None, parent=None):
         super().__init__(parent)

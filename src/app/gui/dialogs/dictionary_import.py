@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QCheckBox, QDialog, QGroupBox, QVBoxLayout,
     QDialogButtonBox
 )
@@ -23,7 +23,7 @@ class ImportDictionaryDialog(QDialog):
         layout.addWidget(self.key_group)
         
         # Add OK, Cancel, and Reset buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)

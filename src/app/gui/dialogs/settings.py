@@ -1,10 +1,9 @@
 from pathlib import Path
 
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
+
 from app.settings import L, Settings
 from core.translation import Language, get_supported_languages, providers
-
-
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
 
 class PathSettingsLayout(QHBoxLayout):
@@ -93,7 +92,7 @@ class SettingsDialog(QDialog):
 
         self.settings_layout.addStretch()
         # Dialog buttons (OK/Cancel)
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         self.settings_layout.addWidget(button_box)

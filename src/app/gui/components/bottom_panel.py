@@ -1,5 +1,5 @@
 import logging
-from PyQt5.QtWidgets import QTabWidget, QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QTabWidget, QWidget, QVBoxLayout, QLabel
 
 logger = logging.getLogger(__name__)
 

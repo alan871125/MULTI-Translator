@@ -3,14 +3,14 @@ import pandas as pd
 from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, Sequence, override, Generic, TypeVar, Hashable
-from PyQt5.QtCore import Qt, QSortFilterProxyModel, QAbstractItemModel, QAbstractProxyModel
-from PyQt5.QtGui import QDropEvent, QKeySequence, QKeyEvent
-from PyQt5.QtWidgets import (
-    QFileDialog, QMessageBox, QShortcut, QTabWidget, QTableView, QAbstractItemView, QCheckBox,
-    QInputDialog, QMenu, QApplication, QWidget, QTabBar
+from typing import Optional, Generic, TypeVar, override
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QAbstractItemModel, QAbstractProxyModel
+from PySide6.QtGui import QDropEvent, QKeySequence, QKeyEvent, QShortcut
+from PySide6.QtWidgets import (
+    QTabWidget, QTableView, QAbstractItemView, 
+    QMenu, QApplication, QWidget
 )
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 from iod import IndexedOrderedDict
 from core.translation import TranslationLevel, TranslationDictionary
 from .language import LanguagePack
@@ -40,28 +40,28 @@ class TranslationRequest(Generic[T]):
 
 class TranslationTableView(QTableView):
     _COLWIDTHS = [60, 80, 500, 500]
-    edit_translation_requested = TypedQtSignal(TranslationRequest)
-    # set_level_requested = TypedQtSignal(list, TranslationLevel)  # row indexes, level
-    copy_cells_requested = TypedQtSignal(IndexLikeSequence, int)  # row indexes, column index (only support single column for now)
+    edit_translation_requested = TypedSignal(TranslationRequest)
+    copy_cells_requested = TypedSignal(IndexLikeSequence, int)  # row indexes, column index (only support single column for now)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         # Use row selection and single selection so a row is selected at a time
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         # self.setAlternatingRowColors(True)
         # enable custom context menu
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         # allow inline editing via double-click or edit key
         self.setEditTriggers(
-            QAbstractItemView.DoubleClicked | 
+            QAbstractItemView.EditTrigger.DoubleClicked | 
             # QAbstractItemView.EditKeyPressed | # F2 conflicts with level setting hotkeys.
-            QAbstractItemView.SelectedClicked  #
+            QAbstractItemView.EditTrigger.SelectedClicked
         ) 
         # horizontal header left align and stretch last section
-        self.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.horizontalHeader().setStretchLastSection(True)
+        h_header = self.horizontalHeader()
+        h_header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        h_header.setStretchLastSection(True)
         self.init_hotkeys()
         self.proxy_model: Optional[QAbstractProxyModel] = None
 
@@ -101,17 +101,17 @@ class TranslationTableView(QTableView):
     @override
     def keyPressEvent(self, e:QKeyEvent):
         key = e.key()
-        sequence = QKeySequence(e.modifiers() | key)
+        sequence = QKeySequence(e.modifiers().value | e.key())
         idxs = self.selected_source_indexes
-        if sequence.matches(QKeySequence.Paste) and len(idxs) > 0:
+        if len(idxs) > 0 and sequence.matches(QKeySequence.StandardKey.Paste)==QKeySequence.SequenceMatch.ExactMatch:
             # self.edit_translation_requested.emit(idxs, EditType.PASTE)
             self.edit_translation_requested.emit(TranslationRequest(EditType.PASTE, idxs))
-        if sequence.matches(QKeySequence.Copy) and len(idxs) > 0:
+        elif len(idxs) > 0 and sequence.matches(QKeySequence.StandardKey.Copy)==QKeySequence.SequenceMatch.ExactMatch:
             col = self.selectionModel().currentIndex().column()
             self.copy_cells_requested.emit(idxs, col)  # Emit the column index of the selected cell
-        elif key in (Qt.Key_Return, Qt.Key_Enter):
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             # If currently inline editing, let the view handle the enter key (usually commits the edit)
-            if self.state() == QAbstractItemView.EditingState:
+            if self.state() == QAbstractItemView.State.EditingState:
                 return super().keyPressEvent(e)
             if not idxs:
                 return super().keyPressEvent(e)
@@ -123,6 +123,7 @@ class TranslationTableView(QTableView):
             return
         else:
             super().keyPressEvent(e)
+
     def set_column_widths(self, colwidths: list[int]):
         for i, width in enumerate(colwidths):
             self.setColumnWidth(i, width)
@@ -148,7 +149,7 @@ class TranslationTableView(QTableView):
         translate_as_batch_action = menu.addAction(L['right_click.translate_as_batch'])
 
         # Execute the menu at the cursor position and get the selected action
-        action = menu.exec_(self.viewport().mapToGlobal(pos))
+        action = menu.exec(self.viewport().mapToGlobal(pos))
         if action is None:
             return
         # idxs = self.selected_source_rows
@@ -160,7 +161,7 @@ class TranslationTableView(QTableView):
         elif action == reset_action:
             self.edit_translation_requested.emit(TranslationRequest(EditType.RESET, idxs))
         elif action == copy_action:
-            original = model.data(model.index(idx.row(), model._COLUMNS.index("original")), Qt.DisplayRole)
+            original = model.data(model.index(idx.row(), model._COLUMNS.index("original")), Qt.ItemDataRole.DisplayRole)
             QApplication.clipboard().setText(str(original))
         elif action == translate_as_batch_action:
             self.edit_translation_requested.emit(TranslationRequest(EditType.API_BATCH, idxs))
@@ -174,9 +175,9 @@ class TranslationTabWidget(QTabWidget):
     
     It keeps track of the open tabs and their corresponding file paths, 
     provides signals for when tabs are added or removed, as well as when the current tab changes."""
-    tab_exist_signal = TypedQtSignal(bool)  # file_name
-    tab_save_signal = TypedQtSignal(str)  # file_name
-    open_dropped_file_request = TypedQtSignal(str)  # file_path
+    tab_exist_signal = TypedSignal(bool)  # file_name
+    tab_save_signal = TypedSignal(str)  # file_name
+    open_dropped_file_request = TypedSignal(str)  # file_path
     def __init__(self, parent:Optional[QWidget]=None):
         super().__init__(parent)
         self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView

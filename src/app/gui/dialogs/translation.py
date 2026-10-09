@@ -1,7 +1,7 @@
 from app.settings import L, Settings
 
-from PyQt5.QtWidgets import QLabel, QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit, QShortcut
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit
+from PySide6.QtGui import QShortcut, QKeySequence
 
 class TranslationDialog(QDialog):
     """Translation dialog window"""
@@ -25,13 +25,13 @@ class TranslationDialog(QDialog):
         layout.addWidget(QLabel(L["translation"]))
         layout.addWidget(self.translated_text_edit)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
         
         # add a keyboard shortcut for Ctrl+Enter to accept the dialog
-        shortcut = QShortcut(Qt.ControlModifier | Qt.Key_Return, self)
+        shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
         shortcut.activated.connect(self.accept)
         
         self.translated_text_edit.setFocus() # set focus to the translated text edit so the user can start typing immediately

@@ -1,8 +1,7 @@
-pyqt5==5.15.11
-pyqt5-qt5==5.15.2
-pyqt5-sip==12.17.0
+PySide6
 pandas
 opencc
+colorlog
 openai==2.41
 python-dotenv
 rapidfuzz==3.14.5
@@ -11,4 +10,4 @@ pyyaml
 pydantic
 deep-translator @ git+https://github.com/alan871125/deep-translator.git@master
 iod @ https://github.com/alan871125/IndexedOrderedDict/releases/download/0.1.3/iod-0.1.3-cp39-abi3-win_amd64.whl
-PyQt5-Extensions @ git+https://github.com/alan871125/PyQt5-Extensions.git@main
+Qt-Extensions @ git+https://github.com/alan871125/Qt-Extensions.git@main

@@ -1,9 +1,10 @@
 """
-Menu initialization utility for PyQt5 applications.
+Menu initialization utility.
 """
 
 from typing import Callable, Mapping, Optional
-from PyQt5.QtWidgets import QMenu, QAction, QMenuBar
+from PySide6.QtWidgets import QMenu, QMenuBar
+from PySide6.QtGui import QAction
 
 MenuDefinition = Mapping[str, Optional[Callable|QAction|QMenu|str]]  # The value can be a callback, a QAction, a QMenu, or a special string like '$separator' or '$menu']
 
@@ -45,6 +46,8 @@ def initialize_menu(
                 The parent menu or menu bar to which the defined menu items will be added.
             root_menu_name (str, optional):
                 The base name for translation keys for the menu items. Default is 'menu'.
+            tr: Callable[[str], str], optional:
+                A translation function that takes a string and returns its translated version.
         Example:
         ```
             menu_def = {
@@ -65,7 +68,7 @@ def initialize_menu(
             dict[str, QMenu|QAction]: A `flat` dictionary mapping menu item names to their corresponding QMenu or QAction objects for further manipulation if needed.
         """
         root_menu_name = MenuPath(root_menu_name)
-        menus = {}
+        menus: dict[str, QMenu | QAction] = {}
         for menu_path, menu_item in menu_def.items():
             splits = menu_path.split('$n:')
             if len(splits) == 2:
@@ -80,17 +83,25 @@ def initialize_menu(
             # Walk through the menu path to create submenus as needed
             for part in menu_path.parts[:-1]:
                 path /= part
-                if path not in menus:
+                if parent_menu is None:
+                    raise ValueError(f"Parent menu is None while processing path: {path}")
+                elif isinstance(parent_menu, QAction):
+                    raise ValueError(f"Parent menu is an QAction while processing path: {path}")
+                elif path not in menus:
                     # initialize parent menu if it doesn't exist
                     parent_menu = menus[path] = parent_menu.addMenu(tr(root_menu_name/path))
                 else:
                     parent_menu = menus[path]
             # Create the final menu item corresponding to the menu_item
-            if isinstance(menu_item, QMenu):
+            if parent_menu is None:
+                raise ValueError(f"Parent menu is None while processing final path: {menu_path}")
+            elif isinstance(parent_menu, QAction):
+                raise ValueError(f"Parent menu is an QAction while processing final path: {menu_path}")
+            elif isinstance(menu_item, QMenu):
                 action = menus[menu_path] = parent_menu.addMenu(menu_item)
-            elif isinstance(menu_item, str) and menu_item == '$menu':
+            elif menu_item == '$menu':
                 action = menus[menu_path] = parent_menu.addMenu(display_name)
-            elif isinstance(menu_item, str) and menu_item == '$separator':
+            elif menu_item == '$separator' and isinstance(parent_menu, QMenu):
                 action = menus[menu_path] = parent_menu.addSeparator()
             elif isinstance(menu_item, QAction):
                 action = menus[menu_path] = menu_item

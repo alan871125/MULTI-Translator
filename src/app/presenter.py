@@ -1,8 +1,8 @@
 from pathlib import Path
 from itertools import cycle, islice
-from typing import Literal, Optional, Sequence
+from typing import Optional
 import logging
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 from app.gui.main_window import TranslationApp
 from core.translation import Translator
 from .models.session import TranslationSession

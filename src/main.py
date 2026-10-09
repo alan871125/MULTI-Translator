@@ -6,11 +6,10 @@ import logging
 import colorlog
 import argparse
 from dotenv import load_dotenv
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QTextEdit
+from PySide6.QtWidgets import QApplication, QMessageBox, QTextEdit
 
 import resources_rc
 from app.gui.main_window import TranslationApp
-from app.models.filters import TableFilters
 from app.models.session import TranslationSession
 from app.presenter import TranslationAppPresenter
 from app.settings import Settings, DEFAULT_SETTINGS_FILE, DEFAULT_GLOBAL_WORKSPACE_FILE
@@ -113,7 +112,7 @@ def main():
     session = TranslationSession(settings)
     presenter = TranslationAppPresenter(main_window, settings, session=session, translation_tab_widget=main_window.translation_table)
     main_window.show()
-    app.exec_()
+    app.exec()
     
 if __name__ == "__main__":
     main()

@@ -1,15 +1,15 @@
 import logging
-from PyQt5.QtWidgets import QMenu
+from PySide6.QtWidgets import QMenu
 
 from core.lru_file import LeastRecentlyUsedFiles
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 from ..menu_utils import initialize_menu
 
 logger = logging.getLogger(__name__)
 
 class RecentFilesMenu(QMenu):
     """Custom QMenu to handle Recent Files with dynamic content."""
-    recent_file_selected = TypedQtSignal(str)
+    recent_file_selected = TypedSignal(str)
     def __init__(self, title, lru_files:LeastRecentlyUsedFiles, parent=None):
         super().__init__(title, parent)
         self.lru_files = lru_files

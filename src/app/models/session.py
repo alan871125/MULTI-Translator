@@ -5,12 +5,12 @@ import pandas as pd
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
-from PyQt5.QtWidgets import QUndoStack
-from PyQt5.QtCore import QObject
+from PySide6.QtGui import QUndoStack
+from PySide6.QtCore import QObject
 
 from iod import IndexedOrderedDict
 
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 from app.settings import Settings
 from app.translation_table import logger
 from app.typing import IndexLikeSequence
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class TranslationSession(QObject):
-    file_opened = TypedQtSignal(str, TranslationTableModel)  # Signal emitted when a file is opened, with the file path and model as arguments
-    file_closed = TypedQtSignal(str)  # Signal emitted when a file is closed, with the file path as an argument
+    file_opened = TypedSignal(str, TranslationTableModel)  # Signal emitted when a file is opened, with the file path and model as arguments
+    file_closed = TypedSignal(str)  # Signal emitted when a file is closed, with the file path as an argument
     
     def __init__(self, settings:Settings, parent: Optional[QObject] = None):
         super().__init__(parent)

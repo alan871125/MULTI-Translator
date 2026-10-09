@@ -1,5 +1,5 @@
 import logging
-import PyQt5.QtWidgets as qt
+import PySide6.QtWidgets as qt
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import cast

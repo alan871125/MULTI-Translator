@@ -3,26 +3,22 @@ import logging
 from pathlib import Path
 from typing import Optional, override, Literal
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QKeySequence, QCloseEvent
-from PyQt5.QtWidgets import (
-    QLabel,QCheckBox, QFileDialog, QMainWindow, QTabWidget, QUndoStack, QWidget, 
-    QVBoxLayout, QHBoxLayout, 
-    QPushButton, QMessageBox,
-    QInputDialog, QDialog, QDialogButtonBox,
-    QMenu, QShortcut, QComboBox, QAction,
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QCloseEvent, QAction, QShortcut, QUndoStack
+from PySide6.QtWidgets import (
+    QLabel,QCheckBox, QFileDialog, QMainWindow, QWidget, 
+    QVBoxLayout, QMessageBox,
+    QDialog
 )
-
 from app.gui.dialogs.settings import SettingsDialog
 from app.gui.dialogs.translation import TranslationDialog
 from app.gui.theme import ThemeManager
-from app.models.translation_table_model import TranslationTableModel
 from app.translation_table import TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings
 
 import core.engines as engines
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
@@ -34,14 +30,14 @@ L = LanguagePack()
 
 
 class TranslationApp(QMainWindow):
-    edit_current_file_requested = TypedQtSignal(EditType)
-    save_current_file_requested = TypedQtSignal(str)
-    save_translation_requested = TypedQtSignal()
-    load_dir_requested = TypedQtSignal(str)
-    load_file_requested = TypedQtSignal(str)
-    import_from_file_requested = TypedQtSignal(str)
-    import_from_dict_requested = TypedQtSignal(Path, list[str])
-    batch_operation_requested = TypedQtSignal(Path)  # Signal to request batch operations with a list of operation dicts
+    edit_current_file_requested = TypedSignal(EditType)
+    save_current_file_requested = TypedSignal(str)
+    save_translation_requested = TypedSignal()
+    load_dir_requested = TypedSignal(str)
+    load_file_requested = TypedSignal(str)
+    import_from_file_requested = TypedSignal(str)
+    import_from_dict_requested = TypedSignal(Path, list[str])
+    batch_operation_requested = TypedSignal(Path)  # Signal to request batch operations with a list of operation dicts
     
     def __init__(self, settings: Settings):
         super().__init__()
@@ -83,7 +79,7 @@ class TranslationApp(QMainWindow):
         dialog.replace_requested.connect(model.search_and_replace)  # Connect the replace signal to the model's replace method
         # Hide the replace button (hidden when only filtering)
         dialog.replace_widget.setVisible(False)  
-        dialog.exec_()
+        dialog.exec()
         
     def init_ui(self):
         self.central_widget = QWidget(self)
@@ -113,7 +109,7 @@ class TranslationApp(QMainWindow):
         self.bottom_bar = QLabel()
         self.bottom_bar.setFixedHeight(20)
         self.bottom_bar.setStyleSheet("background-color: lightgray; padding-left: 5px;")
-        self.bottom_bar.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.bottom_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.main_layout.addWidget(self.bottom_bar)
         
     def init_menu_bar(self):
@@ -167,16 +163,16 @@ class TranslationApp(QMainWindow):
             
     def init_hotkeys(self):
         self.hotkeys = {
-            "save": QShortcut(Qt.CTRL + Qt.Key_S, self),
-            "search": QShortcut(Qt.CTRL + Qt.Key_F, self),
+            "save": QShortcut(QKeySequence.StandardKey.Save, self),
+            "search": QShortcut(QKeySequence.StandardKey.Find, self),
         }
         self.hotkeys["save"].activated.connect(self.save_translation_requested.emit)
         self.hotkeys["save"].setEnabled(False)  # Disable save hotkey until a tab with a loaded file exists
         self.hotkeys["search"].activated.connect(self.open_filter_menu)
         self.translation_table.tab_exist_signal.connect(lambda exist:self.hotkeys["save"].setEnabled(exist))
 
-        self.undo_action.setShortcuts(QKeySequence.Undo)   
-        self.redo_action.setShortcuts(QKeySequence.Redo) 
+        self.undo_action.setShortcuts(QKeySequence.StandardKey.Undo)   
+        self.redo_action.setShortcuts(QKeySequence.StandardKey.Redo) 
         self.addAction(self.undo_action) # Ctrl+Z / Cmd+Z
         self.addAction(self.redo_action) # Ctrl+Y / Cmd+Shift+Z
     
@@ -239,7 +235,7 @@ class TranslationApp(QMainWindow):
         if path and (file_path:= Path(path)).exists():
             # Show a dialog to select which columns to use as keys
             dialog = ImportDictionaryDialog(self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 self.import_from_dict_requested.emit(file_path, dialog.keys)
             else:
                 logger.info("Import dictionary operation cancelled.")
@@ -262,7 +258,7 @@ class TranslationApp(QMainWindow):
     
     def open_edit_translation_dialog(self, original: str, translation: str) -> Optional[str]:
         dialog = TranslationDialog(self.settings, original, translation, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             return dialog.translation
         return None
 
@@ -273,7 +269,7 @@ class TranslationApp(QMainWindow):
             return confirm
         
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Question)
+        msg_box.setIcon(QMessageBox.Icon.Question)
         msg_box.setWindowTitle("Confirm Action")
         msg_box.setText(L["confirm_msg.share_translation"])
         check_box = QCheckBox(L["confirm_msg.dont_ask_again"])
@@ -289,7 +285,7 @@ class TranslationApp(QMainWindow):
     def show_unsaved_changes_dialog(self, file_name: str) -> str:
         # Display the confirmation box
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setWindowTitle(L["confirm_msg.unsaved_changes"])
         msg_box.setText(L["confirm_msg.unsaved_changes_desc"].format(file_name=file_name))
         msg_box.setInformativeText(L["confirm_msg.unsaved_changes_desc2"])
@@ -326,7 +322,7 @@ class TranslationApp(QMainWindow):
     def open_settings(self):
         """Open settings dialog"""
         dialog = SettingsDialog(self.settings, self)
-        if dialog.exec_()== QDialog.Accepted:
+        if dialog.exec()== QDialog.DialogCode.Accepted:
             dialog.save_settings()
             L.set_language(self.settings.language)
             logger.debug("Settings saved")

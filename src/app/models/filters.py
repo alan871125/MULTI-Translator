@@ -3,9 +3,9 @@ import pandas as pd
 from typing import Iterable, Optional, overload, Literal
 from dataclasses import dataclass
 from re import PatternError
-from PyQt5.QtCore import QObject
+from PySide6.QtCore import QObject
 
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 from core.translation import TranslationLevel
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,8 @@ class ColumnFilter:
         return bool(self.text)  # A filter is considered active if it has non-empty text
 
 class TableFilters(QObject):
-    text_filter_changed = TypedQtSignal()
-    level_filter_changed = TypedQtSignal(list)
+    text_filter_changed = TypedSignal()
+    level_filter_changed = TypedSignal(list)
     def __init__(self, parent:Optional[QObject]=None):
         super().__init__(parent)
         self.levels = {lv:True for lv in TranslationLevel}  # Keep track of which translation levels are currently selected for filtering

@@ -3,11 +3,13 @@ import pandas as pd
 from pathlib import Path
 from typing import Any, Iterable, Literal, Sequence, cast, override, Optional, overload
 
-from PyQt5.QtCore import Qt, QAbstractItemModel, QAbstractTableModel,QAbstractProxyModel, QModelIndex, QSortFilterProxyModel
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QUndoCommand, QUndoStack
+from PySide6.QtCore import (
+    Qt, QAbstractItemModel, QAbstractTableModel, QAbstractProxyModel, QSortFilterProxyModel,
+    QModelIndex, QPersistentModelIndex
+)
+from PySide6.QtGui import QColor, QUndoCommand, QUndoStack
 
-from pyqt5_extensions.core import TypedQtSignal
+from qt_extensions.core import TypedSignal
 
 from app.models.filters import ColumnFilter, build_mask
 from app.settings import Settings
@@ -67,11 +69,12 @@ class TranslationTableModel(QAbstractTableModel):
             return TranslationLevel.UNTRANSLATED
         return TranslationLevel(value)
 
+    # def headerData(self, section: int, orientation: PySide6.QtCore.Qt.Orientation, /, role: int = ...) -> typing.Any: ...
     @override
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role != Qt.DisplayRole:
+    def headerData(self, section:int, orientation:Qt.Orientation, /, role=Qt.ItemDataRole.DisplayRole):
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
-        if orientation == Qt.Horizontal:
+        if orientation == Qt.Orientation.Horizontal:
             if 0 <= section < len(self._COLUMNS):
                 return L[self._COLUMNS[section]]
         return section + 1
@@ -109,13 +112,13 @@ class TranslationTableModel(QAbstractTableModel):
         logger.info(f"Saved translations to {save_path}")
 
     @override
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, /, parent:QModelIndex|QPersistentModelIndex = QModelIndex())  -> int:
         return len(self.df)
     @override
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent:QModelIndex|QPersistentModelIndex = QModelIndex()):
         return len(self._COLUMNS)
     @override
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, /, role=Qt.ItemDataRole.DisplayRole):
         theme = ThemeManager.theme
 
         if not (
@@ -125,19 +128,19 @@ class TranslationTableModel(QAbstractTableModel):
         ):
             return None
 
-        if ((role == Qt.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
-            (role == Qt.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
+        if ((role == Qt.ItemDataRole.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
+            (role == Qt.ItemDataRole.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
             level = self._level_from_value(self.df.iloc[r]['level'])
             return QColor(ThemeManager.theme.get_level_color(level))
 
         # value = self.df.iat[r, c] # this will break if the column order changes, so we use the column name instead
         value = self.df.iloc[r][self._COLUMNS[c]]
-        if role in (Qt.DisplayRole, Qt.EditRole) and not pd.isna(value):
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole) and not pd.isna(value):
             return str(value)
         return None
 
     @override
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(self, index, value, /, role=Qt.ItemDataRole.EditRole):
         # Support inline editing from the view for the Translation column
         if not (
             index.isValid() and
@@ -181,13 +184,13 @@ class TranslationTableModel(QAbstractTableModel):
     @override
     def flags(self, index):
         if not index.isValid():
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
+            return Qt.ItemFlag.ItemIsEnabled
         # make items selectable and enabled; only the Translation column is editable
         col = index.column()
-        flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         try:
             if self._COLUMNS[col] == "translation":
-                flags |= Qt.ItemIsEditable
+                flags |= Qt.ItemFlag.ItemIsEditable
         except Exception:
             pass
         return flags
@@ -265,7 +268,7 @@ class TranslationTableModel(QAbstractTableModel):
         if idxs.empty:
             return 0
         int_idxs = self.df.index.get_indexer(idxs)
-        self.dataChanged.emit(self.index(int_idxs.min(), 0), self.index(int_idxs.max(), self.columnCount() - 1))
+        self.dataChanged.emit(self.index(int_idxs.min().astype(int), 0), self.index(int_idxs.max().astype(int), self.columnCount() - 1))
         return len(int_idxs)
     
     def search_and_replace(self, filters: dict[Literal['file', 'key', 'original', 'translation'], ColumnFilter], replace_text: str, column: Literal['original', 'translation'] = "original"):
@@ -396,14 +399,14 @@ class TranslationTableModel(QAbstractTableModel):
     #     out = df.iloc[indexes].reset_index().groupby("original").index.min()
     #     return pd.Index(out.values)
     
-    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder):
         if not (0 <= column < len(self._COLUMNS)):
             return
 
         self.layoutAboutToBeChanged.emit()
         
         col_name = self._COLUMNS[column]
-        ascending = (order == Qt.AscendingOrder)
+        ascending = (order == Qt.SortOrder.AscendingOrder)
         
         # Fast vector sorting using pandas string methods
         # Use key to perform case-insensitive sort without altering actual data
@@ -428,7 +431,7 @@ class TranslationTableProxyModel(QSortFilterProxyModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setDynamicSortFilter(True)
-        self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._accepted_rows: Optional[set[int]] = None  # Cache of accepted source model rows for fast filtering
     
     @override
@@ -459,7 +462,7 @@ class TranslationTableProxyModel(QSortFilterProxyModel):
         super().invalidateFilter()  # Trigger re-evaluation of filterAcceptsRow
 
     @override
-    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex|QPersistentModelIndex, /)->bool:
         if not self.sourceModel().filters.is_filtering:
             return True
         df_index = self.sourceModel().df.index[source_row]
@@ -480,7 +483,7 @@ class TranslationTableProxyModel(QSortFilterProxyModel):
         return self.mapToSource(proxy_index)
     
     @override
-    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder):
         # Delegate sorting directly to the pandas-backed source model
         if self.sourceModel():
             self.sourceModel().sort(column, order)

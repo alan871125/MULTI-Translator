@@ -48,7 +48,7 @@ def test_settings_signals():
 def test_settings_invalid_attribute():
     settings = Settings()
     with pytest.raises(AttributeError):
-        _ = settings.non_existent_attribute
+        _ = settings.non_existent_attribute # type: ignore -> We know this does't exist, let the static type checker be quite
     
     with pytest.raises(AttributeError):
         settings.non_existent_attribute = "value"

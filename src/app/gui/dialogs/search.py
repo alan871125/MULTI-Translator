@@ -1,11 +1,14 @@
 import logging
-import PyQt5.QtWidgets as qt
-
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QDialogButtonBox
 from typing import Literal, override, get_args
 
-from pyqt5_extensions.core import TypedQtSignal
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget,
+    QLabel, QCheckBox, QPushButton, QLineEdit, QStyle, QSizePolicy, 
+    QDialog, QDialogButtonBox, QToolButton, 
+)
+
+from qt_extensions.core import TypedSignal
 from app.language import LanguagePack
 from app.typing import SearchableColumn
 from ...models.filters import ColumnFilter, TableFilters
@@ -15,17 +18,17 @@ L = LanguagePack()
 # For Propper type hinting of the signal
 SEARCH_COLUMNS = ("file", "key", "original", "translation")
 assert all(col in get_args(SearchableColumn) for col in SEARCH_COLUMNS), "SEARCH_COLUMNS must match SearchableColumn type"
-class SearchLineEdit(qt.QLineEdit):
+class SearchLineEdit(QLineEdit):
     padding=1
     def __init__(self, parent=None):
         super().__init__(parent)        
         self.buttons = {}
-        self.buttons["case"] = qt.QToolButton(self)
+        self.buttons["case"] = QToolButton(self)
         self.buttons["case"].setText("Aa")
         self.buttons["case"].setToolTip("Match Case")
         self.buttons["case"].setCheckable(True)
         self.buttons["case"].setAutoRaise(True) # Makes it look like a flat button without borders
-        self.buttons["regex"] = qt.QToolButton(self)
+        self.buttons["regex"] = QToolButton(self)
         self.buttons["regex"].setText("(.*)")
         self.buttons["regex"].setToolTip("Use Regular Expression")
         self.buttons["regex"].setCheckable(True)
@@ -40,7 +43,11 @@ class SearchLineEdit(qt.QLineEdit):
         self.update_button_position()
         
     def update_button_position(self):
-        frame = self.style().pixelMetric(qt.QStyle.PM_DefaultFrameWidth)
+        if (style := self.style()) is not None:
+            frame = style.pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth)
+        else:
+            logger.error("Style is not available, using fallback frame width of 2 pixels.")
+            frame = 2  # Fallback value if style is not available
         n = len(self.buttons)
         
         for i,btn in enumerate(self.buttons.values()):
@@ -50,9 +57,9 @@ class SearchLineEdit(qt.QLineEdit):
             y = (self.rect().height() - size.height()) // 2
             btn.move(x, y)
 
-class SearchDialog(qt.QDialog):
+class SearchDialog(QDialog):
     # Note: suppose the replace uses regex if the search does.
-    replace_requested: TypedQtSignal[dict[SearchableColumn, ColumnFilter], str, Literal["original", "translation"]] = TypedQtSignal(dict, str, Literal["original", "translation"])  # filters, replace_text, column
+    replace_requested: TypedSignal[dict[SearchableColumn, ColumnFilter], str, Literal["original", "translation"]] = TypedSignal(dict, str, Literal["original", "translation"])  # filters, replace_text, column
     SEARCH_COLUMNS =  SEARCH_COLUMNS
     
     REPLACE_START_ROW = 2  # The row index in the grid layout where the replace row starts  
@@ -64,24 +71,24 @@ class SearchDialog(qt.QDialog):
         
         self.center_on_parent()
         # 1. Main vertical layout
-        layout = qt.QVBoxLayout(self)
+        layout = QVBoxLayout(self)
         self.filter_entries = {}
         
         # 2. Main Grid Layout to handle perfect alignment
-        grid_layout = qt.QGridLayout()
+        grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.setHorizontalSpacing(8)
         grid_layout.setVerticalSpacing(6)
         
         # 3. Create the Fold Toggle Button
-        self.fold_button = qt.QToolButton(self)
+        self.fold_button = QToolButton(self)
         self.fold_button.setText(" 〉") 
         self.fold_button.setCheckable(True)
-        self.fold_button.setCursor(Qt.PointingHandCursor)
+        self.fold_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.fold_button.setToolTip("Show/Hide Replace Options")
         
         # Let it expand vertically to match row heights seamlessly
-        self.fold_button.setSizePolicy(qt.QSizePolicy.Policy.Fixed, qt.QSizePolicy.Policy.Expanding)
+        self.fold_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self.fold_button.setMinimumWidth(28)
         self.fold_button.setMaximumWidth(28)
         #TODO: move to theme
@@ -102,13 +109,13 @@ class SearchDialog(qt.QDialog):
         
         for idx, col in enumerate(self.SEARCH_COLUMNS):
             # Form Label
-            lbl = qt.QLabel(L[col], self)
+            lbl = QLabel(L[col], self)
             grid_layout.addWidget(lbl, idx,  1) # row idx, col 1
             
             # Form Entry Container
-            search_box = qt.QWidget(self)
+            search_box = QWidget(self)
             search_box.setObjectName("SearchBox")
-            box_layout = qt.QHBoxLayout(search_box)
+            box_layout = QHBoxLayout(search_box)
             box_layout.setContentsMargins(5, 2, 5, 2)
             box_layout.setSpacing(4)
             
@@ -152,30 +159,30 @@ class SearchDialog(qt.QDialog):
             }
             
         # 5. Containerized Replace Row
-        self.replace_widget = qt.QWidget(self)
-        replace_container_layout = qt.QHBoxLayout(self.replace_widget)
+        self.replace_widget = QWidget(self)
+        replace_container_layout = QHBoxLayout(self.replace_widget)
         replace_container_layout.setContentsMargins(0, 0, 0, 0)
         replace_container_layout.setSpacing(6)
         
-        replace_box = qt.QWidget(self)
+        replace_box = QWidget(self)
         replace_box.setStyleSheet("QWidget { background: white; border: 1px solid #c3c3c3; border-radius: 4px; }")
-        rb_layout = qt.QHBoxLayout(replace_box)
+        rb_layout = QHBoxLayout(replace_box)
         rb_layout.setContentsMargins(5, 2, 5, 2)
         
-        replace_entry = qt.QLineEdit(self)
+        replace_entry = QLineEdit(self)
         replace_entry.setFrame(False)
         replace_entry.setPlaceholderText("Replace text here...")
         rb_layout.addWidget(replace_entry)
         
         replace_container_layout.addWidget(replace_box, stretch=1)
         
-        self.replace_source_checkbox = qt.QCheckBox(L["replace_from_original"], self)
+        self.replace_source_checkbox = QCheckBox(L["replace_from_original"], self)
         self.replace_source_checkbox.setChecked(False)
         self.replace_source_checkbox.setToolTip(L['replace_from_original.tooltip'])
         replace_container_layout.addWidget(self.replace_source_checkbox)
 
-        replace_button = qt.QPushButton(L["replace_all"], self)
-        replace_button.setCursor(Qt.PointingHandCursor)
+        replace_button = QPushButton(L["replace_all"], self)
+        replace_button.setCursor(Qt.CursorShape.PointingHandCursor)
         replace_button.clicked.connect(self.on_replace)
         replace_container_layout.addWidget(replace_button)
         
@@ -186,11 +193,11 @@ class SearchDialog(qt.QDialog):
         layout.addLayout(grid_layout)
         
         # 6. Bottom Button Box
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset, self)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Reset, self)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-
-        button_box.button(QDialogButtonBox.Reset).clicked.connect(self.reset_filters)
+        assert (reset_button:= button_box.button(QDialogButtonBox.StandardButton.Reset)) is not None
+        reset_button.clicked.connect(self.reset_filters)
         layout.addWidget(button_box)
         
         # Connect Fold button actions
@@ -204,9 +211,9 @@ class SearchDialog(qt.QDialog):
     
     def center_on_parent(self):
         """Calculates geometry coordinates to place this dialog in the middle of its parent window."""
-        if self.parentWidget():
+        if parent := self.parentWidget():
             # Get the geometry of the main window frame
-            parent_geo = self.parentWidget().geometry()
+            parent_geo = parent.geometry()
             # Get our own dialog frame geometry parameters
             dialog_geo = self.geometry()
             
@@ -217,7 +224,7 @@ class SearchDialog(qt.QDialog):
             # Snap dialog into position
             self.move(x, y)
     
-    def toggle_replace_row(self, checked, grid_layout:qt.QGridLayout):
+    def toggle_replace_row(self, checked, grid_layout:QGridLayout):
         """Updates layout span and visibility dynamically on fold."""
         # 1. Update visibility
         self.replace_widget.setVisible(checked)
@@ -235,8 +242,9 @@ class SearchDialog(qt.QDialog):
             grid_layout.addWidget(self.fold_button, self.REPLACE_START_ROW, 0, 2, 1)
             
         # 3. Force instant geometry calculation recalculation 
-        self.layout().activate()
-        qt.QApplication.processEvents()
+        assert (layout:=self.layout()) is not None
+        layout.activate()
+        QApplication.processEvents()
         self.adjustSize()
     
     def reset_filters(self):
