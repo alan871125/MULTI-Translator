@@ -92,16 +92,7 @@ class SearchDialog(QDialog):
         self.fold_button.setMinimumWidth(28)
         self.fold_button.setMaximumWidth(28)
         #TODO: move to theme
-        self.fold_button.setStyleSheet("""
-            QToolButton {
-                background: transparent;
-                border: none;
-                border-radius: 3px;
-                font-weight: bold;
-                padding: 2px 4px;
-            }
-            QToolButton:hover { background: #e0e0e0; }
-        """)
+        self.fold_button.setObjectName("FoldButton")
         # Place button in Grid: row 0, col 0, spanning 2 rows initially (original & translation)
         grid_layout.addWidget(self.fold_button, self.REPLACE_START_ROW, 0, 2, 1)
         
@@ -165,7 +156,7 @@ class SearchDialog(QDialog):
         replace_container_layout.setSpacing(6)
         
         replace_box = QWidget(self)
-        replace_box.setStyleSheet("QWidget { background: white; border: 1px solid #c3c3c3; border-radius: 4px; }")
+        # replace_box.setStyleSheet("QWidget { background: white; border: 1px solid #c3c3c3; border-radius: 4px; }")
         rb_layout = QHBoxLayout(replace_box)
         rb_layout.setContentsMargins(5, 2, 5, 2)
         

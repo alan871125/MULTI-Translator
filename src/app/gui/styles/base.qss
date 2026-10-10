@@ -1,3 +1,10 @@
+* {
+    /* background-color: $BACKGROUND_COLOR; */ /* will break many of the default styles */
+    font-family: $FONT_FAMILY;
+    font-size: $FONT_SIZE;
+    color: $TEXT_COLOR;
+}
+/* 
 QScrollBar:vertical {
     background: $BACKGROUND_COLOR;
     width: 16px;
@@ -42,8 +49,145 @@ QScrollBar::sub-page:vertical {
     background: transparent;
     border: none;
 }
+*/
+
+QLineEdit, QPlainTextEdit, QTextEdit,
+QSpinBox, QComboBox {
+    background-color: $MAIN_CONTENT_COLOR;
+    border: 1px solid $BORDER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+    padding: $PADDING_Y $PADDING_X;
+}
+QSpinBox:hover, QComboBox:hover{
+    /* background-color: $HOVER_COLOR; */
+    border: 1px solid $HOVER_BORDER_COLOR;          
+}
+QSpinBox::up-button, QSpinBox::down-button, QComboBox::drop-down {
+    border: none;
+}
+
+QSpinBox::up-button:hover{
+    background-color: $HOVER_COLOR;
+    border-top-left-radius: $BUTTON_RADIUS;
+    border-bottom-left-radius: $BUTTON_RADIUS;
+}
+QComboBox::drop-down:hover,
+QSpinBox::down-button:hover{
+    background-color: $HOVER_COLOR;
+    border-top-right-radius: $BUTTON_RADIUS;
+    border-bottom-right-radius: $BUTTON_RADIUS;
+}
+
+QSpinBox::down-arrow, QComboBox::down-arrow {
+    image: url(:/assets/resources/icons/chevron-down.svg);
+    width: 12px;
+    height: 12px;
+}
+QSpinBox::up-arrow, QComboBox::up-arrow {
+    image: url(:/assets/resources/icons/chevron-up.svg);
+    width: 12px;
+    height: 12px;
+}
+
+/* QMenuBar::item:selected{background-color: $HOVER_COLOR;} */
+QMenu{padding: 4px 0px;}
+QMenu::item{padding: 4px 30px;}
+QMenu::item:selected{background-color: $HOVER_COLOR;}
+QMenu::item:disabled{color: $DISABLED_COLOR;}
+QMenu::item:disabled:selected{
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton {
+    border-radius: $BUTTON_RADIUS;
+    background-color: $BUTTON_COLOR;
+    border: 1px solid $BORDER_COLOR;
+    padding: $PADDING_Y $PADDING_X;
+}
+QPushButton:selected {
+    background-color: $SELECT_COLOR;
+    border: 1px solid $SELECT_BORDER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+} 
+QPushButton:hover {
+    background-color: $HOVER_COLOR;
+    border: 1px solid $HOVER_BORDER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+}
+QPushButton[checkable="true"]:checked {
+    background-color: $SELECT_COLOR;
+    border: 1px solid $SELECT_BORDER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+}
+QPushButton[checkable="true"]:hover {
+    background-color: $HOVER_COLOR;
+}
 
 
+QTableView::item:selected,
+QTableWidget::item:selected {
+    background-color: $SELECT_COLOR;
+    border: 1px solid $SELECT_BORDER_COLOR;
+    color: $TEXT_COLOR;
+}        
+QTableCornerButton::section,
+QHeaderView::section {
+    background-color: $BACKGROUND_COLOR;
+    padding: $PADDING_Y $PADDING_X;
+    border: 1px solid $BORDER_COLOR;
+}    
+QTabWidget::pane {
+    background-color: $BACKGROUND_COLOR;
+    border-top: 1px solid $BORDER_COLOR;
+}     
+QTabBar::tab {
+    background-color: $BACKGROUND_COLOR;
+    padding: $PADDING_Y $PADDING_X;
+    border: 1px solid $BORDER_COLOR;
+    border-bottom: none;
+    border-top-left-radius:  $BUTTON_RADIUS;
+    border-top-right-radius: $BUTTON_RADIUS;
+}
+QTabBar::tab:selected {background: $MAIN_CONTENT_COLOR;}
+QTabBar::tab:hover{ background: $MAIN_CONTENT_COLOR;}
 
+/* These two will not work for the TranslationTableView tabs
+Because they are replaced with a custom QToolButton->DynamicCloseButton */
+QTabBar::close-button {
+    image: url(:/assets/resources/icons/close.svg);
+    subcontrol-position: right center;
+}
+QTabBar::close-button::hover {
+    background-color: $HOVER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+}
 
-
+/* ========== Styles for None native Qt widgets and elements ==========*/
+QLabel#ButtonBar {
+    background-color: lightgray;
+    padding-left: 5px;
+}
+.DynamicCloseButton {
+    background: transparent;
+    border: none;
+    border-radius: $BUTTON_RADIUS;
+    font-weight: bold;
+    padding: 2px 2px;
+}
+.DynamicCloseButton:hover {
+    background-color: $HOVER_COLOR;
+}
+QToolButton#FoldButton {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    font-weight: bold;
+    padding: 2px 4px;
+}
+QToolButton:hover {
+    background: #e0e0e0;
+}
+PieChartWidget {
+    qproperty-center_label_color: $TEXT_COLOR;
+} 

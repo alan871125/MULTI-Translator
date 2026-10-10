@@ -39,6 +39,7 @@ class LevelFilterButtons(QWidget):
     def __init__(self, filters:TableFilters, parent:Optional[QWidget]=None, button_size:int=24):
         super().__init__(parent)
         self.buttons = QButtonGroup(self)
+        self.buttons.setObjectName("LevelFilterButtonsGroup")
         self.buttons.setExclusive(False)
         self.filters = filters
         theme = ThemeManager.theme
@@ -55,17 +56,7 @@ class LevelFilterButtons(QWidget):
             self.buttons.addButton(button, level.value)
             
             button.setFixedSize(button_size, button_size)
-            button.setStyleSheet(f"""QPushButton{{
-                border-width: 1px;
-                border-radius: 6px;
-            }}
-            QPushButton:checked{{
-                background-color: {theme.SELECT_COLOR};
-            }}
-            QPushButton:hover{{
-                background-color: {theme.HOVER_COLOR};
-            }}
-            """)
+        
         self.buttons.buttonToggled.connect(self.on_button_toggled)
 
     def on_button_toggled(self, button:QPushButton, checked):

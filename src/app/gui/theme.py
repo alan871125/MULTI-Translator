@@ -1,12 +1,13 @@
+import re
 import logging
 import PySide6.QtWidgets as qt
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import cast
 from core.translation.level import TranslationLevel
 
 logger = logging.getLogger(__name__)
 BASE_THEME = Path(__file__).parent / "styles" / "base.qss"
+VAR_PATTERN = re.compile(r"\$([A-Z_]+)")
 
 @dataclass
 class Theme:
@@ -21,10 +22,10 @@ class Theme:
     SELECT_COLOR:str = "rgba(0, 100, 255, .2)" # Semi-transparent selection color
     SELECT_BORDER_COLOR:str = "rgba(85, 148, 230, 0.5)"
     SCROLLBAR_HANDLE_COLOR:str = "#b0b0b0"
-    BUTTON_RADIUS:str = "2px"
+    BUTTON_RADIUS:str = "4px"
     BUTTON_COLOR:str = "#FFFFFF"
-    FONT_FAMILY: str = "Microsoft YaHei, PingFang SC, Arial"
-    FONT_SIZE: str = "14px"
+    FONT_FAMILY: str = "Microsoft JhengHei, Microsoft YaHei, Arial, sans-serif"
+    FONT_SIZE: str = "11pt"
     LV_UNTRANSLATED:str = ""
     LV_PARTIAL: str ="#f39292"
     LV_HEURISTIC: str ="#f493da"
@@ -50,7 +51,7 @@ DARK = Theme(
     MAIN_CONTENT_COLOR = "#232323",
     ALT_CONTENT_COLOR = "#272727",
     BORDER_COLOR = "#333333",
-    TEXT_COLOR = "#ffffff",
+    TEXT_COLOR = "#F5F5F5",
     DISABLED_COLOR = "#777777",
     HOVER_COLOR = "#5c5c5c",
     HOVER_BORDER_COLOR = "rgba(85, 148, 230, 0.5)",
@@ -81,117 +82,19 @@ class ThemeManager:
         else:
             cls.theme = LIGHT
         cls.apply_theme()
+
     @classmethod
     def apply_theme(cls):
-        if (app := qt.QApplication.instance()) is None:
-            return
-        # Cast to QApplication so static type checkers know setStyleSheet exists
-        app_qt = cast(qt.QApplication, app)
-        app_qt.setStyleSheet(cls.generate_theme())
-    @classmethod  
-    def get_global_style_theme(cls) -> str:
-        return """* {{
-            background-color: {BACKGROUND_COLOR} ;
-            font-family: {FONT_FAMILY};
-            font-size: {FONT_SIZE};
-            color: {TEXT_COLOR} ;
-        }}
-        """
+        app = qt.QApplication.instance()
+        if isinstance(app, qt.QApplication):
+            app.setStyleSheet(cls.generate_theme())
+        else:
+            logger.error("No QApplication instance found. Cannot apply theme.")
+    
     @classmethod
     def generate_theme(cls) -> str:
         """Generate a dark theme stylesheet based on the defined colors and fonts."""
-        base_theme = BASE_THEME.read_text(encoding="utf-8") if BASE_THEME.exists() else ""
-        for key, value in cls.theme.asdict().items():
-            if isinstance(value, str):
-                base_theme = base_theme.replace(f"${key}", value)
-        theme = cls.get_global_style_theme()
-        theme+="""
-        QTableView::item:selected,
-        QTableWidget::item:selected {{
-            background-color: {SELECT_COLOR};
-            border: 1px solid {SELECT_BORDER_COLOR};
-            color: {TEXT_COLOR};
-        }}        
-        QTableCornerButton::section,
-        QHeaderView::section {{
-            background-color: {BACKGROUND_COLOR};
-            padding: 4px 6px;
-            border: 1px solid {BORDER_COLOR};
-        }}    
-        QLineEdit, QPlainTextEdit, QTextEdit,
-        QSpinBox, QComboBox {{
-            background-color: {MAIN_CONTENT_COLOR};
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 4px;
-            padding: 2px 6px;
-        }}
-        QSpinBox:hover, QComboBox:hover{{
-            background-color: {HOVER_COLOR};
-            border: 1px solid {HOVER_BORDER_COLOR};          
-        }}
-        QSpinBox::up-button, QSpinBox::down-button, QComboBox::drop-down {{
-            border: none;
-        }}
-        QSpinBox::down-arrow, QComboBox::down-arrow {{
-            image: url(:/assets/resources/icons/chevron-down.svg);
-            width: 12px;
-            height: 12px;
-        }}
-        QSpinBox::up-arrow, QComboBox::up-arrow {{
-            image: url(:/assets/resources/icons/chevron-up.svg);
-            width: 12px;
-            height: 12px;
-        }}
-        
-        QTabWidget::pane {{
-            background-color: {BACKGROUND_COLOR};
-            border-top: 1px solid {BORDER_COLOR};
-        }}        
-        QTabBar::tab {{
-            background: {BACKGROUND_COLOR};
-            border: 1px solid {BORDER_COLOR};
-            padding: {PADDING_Y} {PADDING_X};
-            margin-right: 1px;
-            border-bottom: none;
-            border-top-left-radius:  4px;
-            border-top-right-radius: 4px;
-        }}
-        QPushButton {{
-            border-radius: {BUTTON_RADIUS};
-            background-color: {BUTTON_COLOR};
-            border: 1px solid {BORDER_COLOR};
-            padding: {PADDING_Y} {PADDING_X};
-        }}
-        QMenu::item:selected,
-        QMenuBar::item:selected,
-        QPushButton:selected {{
-            background-color: {SELECT_COLOR};
-            border: 1px solid {SELECT_BORDER_COLOR};
-            border-radius: {BUTTON_RADIUS};
-        }}
-        CustomContextMenu::item:hover,
-        QTabBar::tab:hover,
-        QPushButton:hover {{
-            background-color: {HOVER_COLOR};
-            border: 1px solid {HOVER_BORDER_COLOR};
-            border-radius: {BUTTON_RADIUS};
-        }}
-        
-        QTabBar::tab:selected{{background-color: {MAIN_CONTENT_COLOR}; border-color: {BORDER_COLOR} {BORDER_COLOR} {MAIN_CONTENT_COLOR} {BORDER_COLOR};}}
-        QTabBar::close-button {{
-            image: url(:/assets/resources/icons/close.svg);
-        }}
-        QTabBar::close-button::hover {{
-            background-color: {HOVER_COLOR};
-            border: 1px solid {HOVER_BORDER_COLOR};
-            border-radius: {BUTTON_RADIUS};
-        }}
-        QMenu{{padding: 4px 0px;}}
-        QMenu::item{{padding: 4px 30px;}}
-        QMenu::item:disabled{{color: {DISABLED_COLOR};}}
-        QMenu::item:disabled:selected{{
-            background-color: transparent;
-            border: none;
-        }}
-        """
-        return base_theme+theme.format_map(cls.theme.asdict())
+        base_theme = BASE_THEME.read_text(encoding="utf-8")
+        theme_dict = cls.theme.asdict()
+        theme = VAR_PATTERN.sub(lambda m: theme_dict[m.group(1)], base_theme)
+        return theme

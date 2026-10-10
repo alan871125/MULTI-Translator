@@ -108,7 +108,7 @@ class TranslationApp(QMainWindow):
         self.main_layout.addStretch()  # Add stretch to push the bottom bar to the bottom
         self.bottom_bar = QLabel()
         self.bottom_bar.setFixedHeight(20)
-        self.bottom_bar.setStyleSheet("background-color: lightgray; padding-left: 5px;")
+        self.bottom_bar.setObjectName("ButtonBar")  # Set the object name for styling
         self.bottom_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.main_layout.addWidget(self.bottom_bar)
         

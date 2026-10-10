@@ -104,9 +104,10 @@ def main():
         settings=DEFAULT_SETTINGS_FILE, 
         workspace=parsed_args.workspace or DEFAULT_GLOBAL_WORKSPACE_FILE
     )
-    if (darkmode := int(settings.dark_mode)):
-        # let the dark mode setting take effect on Win11's TitleBar
-        sys_args += ['-platform', f'windows:darkmode={darkmode}'] 
+    if (settings.dark_mode):
+        sys_args += ['-platform', f'windows:darkmode=2']
+    else:
+        sys_args += ['-platform', 'windows:darkmode=1']
     app = QApplication(sys_args)
     main_window = TranslationApp(settings)
     session = TranslationSession(settings)

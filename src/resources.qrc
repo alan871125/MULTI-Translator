@@ -3,5 +3,6 @@
     <file>resources/icons/chevron-up.svg</file>
     <file>resources/icons/chevron-down.svg</file>
     <file>resources/icons/close.svg</file>
+    <file>resources/icons/close-unsaved.svg</file>
   </qresource>
 </RCC>

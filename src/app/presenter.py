@@ -304,7 +304,7 @@ class TranslationAppPresenter:
         tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
-                lambda: self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
+                lambda clean: self.translation_tab_widget.update_tab_save_status(file_path.as_posix(), clean=clean)
             )
             self.translation_tab_widget.update_tab_save_status(file_path.as_posix())
         
@@ -351,7 +351,7 @@ class TranslationAppPresenter:
         tab.setModel(proxy_model)
         if model.undo_stack is not None:
             model.undo_stack.cleanChanged.connect(
-                lambda: self.translation_tab_widget.update_tab_save_status(dir_path.as_posix())
+                lambda clean: self.translation_tab_widget.update_tab_save_status(dir_path.as_posix(), clean)
             )
             self.translation_tab_widget.update_tab_save_status(dir_path.as_posix())
     

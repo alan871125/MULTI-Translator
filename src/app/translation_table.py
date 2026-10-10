@@ -1,14 +1,14 @@
 import logging
-import pandas as pd
 from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, Generic, TypeVar, override
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QAbstractItemModel, QAbstractProxyModel
-from PySide6.QtGui import QDropEvent, QKeySequence, QKeyEvent, QShortcut
+from PySide6.QtGui import QDropEvent, QKeySequence, QKeyEvent, QShortcut, QIcon
 from PySide6.QtWidgets import (
-    QTabWidget, QTableView, QAbstractItemView, 
-    QMenu, QApplication, QWidget
+    QWidget, QTabWidget, QTableView, QAbstractItemView, 
+    QMenu, QApplication, 
+    QToolButton, QTabBar
 )
 from qt_extensions.core import TypedSignal
 from iod import IndexedOrderedDict
@@ -169,7 +169,19 @@ class TranslationTableView(QTableView):
     def on_level_hotkey_triggered(self, level: TranslationLevel):
         if (idxs := self.selected_source_indexes):
             self.edit_translation_requested.emit(TranslationRequest(EditType.LEVEL, idxs, val=level))
-    
+
+class DynamicCloseButton(QToolButton):
+    """A QToolButton that changes its icon based on the save status of the associated tab."""
+    ICON = QIcon(":/assets/resources/icons/close.svg")
+    ICON_ALT = QIcon(":/assets/resources/icons/close-unsaved.svg")
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAutoRaise(True) # Makes it look like a flat button without borders
+        self.switch_icon(True)  # Default to saved state
+        
+    def switch_icon(self, alt: bool):
+        self.setIcon(self.ICON if alt else self.ICON_ALT)
+        
 class TranslationTabWidget(QTabWidget):
     """A QTabWidget that manages multiple TranslationTableViews, each associated with a translation file.  
     
@@ -226,13 +238,14 @@ class TranslationTabWidget(QTabWidget):
         if isinstance(model, TranslationTableModel):
             return model
         return None
-    
+        
     def add_translation_tab(self, file_path: str) -> TranslationTableView:
         if file_path in self.tabs:
             return self.tabs[file_path]
         new_tab = TranslationTableView(self)
         self.tabs[file_path] = new_tab
-        self.addTab(new_tab, Path(file_path).name)
+        index = self.addTab(new_tab, Path(file_path).name)
+        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, DynamicCloseButton(self))
         self.tab_exist_signal.emit(True)
         self.setCurrentWidget(new_tab)
         return new_tab
@@ -254,25 +267,22 @@ class TranslationTabWidget(QTabWidget):
             return None
         return self.tabs.keys()[index]
     
-    def update_tab_save_status(self, file_path: str):
-        """Updates the tab title and close button to indicate whether there are unsaved changes."""
-        logger.debug("Updating tab save status for %s", file_path)
+    def update_tab_save_status(self, file_path: str, clean: Optional[bool] = None):
         if file_path not in self.tabs:
             return
         index = self.indexOf(self.tabs[file_path])
         if index == -1:
             return
-        
-        model = self.tabs[file_path].model()
-        if not isinstance(model, TranslationTableModel) or model.undo_stack is None:
-            return
-        unsaved = not model.undo_stack.isClean()
-        
-        # Update tab text (asterisk)
         current_title = self.tabText(index)
-        if unsaved:
+        close_button = self.tabBar().tabButton(index, QTabBar.ButtonPosition.RightSide)
+        
+        if clean is False:
             if not current_title.endswith("*"):
                 self.setTabText(index, current_title + "*")
+            if close_button and isinstance(close_button, DynamicCloseButton):
+                close_button.switch_icon(False)
         else:
             if current_title.endswith("*"):
                 self.setTabText(index, current_title[:-1])
+            if close_button and isinstance(close_button, DynamicCloseButton):
+                close_button.switch_icon(True)
