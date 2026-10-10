@@ -331,9 +331,9 @@ class TranslationTableModel(QAbstractTableModel):
 
         self.emit_df_row_changed(updated_keys)
 
-    def chinese_convertion(self, target: Literal['s','t']):
+    def chinese_convertion(self, target: Literal['s','t'], max_level: TranslationLevel = TranslationLevel.LOCKED):
         """Convert all Chinese translations between Simplified and Traditional using OpenCC."""
-        mask = self.filter_mask
+        mask = self.filter_mask & (self.df["level"] <= max_level)
         if (idxs:= self.df.index[mask]).empty:
             return
         self.df.loc[mask, "translation"] = batch_chinese_convertion(self.df.loc[mask, "translation"], target)
@@ -365,9 +365,6 @@ class TranslationTableModel(QAbstractTableModel):
             ))
         else:
             self.set_translations(idxs_to_update, translations_to_update, levels_to_update)
-        
-    def chs2cht(self): return self.chinese_convertion(target='t')
-    def cht2chs(self): return self.chinese_convertion(target='s')
         
     def is_same_original_exists(self, idxs: IndexLikeSequence|int) -> bool:
         """Checks if there are any other text units with the same original text as the given indexes. 

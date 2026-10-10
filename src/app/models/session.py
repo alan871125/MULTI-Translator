@@ -222,22 +222,22 @@ class TranslationSession(QObject):
             description=f"Reset Translations for {len(idxs)} rows"
         ))
 
-    def cht2chs(self, file_path: str|Path):
+    def cht2chs(self, file_path: str|Path, max_level: TranslationLevel = TranslationLevel.LOCKED):
         # TODO: Add to history for undo/redo
         model = self.models.get(Path(file_path).absolute().as_posix())
         if model is None:
             logger.warning(f"Attempted to convert CHT to CHS for a file that is not open: {file_path}")
             return
-        model.cht2chs()
+        model.chinese_convertion(target='s', max_level=max_level)
         
-    def chs2cht(self, file_path: str|Path):
+    def chs2cht(self, file_path: str|Path, max_level: TranslationLevel = TranslationLevel.LOCKED):
         # TODO: Add to history for undo/redo
         model = self.models.get(Path(file_path).absolute().as_posix())
         if model is None:
             logger.warning(f"Attempted to convert CHS to CHT for a file that is not open: {file_path}")
             return
-        model.chs2cht()
-    
+        model.chinese_convertion(target='t', max_level=max_level)
+
     def apply_dictionary(self, dict_path: str|Path, target:str|Path, keys: Optional[list[str]] = None):
         """Apply translation from the specified dictionary to the target tab.
         
