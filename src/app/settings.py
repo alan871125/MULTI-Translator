@@ -22,7 +22,9 @@ DEFAULT_LOCAL_WORKSPACE_FILE= "./workspace.translation-workspace"
 DEFAULT_SETTINGS_FILE = "settings.json"
 DEFAULT_GAME_DATA_DIR = "%WORKSPACE_DIR%/data"
 DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
-
+DEFAULT_OUTPUT_DIR = "%WORKSPACE_DIR%/output"
+DEFAULT_DB_PATH = "%WORKSPACE_DIR%/user_dict.db"
+DEFAULT_PLUGIN = "RPG Maker MV"
 @dataclass
 class Confirmations:
     share_translation: bool = False
@@ -115,9 +117,9 @@ class WorkspaceData:
     workspace_dir: Optional[str] = None  # None means the global default workspace
     game_data_dir: str = DEFAULT_GAME_DATA_DIR
     user_dict_dir: str = DEFAULT_USER_DICT_DIR
-    output_dir: str = "./output"
-    engine: str = "RPG Maker MV"
-    db_path: str = "./user_dict.db"
+    output_dir: str = DEFAULT_OUTPUT_DIR
+    plugin: str = DEFAULT_PLUGIN
+    db_path: str = DEFAULT_DB_PATH
     last_open_tabs: list[str] = field(default_factory=list)
     
     def asdict(self) -> dict:
@@ -165,7 +167,7 @@ class WorkspaceData:
 StringSettings = Literal["SOURCE_LANG", "TARGET_LANG", "API", "DEEPL_API_KEY", "CUSTOM_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_MODEL", "language", "theme", "last_open_workspace"]
 BoolSettings = Literal["dark_mode", "restore_last_session"]
 IntSettings = Literal["max_workers"]
-StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_dir", "output_dir", "engine"]
+StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_dir", "output_dir", "plugin"]
 
 
 class Settings(QObject):

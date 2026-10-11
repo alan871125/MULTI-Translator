@@ -3,7 +3,7 @@ import pkgutil
 import importlib
 import logging
 from ._registry import extractors, engine_modules
-
+from ._base import BaseExtractor
 logger = logging.getLogger(__name__)
 
 # Two ways to register engines:
@@ -23,4 +23,4 @@ for finder, modname, ispkg in pkgutil.iter_modules(__path__):
     except Exception as e:
         logger.exception("Failed importing engine module %s with error: %s", modname, e)
 
-supported_engines = list(extractors.keys())
+plugin_list = list(extractors.keys())

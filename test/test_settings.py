@@ -1,5 +1,6 @@
 
 import pytest
+from pathlib import Path
 from app.settings import Settings, SettingsData, WorkspaceData
 def test_settings_initialization():
     # This should not raise RecursionError
@@ -14,9 +15,9 @@ def test_settings_attribute_access():
     assert settings.SOURCE_LANG == "auto"
     
     # Test access to WorkspaceData attributes via proxy
-    assert settings.engine == "RPG Maker MV"
-    assert settings.output_dir == "output" # this is the normalized value
-    assert settings.workspace_data.output_dir == "./output"
+    assert settings.plugin == "RPG Maker MV"
+    assert settings.workspace_data.output_dir == "%WORKSPACE_DIR%/output" # this is the raw value
+    assert settings.output_dir ==  Path('output').resolve().as_posix() # this is the normalized value
 
 def test_settings_attribute_setting():
     settings = Settings()
@@ -27,9 +28,9 @@ def test_settings_attribute_setting():
     assert settings.API == "DeepL"
     
     # Set WorkspaceData attribute
-    settings.engine = "Simple JSON"
-    assert settings.workspace_data.engine == "Simple JSON"
-    assert settings.engine == "Simple JSON"
+    settings.plugin = "Simple JSON"
+    assert settings.workspace_data.plugin == "Simple JSON"
+    assert settings.plugin == "Simple JSON"
 
 def test_settings_signals():
     settings = Settings()
@@ -42,8 +43,8 @@ def test_settings_signals():
     settings.API = "DeepL"
     assert "API" in emitted_settings
     
-    settings.engine = "Simple JSON"
-    assert "engine" in emitted_workspaces
+    settings.plugin = "Simple JSON"
+    assert "plugin" in emitted_workspaces
 
 def test_settings_invalid_attribute():
     settings = Settings()

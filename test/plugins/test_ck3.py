@@ -1,6 +1,6 @@
 from pathlib import Path
 from core.text_unit import TextUnit
-from core.engines.ck3 import Extractor
+from plugins import ck3
 
 import pandas as pd
 
@@ -11,14 +11,14 @@ class TestCK3Extractor:
     
     @classmethod
     def test_extract_mod(cls):
-        extractor = Extractor()
+        extractor = ck3.Extractor()
         cls.units = extractor.extract_dir(cls.folder_path)
         
     def test_apply_mod(self):
         # Modify translations for testing
         df = pd.DataFrame(self.units)
         df['translation'] = '(Translated) ' + df['original']
-        extractor = Extractor()
+        extractor = ck3.Extractor()
         extractor.apply_translations(
             self.folder_path, df, save_path=self.output_folder, target_lang="spanish")
 

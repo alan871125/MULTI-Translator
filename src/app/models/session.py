@@ -14,7 +14,7 @@ from qt_extensions.core import TypedSignal
 from app.settings import Settings
 from app.translation_table import logger
 from app.typing import IndexLikeSequence
-from core import engines
+import plugins
 from core.translation import TranslationLevel
 from core.translation.dictionary import TranslationDictionary
 from core.translation.dictionary_database import TranslationDictionaryDatabase
@@ -81,7 +81,7 @@ class TranslationSession(QObject):
     def open_file(self, file_path: str|Path) -> Optional[TranslationTableModel]:
         file_path = Path(file_path).absolute()
         try:
-            extractor = engines.extractors[self.settings.engine]()
+            extractor = plugins.extractors[self.settings.plugin]()
             key = file_path.as_posix()
             stack = self.history_stacks.setdefault(key, QUndoStack())  # Create an undo stack for this file if it doesn't exist
             model = TranslationTableModel(
@@ -103,7 +103,7 @@ class TranslationSession(QObject):
             
     def open_dir(self, dir_path: str|Path) -> Optional[TranslationTableModel]:
         dir_path = Path(dir_path).absolute()
-        extractor = engines.extractors[self.settings.engine]()
+        extractor = plugins.extractors[self.settings.plugin]()
         if not extractor.SUPPORTED_DIR_TYPE.check(dir_path):
             return None
         try:

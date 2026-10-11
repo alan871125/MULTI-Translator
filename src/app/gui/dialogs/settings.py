@@ -144,7 +144,7 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(ui_tab, L["settings.UI"])
 
     def init_workspace_settings_tab(self):
-        from core.engines import supported_engines
+        from plugins import plugin_list
         workspace_tab = QWidget()
         self.layouts["workspace"] = QFormLayout(workspace_tab)
         # use raw directories from workspace_dir directly, preventing translating replacers such as %CWD% and %WORKSPACE_DIR%
@@ -153,8 +153,8 @@ class SettingsDialog(QDialog):
         self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.workspace_data.user_dict_dir, browse_type="dir")
         self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.output_dir, browse_type="dir")
         self.widgets["workspace"]["engine"] = QComboBox()
-        self.widgets["workspace"]["engine"].addItems(supported_engines)
-        self.widgets["workspace"]["engine"].setCurrentText(self.settings.engine)
+        self.widgets["workspace"]["engine"].addItems(plugin_list)
+        self.widgets["workspace"]["engine"].setCurrentText(self.settings.plugin)
         self.tabs.addTab(workspace_tab, L["settings.workspace"])
 
     def save_settings(self):

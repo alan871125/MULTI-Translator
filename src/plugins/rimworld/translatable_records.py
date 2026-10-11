@@ -565,7 +565,7 @@ def get_translatable_fields(deftype:str) -> dict[str, int]:
     return records.get(deftype, {})|DEFAULT
 
 def find_translatable_fields_from_definjected(root_dir:Path, skip_common=True) -> dict[str, Counter]:
-    from core.engines.rimworld.extractor import load_xml_file
+    from plugins.rimworld.extractor import load_xml_file
     results = {}
     for xml_file in root_dir.rglob("*.xml"):
         def_type = xml_file.relative_to(root_dir).parent.name

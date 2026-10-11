@@ -9,7 +9,7 @@ from core.text_unit import TextUnit
 from pathlib import Path
 from core.json_path import JsonPath
 from lxml import etree as ET
-from core.engines.rimworld import translatable_records
+from . import translatable_records
 
 def node_walk(root: ET._Element, path_to_node: Optional[list[str]] = None):
     path_to_node = path_to_node or []

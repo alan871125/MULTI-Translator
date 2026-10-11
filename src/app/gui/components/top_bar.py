@@ -9,7 +9,7 @@ from PySide6.QtSvg import QSvgRenderer
 
 from qt_extensions.widgets import PieChartWidget
 
-from core.engines import supported_engines
+from plugins import plugin_list
 from core.translation import TranslationLevel
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
@@ -119,8 +119,8 @@ class TopBar(QWidget):
         self.workspace_button.clicked.connect(self.workspace_clicked.emit)
         
         self.engine_combo_box = QComboBox()
-        self.engine_combo_box.addItems(supported_engines)
-        self.engine_combo_box.setCurrentText(self.settings.engine)
+        self.engine_combo_box.addItems(plugin_list)
+        self.engine_combo_box.setCurrentText(self.settings.plugin)
         self.engine_combo_box.currentTextChanged.connect(
             lambda text: setattr(self.settings, 'engine', text)
         )
@@ -135,7 +135,7 @@ class TopBar(QWidget):
         """Refresh the UI state from settings."""
         current_workspace = Path(self.settings.workspace_dir or "Default").name
         self.workspace_button.setText(current_workspace)
-        self.engine_combo_box.setCurrentText(self.settings.engine)
+        self.engine_combo_box.setCurrentText(self.settings.plugin)
         
     def set_source_filters(self, filters:TableFilters):
         """Update the level filter buttons based on the provided TableFilters instance."""

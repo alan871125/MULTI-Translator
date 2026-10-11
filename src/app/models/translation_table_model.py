@@ -9,16 +9,15 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QColor, QUndoCommand, QUndoStack
 
-from qt_extensions.core import TypedSignal
-
 from app.models.filters import ColumnFilter, build_mask
 from app.settings import Settings
-from core.engines._base import BaseExtractor
-from core.text_unit import TextUnit
-from core.translation import TranslationDictionary, TranslationLevel, batch_chinese_convertion
 from app.gui.dialogs.search import TableFilters
 from app.gui.theme import ThemeManager
 from app.language import LanguagePack
+from plugins import BaseExtractor
+from core.text_unit import TextUnit
+from core.translation import TranslationLevel, batch_chinese_convertion
+from core.translation.dictionary import TranslationDictionary
 
 from app.typing import IndexLikeSequence
 

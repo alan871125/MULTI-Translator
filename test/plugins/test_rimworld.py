@@ -1,8 +1,8 @@
+import pandas as pd
 from pathlib import Path
 from core.text_unit import TextUnit
-from core.engines.rimworld.extractor import RimWorldExtractor, parse_xml_to_dict
+from plugins.rimworld.extractor import RimWorldExtractor, parse_xml_to_dict
 
-import pandas as pd
 
 class TestRimWorldExtractor:
     folder_path = Path("test/.data/rimworld/Languages/English")

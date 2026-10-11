@@ -10,15 +10,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QMessageBox,
     QDialog
 )
+from qt_extensions.core import TypedSignal
+
 from app.gui.dialogs.settings import SettingsDialog
 from app.gui.dialogs.translation import TranslationDialog
 from app.gui.theme import ThemeManager
 from app.translation_table import TranslationTabWidget
 from app.language import LanguagePack
 from app.settings import Settings
-
-import core.engines as engines
-from qt_extensions.core import TypedSignal
+import plugins
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
@@ -148,7 +148,7 @@ class TranslationApp(QMainWindow):
         self.menus["file.save_game_file_as"].setEnabled(exist)
         
     def update_file_menu(self, _:Optional[str] = None):
-        extractor = engines.extractors[self.settings.engine]
+        extractor = plugins.extractors[self.settings.plugin]
         if "file.open_directory" in self.menus:
             self.menus["file.open_directory"].setEnabled(bool(extractor.SUPPORTED_DIR_TYPE))
         else:
@@ -207,7 +207,7 @@ class TranslationApp(QMainWindow):
             self.settings.update_workspace(workspace_dir) # Load the selected workspace using the settings manager, which will also update recent files and refresh the top bar through signals
     
     def get_file_filters(self) -> str:
-        extractor = engines.extractors[self.settings.engine]()
+        extractor = plugins.extractors[self.settings.plugin]()
         supported_types = extractor.SUPPORTED_FILES_TYPES
         file_filters = ";;".join(f"{ft.upper()} Files (*{ft})" for ft in supported_types)+f";;All Files (*.*)"
         return file_filters
