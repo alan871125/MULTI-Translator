@@ -6,4 +6,4 @@ class TranslationLevel(IntEnum):
     DICTIONARY = auto()
     API = auto()
     VERIFIED = auto()
-    LOCKED = -1
+    LOCKED = 99
