@@ -64,7 +64,7 @@ class TranslationAppPresenter:
        
         self.main_window.bind_undo_redo_actions(history)
         self.main_window.update_bottom_bar(file_path)  # Update the bottom bar with the current file path
-        if (model:=self.session.models.iget(index)) is None:
+        if (model:=self.session.models.get(file_path)) is None:
             logger.warning(f"No model found for the current tab index: {index}.")
             return
         elif model.file_path!=Path(file_path):

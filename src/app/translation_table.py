@@ -196,17 +196,25 @@ class TranslationTabWidget(QTabWidget):
         self.tabs: IndexedOrderedDict[str, TranslationTableView] = IndexedOrderedDict()  # file_name -> TranslationTableView
         self.dictionaries: IndexedOrderedDict[str, TranslationDictionary] = IndexedOrderedDict()  # file_name -> TranslationDictionary
         self.setAcceptDrops(True)
+        self.setMovable(True)
     # ---------- Overrides ----------
     @override
     def removeTab(self, index: int):
-        if index < 0 or index >= self.count():
-            return
-        key = self.tabs.keys()[index]
-        self.tabs.pop(key)  # Remove from the tabs dict based on index
         super().removeTab(index)
-        logger.debug("Tab removed: %s, %d remaining", key, len(self.tabs))
+        logger.debug("Tab removed at index %d. Remaining tabs: %s", index, list(self.tabs.keys()))
         if not self.tabs:            
             self.tab_exist_signal.emit(False)
+            
+    def _remove_tab_by_key(self, key: str):
+        """Removes a tab by its associated file name (key)."""
+        if key not in self.tabs:
+            return
+        index = self.indexOf(self.tabs[key])
+        self.tabs.pop(key)  # Remove from the tabs dict
+        super().removeTab(index)
+        if not self.tabs:            
+            self.tab_exist_signal.emit(False)
+        
     @override
     def currentWidget(self) -> TranslationTableView:
         widget = super().currentWidget()
@@ -246,7 +254,10 @@ class TranslationTabWidget(QTabWidget):
         new_tab = TranslationTableView(self)
         self.tabs[file_path] = new_tab
         index = self.addTab(new_tab, Path(file_path).name)
-        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, DynamicCloseButton(self))
+        key = Path(file_path).absolute().as_posix()
+        close_button = DynamicCloseButton(self)
+        close_button.clicked.connect(lambda: self._remove_tab_by_key(key))
+        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, close_button)
         self.tab_exist_signal.emit(True)
         self.setCurrentWidget(new_tab)
         return new_tab
