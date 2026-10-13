@@ -1,6 +1,5 @@
-# TODO List
-This is a list of To-Dos, where the ones on the top are with higher priority.
-Some of the functionalities may be higly related, the order is therefore not necessarily fixed.
+# Features and To-Dos
+This is a list of currenlty implemented and planned featuers.
 
 ## Search and replace functionality, supporting:
 1. [X] Regex patterns
@@ -13,12 +12,15 @@ Some of the functionalities may be higly related, the order is therefore not nec
 2. [X] Default Themes:
    1. [X] DarkMode
    2. [X] LightMode
+
 ### Functionalities
-3. [ ] Translation Progress Bar
-4. [ ] API Progress Bar (Hinting that API is processing)
-5. [ ] (Low priority) Add translation Author tracing (Manual/Google/DeepL/LLM)
+1. [X] Translation Progress Bar
+   - [X] Style 1: Circular Progress Bar
+   - [ ] Style 2: Linear Progress Bar 
+2. [ ] API Progress Bar (Hinting that API is processing)
+
 ### User Warnings
-1. [ ] Show Warning When Orignal Text is updated (Doesn't match dictionary)
+1. [X] Show Warning When Orignal Text is updated (Doesn't match dictionary)
 
 ## API Support
 1. [X] Google Translate
@@ -36,20 +38,9 @@ Some of the functionalities may be higly related, the order is therefore not nec
 - [X] Workspace-specific configurations/dictionary
 
 ## Batch Processing
-1. [ ] Batch search and replace with a given json File, or csv (cleaner for more different patterns).
-   - Support regex search and replacements
-   - Some Random Example of a pattern
-        - **Note*: mode
-        ```{json}
-            {
-                "PATTERN": "([^\s])BUFF",
-                "REPLACE": "\[$1\] BUFF",
-                "REGEX": 1,
-                "CASE_SENSITIVE":1
-                "WHOLE_MATCH":1
-            }
-        ```
-   - Use different Signs to represent different Translation Methods. Example:
+1. [X] Batch search and replace with a given json/yaml file
+   - [X] Support regex search and replacements
+   - [ ] Add Translation Placeholders with different signs to translated specific parts of the text:
        - $: No Translation (Same as Regex)
        - #: Translator
        - %: Dictionary
@@ -58,17 +49,15 @@ Some of the functionalities may be higly related, the order is therefore not nec
 3. [ ] Batch-batch processing: Batch process batch processing functionalities on multiple files once
 
 ## Translation Level and Highlighting
-- [ ] Multi level translation for quality and progress tracking (Inspired by xTranslate). 
+- [X] Multi level translation for quality and progress tracking (Inspired by xTranslate). 
   1. [X] Untranslated
-  2. [X] API Translation
-  3. [ ] Partially Translated (currently: Manully Marked only)
-  4. [X] Verified Translation (currently: whenever Edit is Done)
-  5. [ ] Translated (From (other) Dictionary)
-  6. [ ] Batch Processed
-  7. [ ] Heuristic Translation
-     (A functionality in xTranslator Not Sure what it actually is)
-     - Suppose using word2vec or fuzzy matching to find similar text
-- [x] Add background color for each level.
+  2. [X] Heuristic Translation
+     - Currently implemented by fuzzing matching the dictionary database.
+  3. [X] Partially Translated (currently: Manully Marked only)
+  4. [X] API Translation
+  5. [X] Dictionary (imported From (other) Dictionary)
+  6. [X] Verified Translation (currently: whenever Edit is Done)
+- [X] Add background color (text color in dark mode) for each level.
 
 ## History Tracing
 1. [X] Keep a queue of Actions to Redo/Undo when regret.
@@ -78,6 +67,7 @@ Some of the functionalities may be higly related, the order is therefore not nec
    - [X] load
 
 ## Hot Key Supports
+-  [ ] User Customable Hot Key Settings
 1. [X] CTRL+S: Save Dictionary
 2. [X] CTRL+C: Copy Translation/Original
 3. [X] CTRL+V: Paste Translation
@@ -85,13 +75,13 @@ Some of the functionalities may be higly related, the order is therefore not nec
 5. [X] CTRL+Y: Redo Action
 6. [ ] CTRL+T: API Translation (Popup for Confirmation before action, with a check box to allow user to skip the confirmation. Add in settings incase users regret.)
 7. [X] CTRL+F: Popup Search Window
-8. [X] F1~F?: Mark translation Level (similar to xTranslate)
+8. [X] CTRL+J: Trigger Bottom Panel
+9. [X] CTRL+`: Trigger Console Window
+10. [X] F1~F?: Mark translation Level (similar to xTranslate)
+11. [X] CTRL+F1~F?: Toggle level filter
+12. [X] CTRL+SHIFT+F1~F?: Toggle level filter (exclusive, only show the selected level)
 
 ## Supported Engines:
-- [X] RPG Maker MV
-  - [X] Extract and Apply
+- [X] RPG Maker MV/MZ
 - [X] Rimworld
-  - [X] Extract and Apply
-  - [ ] Supported Language check
-### Planning:
-- [ ] Paradox Games: Crusader Kings 3
+- [X] Paradox Games: Crusader Kings 3
