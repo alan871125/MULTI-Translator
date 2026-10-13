@@ -4,6 +4,7 @@ from typing import Optional, Literal, Union, Callable
 from rapidfuzz import process, fuzz
 import pandas as pd
 from ..json_path import JsonPath
+from ..text_unit import TextUnit
 from .label import TranslationLabel
 import logging
 logger = logging.getLogger(__name__)
@@ -37,7 +38,16 @@ class TranslationDictionary:
             self.df.rename(columns={"translation": f"{target_lang}", "level": f"{target_lang}.level"}, inplace=True)
         self.source_lang = source_lang
         self.target_lang = target_lang
-
+        
+    @classmethod
+    def from_text_units(cls, text_units: list[TextUnit], source_lang: Optional[str] = None, target_lang: Optional[str] = None):
+        """Creates a TranslationDictionary from a list of TextUnit objects."""
+        df:pd.DataFrame = pd.DataFrame(
+            text_units or [], columns=cls.REQUIRED_COLUMNS
+        ).set_index('key', drop=False)
+        df.rename(columns={"translation": f"{target_lang}", "level": f"{target_lang}.level"}, inplace=True)
+        return cls(df=df, source_lang=source_lang, target_lang=target_lang)
+    
     @property
     def languages(self)->list[str]:
         """Returns a list of languages in the dictionary, excluding 'original'."""
