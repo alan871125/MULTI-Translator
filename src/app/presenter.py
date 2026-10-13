@@ -143,7 +143,25 @@ class TranslationAppPresenter:
                 translations = self.main_window.open_edit_translation_dialog(original_text, current_text)
                 if translations is None:
                     return
-                level = TranslationLevel.VERIFIED
+                levels = TranslationLevel.VERIFIED
+            case EditType.HEURISTIC:
+                idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index
+                current_text = model.df.loc[idxs, 'translation']
+                _idxs, translations,  levels = [], [], []
+                for i, text in zip(idxs, current_text):
+                    matches = self.session.db.get_fuzzy_matches(text, self.settings.TARGET_LANG, th=80, limit=1)
+                    if matches:
+                        match matches[0]:
+                            case (org, tran, 100, _):
+                                lv = TranslationLevel.DICTIONARY
+                            case (org, tran, _, _):
+                                lv = TranslationLevel.HEURISTIC
+                            case _:
+                                logger.warning(f"Unexpected match format: {matches[0]}")
+                                continue
+                        _idxs.append(i)
+                        translations.append(tran)
+                        levels.append(lv)
                 
             case EditType.API:
                 # Drop text with duplicated original values to avoid sending the same text wasting API calls/tokens and overwriting
@@ -156,7 +174,7 @@ class TranslationAppPresenter:
                     if trans is not None
                 ]))
                 
-                level=TranslationLevel.API
+                levels=TranslationLevel.API
                 failed_count = len(_idxs) - len(idxs)
                 if failed_count > 0:
                     logger.warning(f"API translation failed for {failed_count} out of {len(_idxs)} selected rows.")
@@ -171,17 +189,17 @@ class TranslationAppPresenter:
                     (i, trans) for i, trans in zip(idxs, translations) 
                     if trans is not None
                 ]))
-                level=TranslationLevel.API
+                levels=TranslationLevel.API
             case EditType.RESET:
                 translations = model.df.loc[idxs,'original'].astype(str)
-                level = TranslationLevel.UNTRANSLATED
+                levels = TranslationLevel.UNTRANSLATED
             case EditType.PASTE:
                 clipboard_text = QApplication.clipboard().text()
                 if not clipboard_text:
                     logger.warning("Clipboard is empty. Nothing to paste.")
                     return
                 translations = list(islice(cycle(clipboard_text.split('\r\n')), len(idxs)))  # Repeat the clipboard text if there are more selected rows than lines in the clipboard
-                level = TranslationLevel.VERIFIED
+                levels = TranslationLevel.VERIFIED
             case EditType.LEVEL:
                 assert isinstance(request.val, TranslationLevel), f"Expected request.val to be a TranslationLevel for EditType.LEVEL, got {type(request.val)}"
                 self.session.set_level(file_path, idxs, request.val)
@@ -190,7 +208,7 @@ class TranslationAppPresenter:
                 raise ValueError(f"Unknown EditType: {EditType}")
         share = self.main_window.show_share_translation_confirmation()
         self.session.set_translations(
-            file_path, idxs, translations=translations, level=level, share=share
+            file_path, idxs, translations=translations, levels=levels, share=share
         )
     
     def handle_copy_cells_request(self, file_path: str|Path, idxs: IndexLikeSequence, col_idx: int):

@@ -24,6 +24,7 @@ class EditType(Enum):
     API = "api"
     API_BATCH = "api_batch"
     MANUAL = "manual"
+    HEURISTIC = "heuristic"
     RESET = "reset"
     SHARE = "share"
     PASTE = "paste"
@@ -146,6 +147,7 @@ class TranslationTableView(QTableView):
         api_action =   menu.addAction(L['right_click.translate_with_api'])
         edit_action =  menu.addAction(L['right_click.edit_translation'])
         reset_action = menu.addAction(L['right_click.reset_translation'])
+        heuristic_action =  menu.addAction(L['right_click.heuristic_translation'])
         copy_action =  menu.addAction(L['right_click.copy_original'])
         translate_as_batch_action = menu.addAction(L['right_click.translate_as_batch'])
 
@@ -161,6 +163,8 @@ class TranslationTableView(QTableView):
             self.edit_translation_requested.emit(TranslationRequest(EditType.MANUAL, idxs))
         elif action == reset_action:
             self.edit_translation_requested.emit(TranslationRequest(EditType.RESET, idxs))
+        elif action == heuristic_action:
+            self.edit_translation_requested.emit(TranslationRequest(EditType.HEURISTIC, idxs))
         elif action == copy_action:
             original = model.data(model.index(idx.row(), model._COLUMNS.index("original")), Qt.ItemDataRole.DisplayRole)
             QApplication.clipboard().setText(str(original))

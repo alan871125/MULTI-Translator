@@ -160,7 +160,7 @@ class TranslationSession(QObject):
             description=f"Set Level: {level.name} for {len(idxs)} rows"
         ))
         
-    def set_translations(self, file_path: str|Path, idxs: IndexLikeSequence, translations: Iterable[str]|str, level: TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
+    def set_translations(self, file_path: str|Path, idxs: IndexLikeSequence, translations: Iterable[str]|str, levels: Iterable[TranslationLevel]|TranslationLevel = TranslationLevel.VERIFIED, share:bool = False):
         """Set the translation for the currently selected rows. This can be used in conjunction with batch operations to set the translation of multiple rows at once."""
         file_path = Path(file_path).absolute().as_posix()
         if (model := self.models.get(file_path)) is None:
@@ -173,7 +173,7 @@ class TranslationSession(QObject):
             model=model,
             idxs=idxs,
             translations=translations,
-            levels=level,
+            levels=levels,
             description=f"Set Translation for {len(idxs)} rows"
         ))
         if share:
