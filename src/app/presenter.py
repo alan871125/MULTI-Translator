@@ -27,6 +27,7 @@ class TranslationAppPresenter:
         self.bottom_panel = main_window.bottom_panel
         self._current_model: Optional[TranslationTableModel] = None  # Keep track of the current model for the active tab
         self.connect_signals()
+        self.register_console_commands()
         if self.settings.restore_last_session:
             self.restore_session()  # Restore session before connecting signals to ensure the UI
             
@@ -46,7 +47,14 @@ class TranslationAppPresenter:
         self.translation_tab_widget.currentChanged.connect(self.on_tab_selection_changed)
         self.bottom_panel.dict_tab.model.check_state_changed.connect(self.on_dictionary_check_state_changed)
     
-        
+    def register_console_commands(self):
+        commands = {
+            "db_search": lambda text:self.session.db.search_translations(text, self.settings.TARGET_LANG),
+            "db_fuzzy":  lambda text:self.session.db.get_fuzzy_matches(text, self.settings.TARGET_LANG),
+        }
+        for func_name, func in commands.items():
+            self.main_window.console.register(func, func_name)
+            
     def restore_session(self, workspace:Optional[Path|str]=None):
         if workspace is not None and Path(workspace).exists():
             self.settings.update_workspace(workspace)
