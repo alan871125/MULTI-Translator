@@ -1,8 +1,10 @@
+import logging
 from pathlib import Path
 from itertools import cycle, islice
 from typing import Optional
-import logging
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
+
 from app.gui.main_window import TranslationApp
 from core.translation import Translator
 from .models.session import TranslationSession
@@ -22,6 +24,7 @@ class TranslationAppPresenter:
         self.translation_tab_widget: TranslationTabWidget = translation_tab_widget
         self.translator = Translator(settings)
         self.main_window:TranslationApp = main_window
+        self.bottom_panel = main_window.bottom_panel
         self._current_model: Optional[TranslationTableModel] = None  # Keep track of the current model for the active tab
         self.connect_signals()
         if self.settings.restore_last_session:
@@ -29,6 +32,7 @@ class TranslationAppPresenter:
             
     def connect_signals(self):
         """Connects signals from the view to the appropriate handler methods in the presenter."""
+        # (use handle_xxx_request for requests, and on_xxx for events or value changes)
         self.main_window.load_file_requested.connect(self.handle_open_file_request)
         self.main_window.load_dir_requested.connect(self.handle_open_dir_request)
         self.main_window.import_from_file_requested.connect(self.handle_import_from_file_request)
@@ -38,8 +42,10 @@ class TranslationAppPresenter:
         self.main_window.edit_current_file_requested.connect(self.handle_edit_current_file_request)
         self.main_window.batch_operation_requested.connect(self.handle_batch_operations_request)
         self.translation_tab_widget.tabCloseRequested.connect(self.handle_close_file_request)
-        self.translation_tab_widget.currentChanged.connect(self.handle_tab_changed)
         self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
+        self.translation_tab_widget.currentChanged.connect(self.on_tab_selection_changed)
+        self.bottom_panel.dict_tab.model.check_state_changed.connect(self.on_dictionary_check_state_changed)
+    
         
     def restore_session(self, workspace:Optional[Path|str]=None):
         if workspace is not None and Path(workspace).exists():
@@ -54,7 +60,7 @@ class TranslationAppPresenter:
             else:
                 logger.warning(f"Previously open file {file_path} not found. Skipping.")
     
-    def handle_tab_changed(self, index: int):
+    def on_tab_selection_changed(self, index: int):
         logger.debug("tab changed signal received for tab index: %d", index)
         if index == -1:  # No tabs are open
             self.main_window.bind_undo_redo_actions(None)
@@ -117,7 +123,6 @@ class TranslationAppPresenter:
                 if model is None:
                     logger.warning(f"Attempted to share top level translations for a file that is not open: {file_path}")
                     return
-                # TODO: move to edit_file_request
                 model.share_top_lv_translations()
                 return
             case _:
@@ -368,3 +373,15 @@ class TranslationAppPresenter:
         file_path = Path(current_file_path).absolute()
         logger.info(f"Importing translations from {dict_path} into {file_path} using keys: {keys}")
         self.session.apply_dictionary(dict_path, file_path, keys)
+    
+    def on_dictionary_check_state_changed(self, file_path: str|Path, state: Qt.CheckState):
+        file_path = Path(file_path).absolute()
+        if not file_path.suffix == '.csv':
+            return
+        elif state == Qt.CheckState.Checked:
+            self.session.db.load_csv(file_path)
+        elif state == Qt.CheckState.Unchecked:
+            self.session.db.unload_csv(file_path)
+        else:
+            logger.warning(f"Received an unexpected check state {state} for file {file_path}. No action taken.")
+        
