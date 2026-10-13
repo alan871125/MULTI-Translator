@@ -1,23 +1,26 @@
 import io
 import re
+import pytest
 import pandas as pd
 from pathlib import Path
+import sqlite3
+from core.translation.dictionary_database import TranslationDictionaryDatabase
 from core.json_path import JsonPath
 from core.translation.dictionary import TranslationDictionary, TranslationDictionaryLong, format2regex
 
 csv_data_wide = """
 file,original,en,en.level,zh-tw,zh-tw.level,key
-Actors,Victor,Victor,1,維克多,3,"[1,""name""]"
-Actors,Vic, Vic,1,維克,2,"[1,""nickname""]"
-Actors,Anna,1,安娜,3,"[2,""name""]"
-Actors,John,1,約翰,3,"[3,""name""]"
+Actors,Victor,Victor,1,維克多,3,$[1].name
+Actors,Vic, Vic,1,維克,2,$[1].nickname
+Actors,Anna,Anna,1,安娜,3,$[2].name
+Actors,John,John,1,約翰,3,$[3].name
 """
 csv_data_long = """
 file,original,translation,level,key
-Actors,Victor,維克多,1,"[1,""name""]"
-Actors,Vic, 維克,1,"[1,""nickname""]"
-Actors,Anna,安娜,1,"[2,""name""]"
-Actors,John,約翰,1,"[3,""name""]"
+Actors,Victor,維克多,1,$[1].name
+Actors,Vic, 維克,1,$[1].nickname
+Actors,Anna,安娜,1,$[2].name
+Actors,John,約翰,1,$[3].name
 """
 class TestTranslationDictionary:
     def test_translation_dictionary_init(self):
@@ -86,7 +89,96 @@ class TestSaveLoadDictionaryLong():
         dictionary = TranslationDictionaryLong(source_lang="en", target_lang="zh-tw", file_name_format=custom_format)
         base_path = Path("data/Actors.json")
         assert dictionary.get_conventional_path(base_path) == Path("data/DICT_Actors_en_zh-tw.csv")
+
+
+class TestTranslationDictionaryDatabase:
+    def test_update_from_csv_existing_database_without_unique_index(self, tmp_path):
+
+        db_path = tmp_path / "test.db"
+        # Create an existing database table that lacked UNIQUE constraint on file
+        conn = sqlite3.connect(db_path)
+        conn.executescript("""
+            CREATE TABLE DictionaryFileState (
+                sha256 BLOB PRIMARY KEY,
+                file TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE Translations (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                key TEXT NOT NULL,
+                original TEXT NOT NULL,
+                UNIQUE (file, key)
+            );
+        """)
+        conn.commit()
+        conn.close()
+
+        csv_path = tmp_path / "Actors.csv"
+        csv_path.write_text(csv_data_wide.strip(), encoding="utf-8")
+
+        # Initializing TranslationDictionaryDatabase should automatically create the unique index and succeed
+        db = TranslationDictionaryDatabase(db_path)
+        res = db.load_csv(csv_path)
+        assert res is not None
+
+        # Updating again should recognize it is up to date without error
+        res_cached = db.load_csv(csv_path)
+        assert res_cached is None
+    
+    @pytest.fixture
+    def test_db_load_csv(self) -> TranslationDictionaryDatabase:
+        db_in_memory = ":memory:"
+        db = TranslationDictionaryDatabase(db_in_memory)
+        csv_path = Path("test/.data/dictionary/Actors.csv")
+        db.load_csv(csv_path)
+        return db
+    
+    def test_search_translation(self, test_db_load_csv):
+        db = test_db_load_csv
+        # Search for a translation that exists
+        results = db.search_translations("Victor", "zh-tw")
+        assert len(results) > 0, "Expected to find at least one translation for 'Victor'"
+        assert any(res[0] == "維克多" for res in results), "Expected to find translation '維克多' for 'Victor'"
+    
+    def test_get_translation(self, test_db_load_csv):
+        db = test_db_load_csv
+        # Search for a translation that exists
+        result = db.get_translation(key="$[1].name",lang="zh-tw")
+        assert result is not None, "Expected to find translation for 'Victor'"
+        assert result == ("維克多", 3), f"Expected translation and level ('維克多', 3), got {result}"
+    
+    def test_fuzzy_matching(self, test_db_load_csv):
+        db = test_db_load_csv
+        # Fuzzy search for a translation that exists
+        results = db.get_fuzzy_matches("Viktor", "zh-tw", th=80)
+        assert len(results) > 0, "Expected to find at least one fuzzy match for 'Viktor'"
+        print(f"Fuzzy matches for 'Viktor': {results}, type: {type(results)}")
+        print(f"Fuzzy matches for 'Viktor': {list[results]}")
+        assert any(res[0:2] == ("Victor","維克多") for res in results), "Expected to find fuzzy match translation '維克多' for 'Viktor'"
+    
+    def test_unload_csv(self, test_db_load_csv):
+        db = test_db_load_csv
+        csv_path = Path("test/.data/dictionary/Actors.csv")
+        # Unload the CSV and check that the file is removed from the database
+        db.unload_csv(csv_path)
+        db.cursor.execute("SELECT * FROM DictionaryFileState WHERE file = ?", (str(csv_path),))
+        result = db.cursor.fetchone()
+        assert result is None, "CSV file was not removed from the database"
         
+        db.cursor.execute("SELECT * FROM Translations WHERE file = ?", (str(csv_path),))
+        translations_result = db.cursor.fetchall()
+        assert translations_result == [], "Translations were not removed from the database"
+        
+        # The Translations and DictionaryFileState tables should be empty:
+        file_state_table = db.cursor.execute("SELECT * FROM DictionaryFileState").fetchall()
+        assert file_state_table == [], "DictionaryFileState table is not empty after unloading CSV"
+        translation_table = db.cursor.execute("SELECT * FROM Translations").fetchall()
+        assert translation_table == [], "Translations table is not empty after unloading CSV"
+        
+        # close the database connection
+        db.connection.close()
+
 
 if __name__ == "__main__":
     test_save_load = TestSaveLoadDictionaryLong()

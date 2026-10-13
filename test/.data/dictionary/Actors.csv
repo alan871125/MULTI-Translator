@@ -1,0 +1,7 @@
+file,original,en,en.level,zh-tw,zh-tw.level,key
+Actors,Victor,Victor,1,維克多,3,$[1].name
+Actors,Vic, Vic,1,維克,2,$[1].nickname
+Actors,Anna,Anna,1,安娜,3,$[2].name
+Actors,John,John,1,約翰,3,$[3].name
+Actors,Anna is a good person,Anna is a good person,1,安娜是個好人,3,$[2].description
+Actors,John is a nice guy,John is a nice guy,1,約翰是個好人,3,$[3].description
