@@ -6,9 +6,9 @@ from typing import Optional, override, Literal
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QCloseEvent, QAction, QShortcut, QUndoStack
 from PySide6.QtWidgets import (
-    QLabel,QCheckBox, QFileDialog, QMainWindow, QWidget, 
-    QVBoxLayout, QMessageBox,
-    QDialog
+    QLabel, QCheckBox, QFileDialog, QMainWindow, QWidget, 
+    QVBoxLayout, QSplitter, 
+    QMessageBox, QDialog, 
 )
 from qt_extensions.core import TypedSignal
 
@@ -23,8 +23,7 @@ from ..translation_table import EditType
 from .menu_utils import initialize_menu
 from .dialogs.search import SearchDialog
 from .dialogs.dictionary_import import ImportDictionaryDialog
-from .components import TopBar, BottomPanel, RecentFilesMenu
-
+from .components import TopBar, BottomPanel, RecentFilesMenu, ConsoleWidget
 logger = logging.getLogger(__name__)
 L = LanguagePack()
 
@@ -99,19 +98,50 @@ class TranslationApp(QMainWindow):
         self.init_menu_bar()
         
         # 4. Bottom Panel
-        # self.bottom_panel = BottomPanel(L, self)
+        self.bottom_panel = BottomPanel(L, self.settings, self)
         
-        self.main_layout.addWidget(self.top_bar)
-        self.main_layout.addWidget(self.translation_table, 1)
-        # self.main_layout.addWidget(self.bottom_panel)
         # 5. Bottom Bar (show the current file full path)
-        self.main_layout.addStretch()  # Add stretch to push the bottom bar to the bottom
         self.bottom_bar = QLabel()
         self.bottom_bar.setFixedHeight(20)
         self.bottom_bar.setObjectName("ButtonBar")  # Set the object name for styling
         self.bottom_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        
+        # --- Add Widgets to the main layout --- 
+        # 1. Top Bar                                      # 1. Top Bar
+        self.main_layout.addWidget(self.top_bar)          
+        # 2. Main Content Area (Splitter)                 # 2. Main Content Area (Splitter)
+        splitter = QSplitter(Qt.Orientation.Vertical)     
+        splitter.addWidget(self.translation_table)        ## 2.1 Translation Table
+        splitter.addWidget(self.bottom_panel)             ## 2.2 Bottom Panel
+        self.main_layout.addWidget(splitter, 1)
+        # 3. Bottom Bar                                   # 3. Bottom Bar
+        self.main_layout.addStretch()  # Add stretch to push the bottom bar to the bottom
         self.main_layout.addWidget(self.bottom_bar)
         
+        # Register shortcuts to show/hide the bottom panel (ctrl+`)
+        self.toggle_console_shortcut = QShortcut(QKeySequence("Ctrl+`"), self)
+        self.toggle_console_shortcut.activated.connect(self.toggle_console)
+    
+        self.toggle_bottom_panel_shortcut = QShortcut(QKeySequence("Ctrl+j"), self)
+        self.toggle_bottom_panel_shortcut.activated.connect(self.toggle_bottom_panel)
+    
+    def toggle_bottom_panel(self):
+        """Toggle the visibility of the bottom panel."""
+        is_visible = not self.bottom_panel.isVisible()
+        self.bottom_panel.setVisible(is_visible)
+        return is_visible
+    
+    def toggle_console(self):
+        """Switch the focus to the console input or close the bottom panel"""
+        if self.focusWidget() == self.bottom_panel.console_widget.line_edit:
+            # If the console input is focused, toggle the bottom panel visibility
+            self.toggle_bottom_panel()
+        else:
+            # If the console input is not focused, show the bottom panel and focus the console input
+            self.bottom_panel.setVisible(True)
+            self.bottom_panel.setCurrentWidget(self.bottom_panel.console_tab)
+            self.bottom_panel.console_widget.line_edit.setFocus()
+
     def init_menu_bar(self):
         self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
         menu_def = {
@@ -140,7 +170,11 @@ class TranslationApp(QMainWindow):
         self.settings.workspace_changed.connect(self.update_file_menu)
         self.translation_table.tab_exist_signal.connect(self.on_tab_exist_changed)
         self.on_tab_exist_changed(False)  # Initially disable save actions since no tab is open
-        
+
+    @property
+    def console(self) -> ConsoleWidget:
+        return self.bottom_panel.console_widget
+    
     def on_tab_exist_changed(self, exist: bool):
         """Enable or disable the save translation action based on whether a tab with a loaded file exists."""
         self.menus["file.save_translation"].setEnabled(exist)
