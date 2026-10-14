@@ -44,6 +44,7 @@ class SettingsData:
     language: str = "en"
     dark_mode: bool = False
     theme: str = "default"
+    font_size: int = 11
     
     # Recent files and session
     restore_last_session: bool = True
@@ -166,7 +167,7 @@ class WorkspaceData:
     
 StringSettings = Literal["SOURCE_LANG", "TARGET_LANG", "API", "DEEPL_API_KEY", "CUSTOM_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_MODEL", "language", "theme", "last_open_workspace"]
 BoolSettings = Literal["dark_mode", "restore_last_session"]
-IntSettings = Literal["max_workers"]
+IntSettings = Literal["max_workers", "font_size"]
 StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_dir", "output_dir", "plugin"]
 
 

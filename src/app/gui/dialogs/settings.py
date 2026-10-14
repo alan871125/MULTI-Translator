@@ -138,7 +138,7 @@ class SettingsDialog(QDialog):
         self.widgets["UI"]["language"].setCurrentText(self.settings.language)
         self.widgets["UI"]["font_size"] = QSpinBox()
         self.widgets["UI"]["font_size"].setRange(8, 24)
-        self.widgets["UI"]["font_size"].setValue(14)
+        self.widgets["UI"]["font_size"].setValue(self.settings.font_size)
         self.widgets["UI"]["dark_mode"] = QCheckBox()
         self.widgets["UI"]["dark_mode"].setChecked(self.settings.dark_mode)
         self.tabs.addTab(ui_tab, L["settings.UI"])
@@ -165,7 +165,11 @@ class SettingsDialog(QDialog):
                     self.settings[k] = widget.currentData()  # Get the language code from the combo box
                 elif isinstance(widget, QComboBox):
                     self.settings[k] = widget.currentText()
-                elif isinstance(widget, QLineEdit):
+                elif isinstance(widget, (QLineEdit, PathSettingsLayout)):
                     self.settings[k] = widget.text().strip()
+                elif isinstance(widget, QSpinBox):
+                    self.settings[k] = widget.value()
                 elif isinstance(widget, QCheckBox):
                     self.settings[k] = widget.isChecked()
+                else:
+                    raise TypeError(f"Unsupported widget type for setting '{k}': {type(widget)}")

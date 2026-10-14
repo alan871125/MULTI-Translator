@@ -43,7 +43,7 @@ class TranslationApp(QMainWindow):
         self._current_undo_stack = None
         self.settings = settings
         L.set_language(self.settings.language)
-        ThemeManager().set_theme(dark = settings.dark_mode) # Apply theme based on settings at startup
+        ThemeManager().set_theme(dark = settings.dark_mode, FONT_SIZE = f"{settings.font_size}pt") # Apply theme based on settings at startup
         # 1. Inintialize UI
         self.setWindowTitle("RPG Translator")
         self.setGeometry(100, 100, 800, 600)
@@ -364,6 +364,6 @@ class TranslationApp(QMainWindow):
                 self.settings.save()
             except Exception:
                 logger.exception("Failed to save settings.json")
-            ThemeManager().set_theme(dark = self.settings.dark_mode)
+            ThemeManager().set_theme(dark = self.settings.dark_mode, FONT_SIZE = f"{self.settings.font_size}pt")  # Apply theme based on settings
         else:
             logger.debug("Settings dialog cancelled")
