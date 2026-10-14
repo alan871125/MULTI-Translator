@@ -31,11 +31,14 @@ class SupportedDirInvalidType(SupportedDirType):
         return False
 class SubDirCheckType(SupportedDirType):
     """A simple implementation of SupportedDirType that checks if a directory exists."""
-    MSG_FORMAT = "Directory {path} does not contain the required subdirectory '{subdir}'."
-    def __init__(self, *subdirs: str):
+    MSG_FORMAT = "Directory {path} does not contain the required subdirectory '{self}'."
+    def __init__(self, *subdirs: str, name: Optional[str] = None):
+        super().__init__(name)
         self.subdirs = subdirs
     def is_valid(self, path: Path|str) -> bool:
         return all((Path(path)/s).exists() for s in self.subdirs)
+    def __str__(self):
+        return f"{self.name}(requires subdirs: {', '.join(self.subdirs)})"
 
 class UnsupportedDirectoryError(Exception):
     """Raised when a directory is not of the expected type."""
