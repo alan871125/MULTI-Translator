@@ -36,6 +36,7 @@ class TranslationAppPresenter:
         # (use handle_xxx_request for requests, and on_xxx for events or value changes)
         self.main_window.load_file_requested.connect(self.handle_open_file_request)
         self.main_window.load_dir_requested.connect(self.handle_open_dir_request)
+        self.main_window.load_workspace_requested.connect(self.handle_open_workspace_request)
         self.main_window.import_from_file_requested.connect(self.handle_import_from_file_request)
         self.main_window.import_from_dict_requested.connect(self.handle_import_from_dict_request)
         self.main_window.save_translation_requested.connect(self.handle_save_translation_request)  # Assuming saving also closes the file, adjust if not
@@ -46,6 +47,7 @@ class TranslationAppPresenter:
         self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
         self.translation_tab_widget.currentChanged.connect(self.on_tab_selection_changed)
         self.bottom_panel.dict_tab.model.check_state_changed.connect(self.on_dictionary_check_state_changed)
+        self.session.file_opened.connect(lambda fp, model: self.settings.add_recent_file(fp))
     
     def register_console_commands(self):
         commands = {
@@ -58,6 +60,10 @@ class TranslationAppPresenter:
     def restore_session(self, workspace:Optional[Path|str]=None):
         if workspace is not None and Path(workspace).exists():
             self.settings.update_workspace(workspace)
+        # Close the tabs in current session before restoring the previous session to avoid conflicts
+        self.translation_tab_widget.clear()
+        # Change the bottom panel's directory to the current user dictionary directory
+        self.bottom_panel.dict_tab.model.setRootPath(self.settings.user_dict_dir)
         # Load the previously open tabs from settings and attempt to restore them
         for file_path in self.settings.last_open_tabs:
             if Path(file_path).exists():
@@ -304,17 +310,16 @@ class TranslationAppPresenter:
         """Handles a request to open a workspace file.
         
         Triggered by Open Workspace action in MenuBar
-        Or by drag-and-dropping a workspace file into the application window (unimplemented)
+        Or by drag-and-dropping a workspace file into the application window
         """
         workspace_path = Path(workspace_path).absolute()
-        assert workspace_path.exists() and workspace_path.suffix == WORKSPACE_FILE_EXTENSION, f"Provided path is not a valid workspace file: {workspace_path}"
         self.restore_session(workspace_path)
         
     def handle_open_file_request(self, file_path: str|Path):
         """Handles a request to open a file.
         
         Triggers by Open File action in MenuBar
-        Or by drag-and-dropping a file into the application window (unimplemented)
+        Or by drag-and-dropping a file into the application window
         """
         file_path = Path(file_path).absolute()
         if file_path.suffix == WORKSPACE_FILE_EXTENSION:

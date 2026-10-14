@@ -127,17 +127,24 @@ class WorkspaceData:
         return asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
     
     @classmethod
-    def load(cls, path: str|Path=DEFAULT_GLOBAL_WORKSPACE_FILE) -> 'WorkspaceData':
-        path = Path(path)
-        if path.is_dir(): # if dir given, use default workspace file name in that dir
-            if (path / DEFAULT_LOCAL_WORKSPACE_FILE).exists():
-                path = path / DEFAULT_LOCAL_WORKSPACE_FILE
+    def load(cls, dir_path: str|Path=DEFAULT_GLOBAL_WORKSPACE_FILE) -> 'WorkspaceData':
+        """ 
+        Load workspace settings from a workspace file or a folder containing a workspace file. 
+        
+        Arguments:
+            dir_path (str | Path): The path to the workspace file or directory. If a directory is provided, it will look for the default workspace file name in that directory.
+        """
+        
+        dir_path = Path(dir_path)
+        if dir_path.is_dir(): # if dir given, use default workspace file name in that dir
+            if (dir_path / DEFAULT_LOCAL_WORKSPACE_FILE).exists():
+                dir_path = dir_path / DEFAULT_LOCAL_WORKSPACE_FILE
             else: 
-                logging.info(f"No workspace settings file found in {path}. Initializing with default settings.")
-                return cls(workspace_dir=path.as_posix())
-        if path.suffix!=".translation-workspace":
-            logger.warning(f"Loading workspace settings from a file with unexpected extension: {path}. Expecting '.translation-workspace' but loading anyway.")
-        with open(path, 'r', encoding='utf-8') as f:
+                logging.info(f"No workspace settings file found in {dir_path}. Initializing with default settings.")
+                return cls(workspace_dir=dir_path.as_posix())
+        if dir_path.suffix!=".translation-workspace":
+            logger.warning(f"Loading workspace settings from a file with unexpected extension: {dir_path}. Expecting '.translation-workspace' but loading anyway.")
+        with open(dir_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return cls(**data)
         

@@ -34,6 +34,7 @@ class TranslationApp(QMainWindow):
     save_translation_requested = TypedSignal()
     load_dir_requested = TypedSignal(str)
     load_file_requested = TypedSignal(str)
+    load_workspace_requested = TypedSignal(str)
     import_from_file_requested = TypedSignal(str)
     import_from_dict_requested = TypedSignal(Path, list[str])
     batch_operation_requested = TypedSignal(Path)  # Signal to request batch operations with a list of operation dicts
@@ -238,8 +239,8 @@ class TranslationApp(QMainWindow):
     def open_load_workspace_dialog(self):
         workspace_dir = QFileDialog.getExistingDirectory(self, L["file_dialog.select_workspace_dir"])
         if workspace_dir:
-            self.settings.update_workspace(workspace_dir) # Load the selected workspace using the settings manager, which will also update recent files and refresh the top bar through signals
-    
+            self.load_workspace_requested.emit(workspace_dir)
+            
     def get_file_filters(self) -> str:
         extractor = plugins.extractors[self.settings.plugin]()
         supported_types = extractor.SUPPORTED_FILES_TYPES
