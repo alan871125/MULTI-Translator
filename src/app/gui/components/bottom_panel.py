@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QTabWidget, QTableView, QAbstractItemView
 
@@ -34,6 +35,7 @@ class BottomPanel(QTabWidget):
         
     def init_ui(self):
         # Dictionary Tab
+        Path(self.settings.user_dict_dir).mkdir(parents=True, exist_ok=True)  # Ensure the user dictionary directory exists
         self.dict_tab = CheckableFileExplorer(root_path=self.settings.user_dict_dir, name_filters=["*.csv"])
         self.addTab(self.dict_tab, self.L["bottom_tab.dictionary"])
 

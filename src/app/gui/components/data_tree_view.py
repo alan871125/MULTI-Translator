@@ -2,13 +2,14 @@ import sys
 import shutil
 from pathlib import Path
 from typing import Any, Sequence, override
+from venv import logger
 from PySide6.QtCore import Qt, QModelIndex, QPersistentModelIndex
 from PySide6.QtWidgets import QApplication, QTreeView, QFileSystemModel, QVBoxLayout, QWidget, QMenu, QInputDialog, QMessageBox
 from qt_extensions.core import TypedSignal
 
 class CheckableFileSystemModel(QFileSystemModel):
     check_state_changed = TypedSignal(str, Qt.CheckState)  # Signal to emit when a checkbox state changes
-    def __init__(self, parent=None):
+    def __init__(self, parent:QWidget|None=None):
         super().__init__(parent)
         # Dictionary to keep track of check states for paths: path -> Qt.CheckState
         self.check_states = {}
@@ -63,14 +64,20 @@ class CheckableFileSystemModel(QFileSystemModel):
 
 
 class CheckableFileExplorer(QWidget):
-    def __init__(self, root_path="", name_filters:Sequence[str]|None=None, parent=None):
-        super().__init__()
+    def __init__(self, root_path:str|None=None, name_filters:Sequence[str]|None=None, parent:QWidget|None=None):
+        super().__init__(parent)
         layout = QVBoxLayout(self)
         
         # 1. Setup Model
         self.model = CheckableFileSystemModel(self)
-        self.root_path = root_path if root_path else QFileSystemModel.myComputer(self.model)
-        self.model.setRootPath(self.root_path)
+        if not root_path:
+            root_path = str(Path.cwd())
+        elif not Path(root_path).exists():
+            logger.warning(f"Root path '{root_path}' does not exist. Falling back to cwd.")
+            root_path = str(Path.cwd())
+            
+        self.model.setRootPath(root_path)
+        
         if name_filters:
             self.model.setNameFilters(name_filters)
             self.model.setNameFilterDisables(False)  # Show only files that match the filter
@@ -89,7 +96,6 @@ class CheckableFileExplorer(QWidget):
         # add context menu to create a new folder, delete a file/folder, and rename a file/folder
         self.tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree_view.customContextMenuRequested.connect(self.open_context_menu)
-        
         # ------ Tree View Options ------
         ## 1. Sortable:
         self.tree_view.setSortingEnabled(True)
@@ -105,6 +111,7 @@ class CheckableFileExplorer(QWidget):
         self.tree_view.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
         self.tree_view.setSelectionBehavior(QTreeView.SelectionBehavior.SelectRows)
         # ------ ================= ------
+        self.model.rootPathChanged.connect(lambda path: self.tree_view.setRootIndex(self.model.index(path)))
         
     def open_context_menu(self, position):
         index = self.tree_view.indexAt(position)
