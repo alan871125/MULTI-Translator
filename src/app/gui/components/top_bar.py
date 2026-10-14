@@ -122,7 +122,7 @@ class TopBar(QWidget):
         self.engine_combo_box.addItems(plugin_list)
         self.engine_combo_box.setCurrentText(self.settings.plugin)
         self.engine_combo_box.currentTextChanged.connect(
-            lambda text: setattr(self.settings, 'engine', text)
+            lambda text: setattr(self.settings, 'plugin', text)
         )
         self.progress_chart = ProgressPieChart(self)
         layout.addWidget(self.filter_button)

@@ -152,9 +152,9 @@ class SettingsDialog(QDialog):
         self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.workspace_data.game_data_dir, browse_type="dir")
         self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.workspace_data.user_dict_dir, browse_type="dir")
         self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.output_dir, browse_type="dir")
-        self.widgets["workspace"]["engine"] = QComboBox()
-        self.widgets["workspace"]["engine"].addItems(plugin_list)
-        self.widgets["workspace"]["engine"].setCurrentText(self.settings.plugin)
+        self.widgets["workspace"]["plugin"] = QComboBox()
+        self.widgets["workspace"]["plugin"].addItems(plugin_list)
+        self.widgets["workspace"]["plugin"].setCurrentText(self.settings.plugin)
         self.tabs.addTab(workspace_tab, L["settings.workspace"])
 
     def save_settings(self):
