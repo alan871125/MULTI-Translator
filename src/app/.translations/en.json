@@ -1,4 +1,8 @@
 {
+    "Google": "Google",
+    "DeepL": "DeepL",
+    "Custom API (LLM)": "Custom API (LLM)",
+    
     "settings": "Settings",
     "settings.UI": "User Interface",
     "settings.UI.language": "Language",
@@ -22,6 +26,7 @@
     "settings.workspace.user_dict_dir": "User Dictionary Directory",
     "settings.workspace.output_dir": "Output Directory",
     "settings.workspace.engine": "Game Engine",
+    "settings.workspace.plugin": "Extraction Plugin",
     
     "menu.settings": "Settings",
     "menu.file": "File",
@@ -30,7 +35,7 @@
     "menu.file.save_game_file": "Complete Translation",
     "menu.file.save_game_file_as": "Complete Translation and Save As...",
     "menu.file.load_game_file": "Open File...",
-    "menu.file.open_directory": "Open Directory (Functionality Based on Game Engine)",
+    "menu.file.open_directory": "Open Directory (Functionality Based on Extraction Plugin)",
     "menu.file.recent_files": "Open Recent Files",
     "menu.file.load_workspace": "Load Workspace...",
     "menu.file.new_workspace": "New Workspace...",
@@ -48,8 +53,11 @@
     "menu.tools.chinese_conversion.cht2chs": "Traditional to Simplified",
     "menu.tools.batch_operation": "Batch Operations",
     "menu.tools.batch_operation.load_yaml": "Load Batch File(*.yaml)...",
+    "menu.tools.batch_operation.load_json": "Load Batch File(*.json)...",
+    "menu.tools.share_top_translations": "Share Top Translations",
 
     "right_click.translate_with_api": "Translate with API",
+    "right_click.heuristic_translation": "Heuristic Translation",
     "right_click.edit_translation": "Edit Translation",
     "right_click.reset_translation": "Reset Translation",
     "right_click.copy_original": "Copy Original Text",
@@ -89,6 +97,10 @@
     "file_dialog.select_file": "Select File",
     "file_dialog.select_directory": "Select Directory",
     "file_dialog.save_translated_file": "Save Translated File",
+
+    "bottom_tab.dictionary": "Dictionary Database",
+    "bottom_tab.fuzzy_suggestions": "Fuzzy Suggestions",
+    "bottom_tab.console": "Console",
 
     "statusBar.saved_success": "Game file saved successfully!"
 }
