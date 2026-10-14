@@ -17,11 +17,13 @@ AvailableLanguage = Literal[
 code2lang = { # google's language codes to paradox localization language names
     'en': 'english',
     'fr': 'french',
+    'fr-CA': 'french',
     'de': 'german',
     'ko': 'korean',
     'pl': 'polish',
     'ru': 'russian',
     'zh-CN': 'simp_chinese',
+    'zh-TW': 'simp_chinese',  # Treat traditional Chinese as simplified for CK3
     'es': 'spanish',
 }
 
