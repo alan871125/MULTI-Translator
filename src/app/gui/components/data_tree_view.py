@@ -67,6 +67,8 @@ class CheckableFileExplorer(QWidget):
     def __init__(self, root_path:str|None=None, name_filters:Sequence[str]|None=None, parent:QWidget|None=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
         # 1. Setup Model
         self.model = CheckableFileSystemModel(self)

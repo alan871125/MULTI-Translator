@@ -136,7 +136,10 @@ QHeaderView::section {
     background-color: $BACKGROUND_COLOR;
     padding: $PADDING_Y $PADDING_X;
     border: 1px solid $BORDER_COLOR;
-}    
+}
+QTreeView QHeaderView::section {
+    height: 20px;
+}
 QTabWidget::pane {
     background-color: $BACKGROUND_COLOR;
     border-top: 1px solid $BORDER_COLOR;
@@ -191,3 +194,15 @@ QToolButton:hover {
 PieChartWidget {
     qproperty-center_label_color: $TEXT_COLOR;
 } 
+BottomPanel{
+    height: 100px;
+}
+ConsoleWidget QFrame#inputFrame {
+    border: 1px solid $BORDER_COLOR;
+    border-radius: $BUTTON_RADIUS;
+    background: $MAIN_CONTENT_COLOR;
+}
+ConsoleWidget QLineEdit {
+    border: none;
+    background: transparent;
+}

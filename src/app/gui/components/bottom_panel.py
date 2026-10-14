@@ -45,10 +45,7 @@ class BottomPanel(QTabWidget):
         fuzzy_layout.addWidget(QLabel("Fuzzy suggestions will go here"))
         self.addTab(self.fuzzy_tab, self.L["bottom_tab.fuzzy_suggestions"])
         
-        self.console_tab = QWidget()
-        console_layout = QVBoxLayout(self.console_tab)
-        self.console_widget = ConsoleWidget()
-        console_layout.addWidget(self.console_widget)
+        self.console_tab = ConsoleWidget()
         self.addTab(self.console_tab, self.L["bottom_tab.console"])
 
     def refresh(self, cell_data=None):

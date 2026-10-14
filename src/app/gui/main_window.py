@@ -134,14 +134,14 @@ class TranslationApp(QMainWindow):
     
     def toggle_console(self):
         """Switch the focus to the console input or close the bottom panel"""
-        if self.focusWidget() == self.bottom_panel.console_widget.line_edit:
+        if self.focusWidget() == self.bottom_panel.console_tab.line_edit:
             # If the console input is focused, toggle the bottom panel visibility
             self.toggle_bottom_panel()
         else:
             # If the console input is not focused, show the bottom panel and focus the console input
             self.bottom_panel.setVisible(True)
             self.bottom_panel.setCurrentWidget(self.bottom_panel.console_tab)
-            self.bottom_panel.console_widget.line_edit.setFocus()
+            self.bottom_panel.console_tab.line_edit.setFocus()
 
     def init_menu_bar(self):
         self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
@@ -174,7 +174,7 @@ class TranslationApp(QMainWindow):
 
     @property
     def console(self) -> ConsoleWidget:
-        return self.bottom_panel.console_widget
+        return self.bottom_panel.console_tab
     
     def on_tab_exist_changed(self, exist: bool):
         """Enable or disable the save translation action based on whether a tab with a loaded file exists."""

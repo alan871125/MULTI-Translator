@@ -51,7 +51,8 @@ class ConsoleWidget(QWidget):
         super().__init__(parent)
 
         main_layout = QVBoxLayout(self)
-
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         self.logger = QPlainTextEdit()
         self.logger.setReadOnly(True)
 
@@ -68,22 +69,6 @@ class ConsoleWidget(QWidget):
 
         input_layout.addWidget(self.line_edit_label)
         input_layout.addWidget(self.line_edit)
-
-        input_frame.setStyleSheet("""
-            QFrame#inputFrame {
-                border: 1px solid palette(mid);
-                border-radius: 4px;
-                background: palette(base);
-            }
-            QFrame#inputFrame:focus-within {
-                border: 2px solid palette(highlight);
-            }
-            QLineEdit {
-                border: none;
-                background: transparent;
-            }
-        """)
-
         main_layout.addWidget(self.logger)
         main_layout.addWidget(input_frame)
 
