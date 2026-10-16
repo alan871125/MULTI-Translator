@@ -51,15 +51,15 @@ class TranslationAppPresenter:
     
     def register_console_commands(self):
         commands = {
-            "db_search": lambda text:self.session.db.search_translations(text, self.settings.TARGET_LANG),
-            "db_fuzzy":  lambda text:self.session.db.get_fuzzy_matches(text, self.settings.TARGET_LANG),
+            "db_search": lambda text:self.session.db.search_translations(text, self.settings.target_lang),
+            "db_fuzzy":  lambda text:self.session.db.get_fuzzy_matches(text, self.settings.target_lang),
         }
         for func_name, func in commands.items():
             self.main_window.console.register(func, func_name)
             
     def restore_session(self, workspace:Optional[Path|str]=None):
         if workspace is not None and Path(workspace).exists():
-            self.settings.update_workspace(workspace)
+            self.settings.load_workspace(workspace)
         # Close the tabs in current session before restoring the previous session to avoid conflicts
         self.translation_tab_widget.clear()
         # Change the bottom panel's directory to the current user dictionary directory
@@ -163,7 +163,7 @@ class TranslationAppPresenter:
                 current_text = model.df.loc[idxs, 'translation']
                 _idxs, translations,  levels = [], [], []
                 for i, text in zip(idxs, current_text):
-                    matches = self.session.db.get_fuzzy_matches(text, self.settings.TARGET_LANG, th=80, limit=1)
+                    matches = self.session.db.get_fuzzy_matches(text, self.settings.target_lang, th=80, limit=1)
                     if matches:
                         match matches[0]:
                             case (org, tran, 100, _):

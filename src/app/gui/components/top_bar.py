@@ -114,8 +114,7 @@ class TopBar(QWidget):
         self.filter_button.clicked.connect(self.filter_clicked.emit)
                 
         self.lv_buttons = LevelFilterButtons(table_filters, parent=self)
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.workspace_button = QPushButton(current_workspace, self)
+        self.workspace_button = QPushButton(self.settings.workspace_name, self)
         self.workspace_button.clicked.connect(self.workspace_clicked.emit)
         
         self.engine_combo_box = QComboBox()
@@ -133,8 +132,7 @@ class TopBar(QWidget):
             
     def refresh(self, *args, **kwargs):
         """Refresh the UI state from settings."""
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.workspace_button.setText(current_workspace)
+        self.workspace_button.setText(self.settings.workspace_name)
         self.engine_combo_box.setCurrentText(self.settings.plugin)
         
     def set_source_filters(self, filters:TableFilters):

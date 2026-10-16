@@ -12,7 +12,7 @@ from app import resources_rc # load the Qt resources
 from app.gui.main_window import TranslationApp
 from app.models.session import TranslationSession
 from app.presenter import TranslationAppPresenter
-from app.settings import Settings, DEFAULT_SETTINGS_FILE, DEFAULT_GLOBAL_WORKSPACE_FILE
+from app.settings import Settings, DEFAULT_SETTINGS_FILE, GLOBAL_WORKSPACE_FILE
 
 def setup_logging():
     handler = colorlog.StreamHandler()
@@ -100,12 +100,11 @@ def main():
     load_dotenv_example()  # Load environment variables from .env file
     parsed_args = parse_args(*sys.argv[1:])  # Parse command-line arguments
     sys_args = sys.argv
-    settings = Settings(
-        settings=DEFAULT_SETTINGS_FILE, 
-        workspace=parsed_args.workspace or DEFAULT_GLOBAL_WORKSPACE_FILE
-    )
+    settings = Settings.load(DEFAULT_SETTINGS_FILE)
+    settings.load_workspace(parsed_args.workspace)
+    settings.update_local(workspace_dir=parsed_args.workspace)
     if (settings.dark_mode):
-        sys_args += ['-platform', f'windows:darkmode=2']
+        sys_args += ['-platform', 'windows:darkmode=2']
     else:
         sys_args += ['-platform', 'windows:darkmode=1']
     app = QApplication(sys_args)

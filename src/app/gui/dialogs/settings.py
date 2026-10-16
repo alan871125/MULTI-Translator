@@ -2,9 +2,10 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
-from app.settings import L, Settings
+from app.settings import Settings
 from core.translation import Language, get_supported_languages, providers
-
+from app.language import LanguagePack
+L = LanguagePack()
 
 class PathSettingsLayout(QHBoxLayout):
     def __init__(self, default_path:str|Path, browse_type: str = "dir"):
@@ -57,9 +58,9 @@ class SettingsDialog(QDialog):
         supported_langs: list[Language] = [Language(code="auto", name="Auto")] if has_auto else []
         if api in providers:
             if role == 'source':
-                supported_langs.extend(get_supported_languages(self.settings.API, role='source'))
+                supported_langs.extend(get_supported_languages(self.settings.api_provider, role='source'))
             elif role == 'target':
-                supported_langs.extend(get_supported_languages(self.settings.API, role='target'))
+                supported_langs.extend(get_supported_languages(self.settings.api_provider, role='target'))
             else:
                 raise ValueError(f"Invalid role: {role}. Must be 'source' or 'target'.")
         else:
@@ -71,8 +72,8 @@ class SettingsDialog(QDialog):
                 combo_box.setCurrentIndex(i)
 
     def on_api_changed(self, api_name:str):
-        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.SOURCE_LANG, role='source')
-        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.TARGET_LANG, role='target', has_auto=False)
+        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.source_lang, role='source')
+        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.target_lang, role='target', has_auto=False)
 
     def init_ui(self):
         """Initialize the settings UI"""
@@ -113,17 +114,17 @@ class SettingsDialog(QDialog):
         self.widgets["translator"]["TARGET_LANG"] = QComboBox()
         self.widgets["translator"]["API"] = QComboBox()
         self.widgets["translator"]["API"].addItems([L[p] for p in providers.keys()])
-        self.widgets["translator"]["API"].setCurrentText(self.settings.API)
+        self.widgets["translator"]["API"].setCurrentText(self.settings.api_provider)
         self.widgets["translator"]["API"].currentTextChanged.connect(self.on_api_changed)
         # Update language combo boxes based on the current API setting
-        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.SOURCE_LANG, role='source')
-        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.TARGET_LANG, role='target', has_auto=False)
+        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.source_lang, role='source')
+        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.target_lang, role='target', has_auto=False)
 
         ## Line Edits
-        self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.DEEPL_API_KEY)
-        self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.CUSTOM_API_KEY)
-        self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.CUSTOM_API_URL)
-        self.widgets["translator"]["CUSTOM_API_MODEL"] = QLineEdit(self.settings.CUSTOM_API_MODEL)
+        self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.deepl_api_key)
+        self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.custom_api_key)
+        self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.custom_api_url)
+        self.widgets["translator"]["CUSTOM_API_MODEL"] = QLineEdit(self.settings.custom_api_model)
         self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["settings.translator.DEEPL_API_KEY.hint"])
         self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["settings.translator.CUSTOM_API_KEY.hint"])
         self.tabs.addTab(translation_tab, L["settings.translator"])
@@ -148,10 +149,10 @@ class SettingsDialog(QDialog):
         workspace_tab = QWidget()
         self.layouts["workspace"] = QFormLayout(workspace_tab)
         # use raw directories from workspace_dir directly, preventing translating replacers such as %CWD% and %WORKSPACE_DIR%
-        self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings.workspace_data.workspace_dir or "./", browse_type="dir")
-        self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings.workspace_data.game_data_dir, browse_type="dir")
-        self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings.workspace_data.user_dict_dir, browse_type="dir")
-        self.widgets["workspace"]["output_dir"] = PathSettingsLayout(self.settings.output_dir, browse_type="dir")
+        self.widgets["workspace"]["workspace_dir"] = PathSettingsLayout(self.settings._local.get("workspace_dir", "./"), browse_type="dir")
+        self.widgets["workspace"]["game_data_dir"] = PathSettingsLayout(self.settings._local.get("game_data_dir", "")  , browse_type="dir")
+        self.widgets["workspace"]["user_dict_dir"] = PathSettingsLayout(self.settings._local.get("user_dict_dir", "")  , browse_type="dir")
+        self.widgets["workspace"]["output_dir"]    = PathSettingsLayout(self.settings._local.get("output_dir"   , "")  , browse_type="dir")
         self.widgets["workspace"]["plugin"] = QComboBox()
         self.widgets["workspace"]["plugin"].addItems(plugin_list)
         self.widgets["workspace"]["plugin"].setCurrentText(self.settings.plugin)
