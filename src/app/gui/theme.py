@@ -71,6 +71,7 @@ DARK = Theme(
 
 class ThemeManager:
     """Manage and generate themes for the application. """
+    theme: Theme = LIGHT  # Default to light theme
     @classmethod
     def set_theme(cls, theme: Theme|None = None, dark=False, **kwargs:str):
         if theme is not None:
