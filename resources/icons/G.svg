@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Background with rounded corners -->
+  <rect width="100" height="100" rx="20" fill="#3b88c3" />
+  
+  <!-- Letter G with fixed coordinates for Qt compatibility -->
+  <text x="50" y="80" 
+        text-anchor="middle" 
+        font-family="Arial Black, sans-serif" 
+        font-size="80" 
+        fill="#ffffff">G</text>
+</svg>
