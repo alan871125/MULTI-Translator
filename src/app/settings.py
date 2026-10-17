@@ -147,7 +147,7 @@ class Workspace(BaseModel):
                     f"Workspace directory {path} does not contain a workspace file named {name}{cls.FILE_EXTENSION}. "
                     "Loading with default settings."
                 )
-                return cls(name=name, settings={})
+                return cls(name=name, settings={"workspace_dir": path.as_posix()})
         if not path.suffix == cls.FILE_EXTENSION:
             logger.warning(
                 f"Workspace file {path} does not have the expected extension {cls.FILE_EXTENSION}."

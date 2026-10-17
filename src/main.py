@@ -102,7 +102,6 @@ def main():
     sys_args = sys.argv
     settings = Settings.load(DEFAULT_SETTINGS_FILE)
     settings.load_workspace(parsed_args.workspace)
-    settings.update_local(workspace_dir=parsed_args.workspace)
     if (settings.dark_mode):
         sys_args += ['-platform', 'windows:darkmode=2']
     else:
