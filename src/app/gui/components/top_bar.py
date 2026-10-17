@@ -110,7 +110,7 @@ class TopBar(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        self.filter_button = QPushButton("Filter", self)
+        self.filter_button = QPushButton(L["filter"], self)
         self.filter_button.clicked.connect(self.filter_clicked.emit)
                 
         self.lv_buttons = LevelFilterButtons(table_filters, parent=self)

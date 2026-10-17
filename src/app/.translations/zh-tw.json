@@ -26,6 +26,7 @@
     "settings.workspace.output_dir": "輸出路徑",
     "settings.workspace.engine": "遊戲引擎",
     "settings.workspace.plugin": "插件",
+    "settings.use_local.tooltip": "使用本地/全域設定",
     "menu.settings": "設定",
     "menu.file": "檔案",
     "menu.file.save_translation": "保存翻譯 (Ctrl+S)",
