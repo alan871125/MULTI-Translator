@@ -1,4 +1,6 @@
 from __future__ import annotations
+import os
+import re
 import json
 import logging
 from pathlib import Path
@@ -30,6 +32,9 @@ DEFAULT_OUTPUT_DIR = "%WORKSPACE_DIR%/output"
 DEFAULT_DB_PATH = "%WORKSPACE_DIR%/user_dict.db"
 DEFAULT_PLUGIN = "Simple Json"    
 
+        
+# Matches either %VAR% (group 1) OR $VAR / ${VAR} (group 2)
+_VARPATTERN = re.compile(r'%(\w+|\{[^}]*\}?)%|\$(\w+|\{[^}]*\}?)')
 @dataclass
 class Confirmations:
     share_translation: bool = False
@@ -202,9 +207,35 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
         - %WORKSPACE_DIR%: Directory of the current local workspace (cwd if None)
         - %CWD%: Current working directory (where the app is launched from)
         """
-        if isinstance(path, str):
-            path = path.replace("%WORKSPACE_DIR%", self._local.get("workspace_dir", self._global.workspace_dir))
-            path = path.replace("%CWD%", str(Path.cwd()))
+        cwd = os.getcwd()
+        
+        # 1. Safely resolve workspace_dir first using only CWD (prevents recursion)
+        raw_ws_dir = self.get_raw("workspace_dir", DEFAULT_WORKSPACE_DIR)
+        
+        ws_var_map = {"CWD": cwd}
+        def replace_ws_var(match: re.Match[str]) -> str:
+            var_name = (match.group(1) or match.group(2)).upper()
+            if var_name.startswith("{") and var_name.endswith("}"):
+                var_name = var_name[1:-1]
+            return ws_var_map.get(var_name, match.group(0))
+            
+        resolved_ws_dir = os.path.expandvars(raw_ws_dir)
+        resolved_ws_dir = re.sub(_VARPATTERN, replace_ws_var, resolved_ws_dir)
+        resolved_ws_dir = Path(resolved_ws_dir).as_posix()
+
+        # 2. Build the full variable map using the resolved workspace directory
+        var_map = ws_var_map.copy()|{"WORKSPACE_DIR": resolved_ws_dir}
+        
+        def replace_var(match: re.Match[str]) -> str:
+            # Group 1 is for %var%, Group 2 is for $var / ${var}
+            var_name = match.group(1) or match.group(2)
+            if var_name.startswith("{") and var_name.endswith("}"):
+                var_name = var_name[1:-1]
+            var_name = var_name.upper()
+            return var_map.get(var_name, match.group(0))
+            
+        path = os.path.expandvars(path)  # Expand environment variables if any
+        path = re.sub(_VARPATTERN, replace_var, path)
         return Path(path).as_posix()
     
     def __setattr__(self, name: str, value: Any) -> None:
