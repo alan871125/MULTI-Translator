@@ -203,7 +203,7 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
         - %CWD%: Current working directory (where the app is launched from)
         """
         if isinstance(path, str):
-            path = path.replace("%WORKSPACE_DIR%", self._global.workspace_dir)
+            path = path.replace("%WORKSPACE_DIR%", self._local.get("workspace_dir", self._global.workspace_dir))
             path = path.replace("%CWD%", str(Path.cwd()))
         return Path(path).as_posix()
     
