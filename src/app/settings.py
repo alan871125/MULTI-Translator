@@ -96,7 +96,7 @@ class SettingsData(BaseSettings):
         settings_dict = self.model_dump(mode="json")
         api_keys = {}
         for k, v in settings_dict.items():
-            if k.endswith("_api_key") and v is None:
+            if k.endswith("_api_key"):
                 api_keys[k] = v
         for k in api_keys:
             settings_dict.pop(k)
