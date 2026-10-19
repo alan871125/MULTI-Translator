@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget, QLabel
 from app.settings import Settings
 from core.translation import Language, get_supported_languages, providers
-from app.language import LanguagePack
+from app.locales import LanguagePack
 L = LanguagePack()
 
 class PathSettingsWidget(QWidget):

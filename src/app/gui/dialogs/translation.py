@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QLabel, QDialog, QDialogButtonBox, QVBoxLayout, QP
 from PySide6.QtGui import QShortcut, QKeySequence
 
 from app.settings import Settings
-from app.language import LanguagePack
+from app.locales import LanguagePack
 L = LanguagePack()
 
 class TranslationDialog(QDialog):

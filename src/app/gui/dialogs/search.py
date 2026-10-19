@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from qt_extensions.core import TypedSignal
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from app.typing import SearchableColumn
 from ...models.filters import ColumnFilter, TableFilters
 logger = logging.getLogger(__name__)
