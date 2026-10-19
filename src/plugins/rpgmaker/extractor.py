@@ -10,8 +10,7 @@ from core.json_utils import walk_json
 
 from .schema import TRANSLATION_FIELDS, EVENT_TRANSLATION_CODES, PLUGIN_HANDLERS
 from ..simple_json import apply_json_path
-from .._registry import registered_extractor
-from .._base import SubDirCheckType, BaseExtractor
+from .. import registered_extractor, SubDirCheckType, BaseExtractor
 logger = logging.getLogger(__name__)
 
 

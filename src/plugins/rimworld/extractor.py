@@ -8,7 +8,7 @@ from typing import Iterator, Optional, Literal, override
 from pandas import DataFrame
 from lxml import etree as ET
 
-from .._base import BaseExtractor, SupportedDirType
+from .. import BaseExtractor, SupportedDirType
 from .version import VERSION, FALLBACK_VERSION
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
