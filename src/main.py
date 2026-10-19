@@ -100,8 +100,12 @@ def main():
     load_dotenv_example()  # Load environment variables from .env file
     parsed_args = parse_args(*sys.argv[1:])  # Parse command-line arguments
     sys_args = sys.argv
-    settings = Settings.load(DEFAULT_SETTINGS_FILE)
-    settings.load_workspace(parsed_args.workspace)
+    try:
+        settings = Settings.load(DEFAULT_SETTINGS_FILE)
+    except FileNotFoundError as e:
+        settings = Settings()  # Load default settings if file not found
+    if parsed_args.workspace:
+        settings.load_workspace(parsed_args.workspace)
     if (settings.dark_mode):
         sys_args += ['-platform', 'windows:darkmode=2']
     else:
