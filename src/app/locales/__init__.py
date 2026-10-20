@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from PySide6.QtCore import QTranslator
 logger = logging.getLogger(__name__)
 
 _TRANSLATIONS_DIR = Path(__file__).parent.resolve()
@@ -14,6 +15,7 @@ class LanguagePack:
     ```
     """
     
+    qt_translator = QTranslator()
     lang_data = {}
     LANGUAGE = "en"
     def __init__(self, LANGUAGE=None):
@@ -56,7 +58,21 @@ class LanguagePack:
             logger.warning(f"Translation file for language '{lang}' not found. Falling back to English.")
             cls.LANGUAGE = "en"
             cls.load_translations("en")
-            
+        cls.set_qt_translator(lang)
+        
+    @classmethod    
+    def set_qt_translator(cls, lang):
+        from PySide6.QtCore import QLibraryInfo, QCoreApplication
+        app = QCoreApplication.instance()
+
+        # Get the path to Qt's built-in translation files
+        translations_path = QLibraryInfo.path(
+            QLibraryInfo.LibraryPath.TranslationsPath
+        )
+        lang = lang.replace("-", "_")  # Qt uses underscores in language codes
+        if app and cls.qt_translator.load(f"qtbase_{lang}", translations_path):
+            app.installTranslator(cls.qt_translator)
+                    
 LanguagePack.load_translations(LanguagePack.LANGUAGE)
 
 
