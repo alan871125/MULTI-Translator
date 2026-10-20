@@ -13,7 +13,7 @@ from app.models.filters import ColumnFilter, build_mask
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
 from app.gui.theme import ThemeManager
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from plugins import BaseExtractor
 from core.text_unit import TextUnit
 from core.translation import TranslationLevel, batch_chinese_convertion
@@ -107,7 +107,7 @@ class TranslationTableModel(QAbstractTableModel):
 
         save_path = save_path or Path(self.settings.output_dir) / self.file_path.name
         units = self.get_units()
-        self.engine.apply_translations(self.file_path, units, save_path=save_path, target_lang=self.settings.TARGET_LANG)
+        self.engine.apply_translations(self.file_path, units, save_path=save_path, target_lang=self.settings.target_lang)
         logger.info(f"Saved translations to {save_path}")
 
     @override
@@ -297,10 +297,10 @@ class TranslationTableModel(QAbstractTableModel):
 
     def apply_dictionary(self, dictionary: TranslationDictionary, keys: Optional[list[str]] = None) -> None:
         keys = keys or ["key"]
-        if (dict_df := dictionary.get(self.settings.TARGET_LANG)) is None:
-            logger.warning(f"Dictionary does not contain target language '{self.settings.TARGET_LANG}'. No translations applied.")
+        if (dict_df := dictionary.get(self.settings.target_lang)) is None:
+            logger.warning(f"Dictionary does not contain target language '{self.settings.target_lang}'. No translations applied.")
             return
-        level_col = f"{self.settings.TARGET_LANG}.level"
+        level_col = f"{self.settings.target_lang}.level"
         if keys!=["key"]: 
             # self.df is indexed by 'key'. We need to align them based on the specified keys.
             df = self.df.set_index(keys)
@@ -309,7 +309,7 @@ class TranslationTableModel(QAbstractTableModel):
             mask = dict_aligned[level_col] > df["level"]
             if not mask.any():
                 return
-            df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
+            df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.target_lang]
             df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
             self.df = df.reset_index().set_index('key', drop=False)
             updated_keys = self.df.index[mask]
@@ -323,7 +323,7 @@ class TranslationTableModel(QAbstractTableModel):
 
             updated_keys = self.df.index[mask]
 
-            self.df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.TARGET_LANG]
+            self.df.loc[mask, "translation"] = dict_aligned.loc[mask, self.settings.target_lang]
             self.df.loc[mask, "level"] = dict_aligned.loc[mask, level_col]
 
         if diff_comments := dictionary.check_difference(self.df, self_type="old"):

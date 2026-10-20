@@ -27,6 +27,7 @@
     "settings.workspace.output_dir": "Output Directory",
     "settings.workspace.engine": "Game Engine",
     "settings.workspace.plugin": "Extraction Plugin",
+    "settings.use_local.tooltip": "Use Local/Global settings",
     
     "menu.settings": "Settings",
     "menu.file": "File",

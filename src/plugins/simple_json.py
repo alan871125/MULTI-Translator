@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
 from typing import Optional
-from ._base import BaseExtractor
-from ._registry import registered_extractor
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
 from core.json_utils import walk_json
+from . import BaseExtractor, registered_extractor
 
 @registered_extractor(name='Simple JSON')
 class SimpleJsonExtractor(BaseExtractor):

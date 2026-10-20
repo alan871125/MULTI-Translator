@@ -206,3 +206,21 @@ ConsoleWidget QLineEdit {
     border: none;
     background: transparent;
 }
+
+CheckBoxLabel QCheckBox::indicator {
+    image: url(:/assets/resources/icons/G.svg);
+    height: 16px;
+    width: 16px;
+    border: 2px solid transparent;
+}
+
+/* Reveal the custom box outline only when hovering over the CheckBoxLabel */
+CheckBoxLabel QCheckBox::indicator:hover{
+    border: 2px solid $HOVER_COLOR;
+    border-radius: 3px;
+}
+
+/* Checked state (image: url overrides image: none to show the checkmark) */
+CheckBoxLabel QCheckBox::indicator:checked {
+    image: url(:/assets/resources/icons/L.svg);
+}

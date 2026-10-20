@@ -7,7 +7,7 @@ from pandas import DataFrame
 
 from core.json_path import JsonPath
 from core.text_unit import TextUnit
-from ._base import BaseExtractor, SupportedDirType, UnsupportedDirectoryError
+from . import BaseExtractor, SupportedDirType, UnsupportedDirectoryError
 
 logger = logging.getLogger(__name__)
 name = 'Crusader Kings III'

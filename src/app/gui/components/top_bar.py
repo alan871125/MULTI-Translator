@@ -13,7 +13,7 @@ from plugins import plugin_list
 from core.translation import TranslationLevel
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from ..theme import ThemeManager
 
 logger = logging.getLogger(__name__)
@@ -110,12 +110,11 @@ class TopBar(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        self.filter_button = QPushButton("Filter", self)
+        self.filter_button = QPushButton(L["filter"], self)
         self.filter_button.clicked.connect(self.filter_clicked.emit)
                 
         self.lv_buttons = LevelFilterButtons(table_filters, parent=self)
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.workspace_button = QPushButton(current_workspace, self)
+        self.workspace_button = QPushButton(self.settings.workspace_name, self)
         self.workspace_button.clicked.connect(self.workspace_clicked.emit)
         
         self.engine_combo_box = QComboBox()
@@ -133,8 +132,7 @@ class TopBar(QWidget):
             
     def refresh(self, *args, **kwargs):
         """Refresh the UI state from settings."""
-        current_workspace = Path(self.settings.workspace_dir or "Default").name
-        self.workspace_button.setText(current_workspace)
+        self.workspace_button.setText(self.settings.workspace_name)
         self.engine_combo_box.setCurrentText(self.settings.plugin)
         
     def set_source_filters(self, filters:TableFilters):

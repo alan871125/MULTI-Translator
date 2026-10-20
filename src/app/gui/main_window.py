@@ -16,7 +16,7 @@ from app.gui.dialogs.settings import SettingsDialog
 from app.gui.dialogs.translation import TranslationDialog
 from app.gui.theme import ThemeManager
 from app.translation_table import TranslationTabWidget
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from app.settings import Settings
 import plugins
 from ..translation_table import EditType 
