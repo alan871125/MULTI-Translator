@@ -86,7 +86,7 @@ class SettingsDialog(QDialog):
 
     def update_lang_combobox(self, combo_box: QComboBox, current_lang:str, role:str, has_auto:bool=True):
         # prevent updating before the combo boxes are initialized
-        api = self.widgets["translator"]["API"].currentText()
+        api = self.widgets["translator"]["api_provider"].currentText()
         supported_langs: list[Language] = [Language(code="auto", name="Auto")] if has_auto else []
         if api in providers:
             if role == 'source':
@@ -104,8 +104,8 @@ class SettingsDialog(QDialog):
                 combo_box.setCurrentIndex(i)
 
     def on_api_changed(self, api_name:str):
-        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.source_lang, role='source')
-        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.target_lang, role='target', has_auto=False)
+        self.update_lang_combobox(self.widgets["translator"]["source_lang"], self.settings.source_lang, role='source')
+        self.update_lang_combobox(self.widgets["translator"]["target_lang"], self.settings.target_lang, role='target', has_auto=False)
 
     def init_ui(self):
         """Initialize the settings UI"""
@@ -169,15 +169,15 @@ class SettingsDialog(QDialog):
         translation_tab = QWidget()
         ## dropdown Menus
         self.layouts["translator"] = QFormLayout(translation_tab)
-        self.widgets["translator"]["SOURCE_LANG"] = QComboBox()
-        self.widgets["translator"]["TARGET_LANG"] = QComboBox()
-        self.widgets["translator"]["API"] = QComboBox()
-        self.widgets["translator"]["API"].addItems([L[p] for p in providers.keys()])
-        self.widgets["translator"]["API"].setCurrentText(self.settings.api_provider)
-        self.widgets["translator"]["API"].currentTextChanged.connect(self.on_api_changed)
+        self.widgets["translator"]["source_lang"] = QComboBox()
+        self.widgets["translator"]["target_lang"] = QComboBox()
+        self.widgets["translator"]["api_provider"] = QComboBox()
+        self.widgets["translator"]["api_provider"].addItems([L[p] for p in providers.keys()])
+        self.widgets["translator"]["api_provider"].setCurrentText(self.settings.api_provider)
+        self.widgets["translator"]["api_provider"].currentTextChanged.connect(self.on_api_changed)
         # Update language combo boxes based on the current API setting
-        self.update_lang_combobox(self.widgets["translator"]["SOURCE_LANG"], self.settings.source_lang, role='source')
-        self.update_lang_combobox(self.widgets["translator"]["TARGET_LANG"], self.settings.target_lang, role='target', has_auto=False)
+        self.update_lang_combobox(self.widgets["translator"]["source_lang"], self.settings.source_lang, role='source')
+        self.update_lang_combobox(self.widgets["translator"]["target_lang"], self.settings.target_lang, role='target', has_auto=False)
 
         ## Line Edits
         self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.deepl_api_key)
@@ -227,7 +227,7 @@ class SettingsDialog(QDialog):
         for tab, widgets in self.widgets.items():
             k, v = None, None
             for k, widget in widgets.items():
-                if k in ["SOURCE_LANG", "TARGET_LANG"]:
+                if k in ["source_lang", "target_lang"]:
                     v = widget.currentData()  # Get the language code from the combo box
                 elif isinstance(widget, QComboBox):
                     v = widget.currentText()

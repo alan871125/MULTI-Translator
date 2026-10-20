@@ -42,11 +42,11 @@ class Translator:
         Arguments:
             settings (TranslatorSettings): 
                 Required attributes:
-                * SOURCE_LANG (str)
-                * TARGET_LANG (str)
-                * API (str)
-                * CUSTOM_API_MODEL (str)
-                * CUSTOM_API_URL (str)
+                * source_lang (str)
+                * target_lang (str)
+                * api_provider (str)
+                * custom_api_model (str)
+                * custom_api_url (str)
         """
         
         self.settings = settings
