@@ -7,7 +7,7 @@ from pathlib import Path
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Iterable, Literal, Annotated, ClassVar, TypeVar
-from pydantic import Field, BeforeValidator, PlainSerializer, BaseModel
+from pydantic import Field, BeforeValidator, PlainSerializer, BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from PySide6.QtCore import QObject
@@ -132,6 +132,16 @@ class Workspace(BaseModel):
     FILE_EXTENSION: ClassVar[str] = ".multi-workspace"
     name: str | None = None
     settings: dict = Field(default_factory=dict)
+    
+    @model_validator(mode="after")
+    def validate_settings(self):
+        if self.settings.get("restore_last_session"):
+            # initialize last_open_tabs, so that the local settings can intercept it when saving the workspace
+            self.settings.setdefault("last_open_tabs", [])
+        else:
+            self.settings.pop("last_open_tabs", None)
+        return self
+    
     @classmethod
     def load(cls, path: str|Path):
         """Load workspace from a JSON file."""
@@ -155,6 +165,14 @@ class Workspace(BaseModel):
             )
         return cls.model_validate_json(path.read_text(encoding="utf-8"))
     
+    def save(self, path: str|Path):
+        """Save workspace to a JSON file."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.model_dump_json(indent=4, ensure_ascii=False))
+        logger.info(f"Workspace saved to {path}")
+    
 # The typing inheritance trick: `SettingsData if TYPE_CHECKING else object`
 # tricks the type checker into thinking that Settings inherits from SettingsData, 
 # while at runtime it inherits from QObject. 
@@ -163,6 +181,7 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
     """A wrapper around SettingsData that provides signal support for PySide6."""
     setting_changed:   TypedSignal[str] = TypedSignal(str)
     workspace_changed: TypedSignal[str] = TypedSignal(str)
+    _workspace_path: str|None = None  # Path to the current workspace file, used for saving local settings
     def __init__(self, global_settings:SettingsData|dict[str,Any]|None=None, *, local_settings:dict[str, Any]|None=None, parent:QObject|None=None, **overrides):
         """
         Arguments:
@@ -241,6 +260,10 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_") or name in ["data", "settings_changed"]:
             super().__setattr__(name, value)
+        elif name in self._local: 
+            # let local settings intercept if defined
+            self._local[name] = value
+            self.setting_changed.emit(name)
         elif name in SettingsData.model_fields:
             setattr(self._global, name, value)
             self.setting_changed.emit(name)
@@ -278,10 +301,16 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
     @property
     def workspace_name(self):
         return  Path(self.workspace_dir).name
-        
+    
+    @property
+    def workspace_path(self):
+        return self._workspace_path or Path(self.workspace_dir)/f"{self.workspace_name}{Workspace.FILE_EXTENSION}"
+    
     def save(self, path: str|Path=DEFAULT_SETTINGS_FILE, *, save_api_keys: bool = True):
         """Save the global settings to a JSON file."""
         self._global.save(path, save_api_keys=save_api_keys)
+        if self._local:
+            Workspace(name=self.workspace_name, settings=self._local).save(self.workspace_path)
         
     def update(self, **overrides):
         self._global.update(**overrides)
