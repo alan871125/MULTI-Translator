@@ -78,8 +78,8 @@ class Translator:
             "You are a professional translator specializing in {engine_name} games."
             "You will be provided several lines of text in JSON format." 
             "Please translate the text from the lines as a whole in to {target_lang}."
-            "Preserve any {engine_name} specifi formatting, special characters, and placeholders in the original text."
-            "Output the translated text in PURE JSON format with no markdown, maintaining the same structure as the input."
+            "Preserve any {engine_name} specific formatting, special characters, and placeholders in the original text."
+            "Output the translated text in PURE JSON format with no markdown. Maintain the same number of lines as the input."
         )
         
         translation_prompt =  "Source JSON:\n{text}\nTranslated JSON:\n"
@@ -102,14 +102,25 @@ class Translator:
             if translated_json is None:
                 return None
             try:
-                return json.loads(translated_json)
+                return json.loads(remove_json_markdown(translated_json))
             except Exception as e:
                 logger.error(f"Error parsing translated JSON: {e}")
                 return [translated_json] * len(lines) # Return the raw translated text in a list if JSON parsing fails
         except Exception as e:
             logger.error(f"Error during line_batch_translate: {e}")
             return None
-        
+
+def remove_json_markdown(text:str)-> str:
+    """Remove markdown formatting from JSON text, if any."""
+    # TODO: If unhandled case is too common, consider using https://github.com/mangiucugna/json_repair
+    # Remove code block markdown (```json ... ```)
+    if text.startswith("```json") and text.endswith("```"):
+        text = text[len("```json"): -len("```")].strip()
+    # Remove inline code markdown (`...`)
+    if text.startswith("`") and text.endswith("`"):
+        text = text[1:-1].strip()
+    return text
+
 def get_supported_languages(api:str, role:Optional[Literal["source", "target"]] = None) -> Iterable[Language]:
     """
     Get the list of supported languages from the translation provider based on the current settings.
