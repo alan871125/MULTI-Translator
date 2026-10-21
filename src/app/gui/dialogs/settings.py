@@ -182,8 +182,8 @@ class SettingsDialog(QDialog):
         ## Line Edits
         self.widgets["translator"]["DEEPL_API_KEY"] = QLineEdit(self.settings.deepl_api_key)
         self.widgets["translator"]["CUSTOM_API_KEY"] = QLineEdit(self.settings.custom_api_key)
-        self.widgets["translator"]["CUSTOM_API_URL"] = QLineEdit(self.settings.custom_api_url)
-        self.widgets["translator"]["CUSTOM_API_MODEL"] = QLineEdit(self.settings.custom_api_model)
+        self.widgets["translator"]["custom_api_url"] = QLineEdit(self.settings.custom_api_url)
+        self.widgets["translator"]["custom_api_model"] = QLineEdit(self.settings.custom_api_model)
         self.widgets["translator"]["DEEPL_API_KEY"].setPlaceholderText(L["settings.translator.DEEPL_API_KEY.hint"])
         self.widgets["translator"]["CUSTOM_API_KEY"].setPlaceholderText(L["settings.translator.CUSTOM_API_KEY.hint"])
         self.tabs.addTab(translation_tab, L["settings.translator"])
