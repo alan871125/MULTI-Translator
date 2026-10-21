@@ -132,6 +132,7 @@ class Workspace(BaseModel):
     FILE_EXTENSION: ClassVar[str] = ".multi-workspace"
     name: str | None = None
     settings: dict = Field(default_factory=dict)
+    _workspace_file: Path|None = None  # Path to the workspace file, used for saving local settings
     
     @model_validator(mode="after")
     def validate_settings(self):
@@ -157,13 +158,15 @@ class Workspace(BaseModel):
                     f"Workspace directory {path} does not contain a workspace file named {name}{cls.FILE_EXTENSION}. "
                     "Loading with default settings."
                 )
-                return cls(name=name, settings={"workspace_dir": path.as_posix()})
+                return cls(name=name, settings={"workspace_dir": path.as_posix()}, _workspace_file=workspace_file)
         if not path.suffix == cls.FILE_EXTENSION:
             logger.warning(
                 f"Workspace file {path} does not have the expected extension {cls.FILE_EXTENSION}."
                 "Loading anyway"
             )
-        return cls.model_validate_json(path.read_text(encoding="utf-8"))
+        obj =  cls.model_validate_json(path.read_text(encoding="utf-8"))
+        obj._workspace_file = path
+        return obj
     
     def save(self, path: str|Path):
         """Save workspace to a JSON file."""
@@ -181,7 +184,7 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
     """A wrapper around SettingsData that provides signal support for PySide6."""
     setting_changed:   TypedSignal[str] = TypedSignal(str)
     workspace_changed: TypedSignal[str] = TypedSignal(str)
-    _workspace_path: str|None = None  # Path to the current workspace file, used for saving local settings
+    _workspace_path: Path|None = None  # Path to the current workspace file, used for saving local settings
     def __init__(self, global_settings:SettingsData|dict[str,Any]|None=None, *, local_settings:dict[str, Any]|None=None, parent:QObject|None=None, **overrides):
         """
         Arguments:
@@ -327,9 +330,16 @@ class Settings(QObject, SettingsData if TYPE_CHECKING else object):
 
     def load_workspace(self, path: str|Path):
         """Load local settings from a JSON file."""
+        path = Path(path)
+        if path.is_file():
+            self._workspace_path = path
+        if path.is_dir() and (path / f"{path.name}{Workspace.FILE_EXTENSION}").is_file():
+            path = path / f"{path.name}{Workspace.FILE_EXTENSION}"
         workspace = Workspace.load(path)
         # Replace the current local settings with the loaded workspace settings
         self._local = workspace.settings
+        self.setting_changed.emit("*")
+        self.workspace_changed.emit("*")
             
     def load_update(self, path: str|Path):
         """Load settings from a JSON file and update the current settings."""

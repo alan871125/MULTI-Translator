@@ -39,6 +39,7 @@
     "menu.file.open_directory": "Open Directory (Functionality Based on Extraction Plugin)",
     "menu.file.recent_files": "Open Recent Files",
     "menu.file.load_workspace": "Load Workspace...",
+    "menu.file.load_workspace_file": "Load Workspace File...",
     "menu.file.new_workspace": "New Workspace...",
     "menu.file.import": "Import",
     "menu.file.import.from_file": "Import from File...",

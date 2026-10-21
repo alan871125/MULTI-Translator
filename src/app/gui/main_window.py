@@ -17,7 +17,7 @@ from app.gui.dialogs.translation import TranslationDialog
 from app.gui.theme import ThemeManager
 from app.translation_table import TranslationTabWidget
 from app.locales import LanguagePack
-from app.settings import Settings
+from app.settings import Settings, Workspace
 import plugins
 from ..translation_table import EditType 
 from .menu_utils import initialize_menu
@@ -89,7 +89,7 @@ class TranslationApp(QMainWindow):
         # 1. Top Bar
         self.top_bar = TopBar(self.settings)
         self.top_bar.filter_clicked.connect(self.open_filter_menu)
-        self.top_bar.workspace_clicked.connect(self.open_load_workspace_dialog)
+        self.top_bar.workspace_clicked.connect(self.open_load_workspace_folder_dialog)
         
         # 2. Translation Table
         self.translation_table = TranslationTabWidget()
@@ -147,7 +147,8 @@ class TranslationApp(QMainWindow):
         self.lru_menu = RecentFilesMenu(L["menu.file.recent_files"], self.settings.recent_files)
         menu_def = {
             "file.load_game_file": self.request_load_file,
-            "file.load_workspace": self.open_load_workspace_dialog,
+            "file.load_workspace": self.open_load_workspace_folder_dialog,
+            "file.load_workspace_file": self.open_load_workspace_file_dialog,
             "file.open_directory": self.request_load_dir,
             "file.import.from_file": self.request_import_from_file,
             "file.import.from_dict": self.request_import_from_dict,
@@ -236,10 +237,15 @@ class TranslationApp(QMainWindow):
             self.undo_action.setEnabled(False)
             self.redo_action.setEnabled(False)
         
-    def open_load_workspace_dialog(self):
+    def open_load_workspace_folder_dialog(self):
         workspace_dir = QFileDialog.getExistingDirectory(self, L["file_dialog.select_workspace_dir"])
         if workspace_dir:
             self.load_workspace_requested.emit(workspace_dir)
+            
+    def open_load_workspace_file_dialog(self):
+            workspace_dir = QFileDialog.getOpenFileName(self, L["file_dialog.select_workspace_file"], "", f"Workspace Files (*{Workspace.FILE_EXTENSION})")[0]
+            if workspace_dir:
+                self.load_workspace_requested.emit(workspace_dir)
             
     def get_file_filters(self) -> str:
         extractor = plugins.extractors[self.settings.plugin]()

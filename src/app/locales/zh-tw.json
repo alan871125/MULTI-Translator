@@ -37,6 +37,7 @@
     "menu.file.open_directory": "開啟文件 (功能視目前選定引擎而定)",
     "menu.file.recent_files": "最近使用的文件...",
     "menu.file.load_workspace": "載入工作區...",
+    "menu.file.load_workspace_file": "載入工作區文件...",
     "menu.file.new_workspace": "新工作區...",
     "menu.file.import": "導入",
     "menu.file.import.from_file": "從文件導入...",
