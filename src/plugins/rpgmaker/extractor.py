@@ -1,7 +1,8 @@
+import re
 import json
 import logging
 from pathlib import Path
-from typing import Optional, override
+from typing import Callable, Optional, override
 from concurrent.futures import ThreadPoolExecutor
 
 from core.json_path import JsonPath
@@ -17,6 +18,92 @@ logger = logging.getLogger(__name__)
 def _json_dump_worker(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+ENCLOSED_STRING_PATTERN = re.compile(r"^`.*`$|^\".*\"$|^'.*'$|^「.*」$")
+class CmdExtractor:
+    def __init__(self, path: Path, json_prefix: Optional[tuple]=None):
+        self.path = path
+        self.json_prefix = json_prefix or ()
+        self._handlers: dict[int, Callable[[list, tuple], list[TextUnit]]] = {
+            101: self._extract_101,
+            122: self._extract_122,
+            357: self._extract_357,
+        }
+        
+    def extract_cmds(self, cmds: list[dict]) -> list[TextUnit]:
+        cmd_data = []
+        for j, command in enumerate(cmds):
+            if not (
+                (cmd_code:=command.get("code")) and
+                (cmd_type:=EVENT_TRANSLATION_CODES.get(cmd_code)) and
+                (params := command.get("parameters"))
+            ):
+                continue
+            cmd_data.extend(self.extract(cmd_code, params, (self.path.stem, *self.json_prefix, j, 'parameters')))
+        return cmd_data
+
+    def extract(self, cmd_code:int, params: list, json_prefix: tuple=()) -> list[TextUnit]:
+        handler = self._handlers.get(cmd_code, self._extract)
+        return handler(params, json_prefix)
+    
+    def _extract(self, params:list, json_prefix: tuple)  -> list[TextUnit]:
+        out = []
+        for param, current_path, parent in walk_json(params):
+            if isinstance(param, str) and param.strip():
+                json_suffix = (*json_prefix, *current_path)
+                out.append(TextUnit(
+                    file=self.path.stem,
+                    key=JsonPath._from_parts(json_suffix),
+                    original=param
+                ))
+        return out
+    
+    def _extract_101(self, params: list, json_prefix: tuple)  -> list[TextUnit]:
+        """Extract Code 101 (ShowText) command parameters"""
+        if params[4].strip():
+            return [TextUnit(
+                file=self.path.stem,
+                key=JsonPath._from_parts((*json_prefix, 4)),
+                original=params[4]
+            )]
+        return []
+    
+    def _extract_122(self, params: list, json_prefix: tuple)  -> list[TextUnit]: #ControlVariables
+        """Extract Code 122 (ControlVariables) command parameters
+        
+        Identifying translatable text in ControlVariables command is quite tricky. I assume:
+        1. Single variable assignment (start_id == end_id)
+        2. The operand is a string (operand_type == 4)
+        3. The string is enclosed in backticks (e.g., `Translatable Text`) or quotes or Chinese quotes.
+        
+        **Note: This is a heuristic and may not cover all cases. Further refinement may be needed based on actual game data.**
+        """
+        match params:
+            case [start_id, end_id, 0, 4, str() as operand_text]:
+                if not operand_text or operand_text[0] == '$': # Skip variable references like $gameVariables.value(1)
+                    return []
+                elif start_id==end_id and ENCLOSED_STRING_PATTERN.match(operand_text):
+                    return [TextUnit(
+                        file=self.path.stem,
+                        key=JsonPath._from_parts((*json_prefix, 4)),
+                        original=operand_text
+                    )]
+                else:
+                    return []
+            case _:
+                return []
+
+    def _extract_357(self, params: list, json_prefix: tuple)  -> list[TextUnit]: #PluginCommand
+        """Extract Code 357 (PluginCommand) command parameters"""
+        plugin, method, _, method_kwargs,*_ = params
+        if (translatable_path := PLUGIN_HANDLERS.get((plugin, method))) is not None:
+            v = translatable_path.fetch(method_kwargs)
+            return [TextUnit(
+                file=self.path.stem,
+                key=JsonPath._from_parts((*json_prefix, 3,*translatable_path._parts)),
+                original=v
+            )]
+        return []
 
 @registered_extractor(name='RPG Maker MV')
 class RPGMakerMVExtractor(BaseExtractor):
@@ -108,7 +195,7 @@ class RPGMakerMVExtractor(BaseExtractor):
         Example of event data structure:
         ```
         [ ...,
-          {"id": 2, "list": [{"code": 401, "indent": 0, "parameters": ["Translatable Text"]}]            
+          {"id": 2, "list": [{"code": 401, "indent": 0, "parameters": ["Translatable Text"]}]
         ]            
         ```
         """
@@ -117,73 +204,9 @@ class RPGMakerMVExtractor(BaseExtractor):
         for i, item in enumerate(pages):    
             if not isinstance(item, dict):
                 continue
-            elif not (command_list := item.get("list")):
-                continue
-            for j, command in enumerate(command_list):
-                if not (
-                    (cmd_code:=command.get("code")) and
-                    (cmd_type:=EVENT_TRANSLATION_CODES.get(cmd_code)) and
-                    (params := command.get("parameters"))
-                ):
-                    continue
-                if cmd_type == "ShowText": # only in rpg maker mz
-                    if len(params)==4 and  isinstance((speaker := params[4]), str) and speaker.strip():
-                        out.append(TextUnit(
-                            file=path.stem,
-                            key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 4)),
-                            original=speaker,
-                            other_attrs={"attribute":f"CMD:{cmd_type}",}
-                        ))
-                if cmd_type == "PluginCommand":
-                    plugin, method, _, method_kwargs = params[:4]
-                    if (translatable_path := PLUGIN_HANDLERS.get((plugin, method))) is not None:
-                        v = translatable_path.fetch(method_kwargs)
-                        out.append(TextUnit(
-                            file=path.stem,
-                            key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 3, *translatable_path._parts)),
-                            original=v,
-                            other_attrs={"attribute":f"CMD:{cmd_type}","plugin":plugin,"method":method}
-                        ))
-                elif cmd_type == "ControlVariables":
-                    # This command can contain translatable text when the game uses texts like \v[1] to display text stored in variables.
-                    # start_id, end_id, operator, operand_type, operand_value = params[:5]
-                    match params:
-                        case [start_id, end_id, 0, 4, str() as operand_value]:
-                            # Identifying translatable text in ControlVariables command is quite tricky. I assume:
-                            # 1. Single variable assignment (start_id == end_id)
-                            # 2. The operand is a string (operand_type == 4)
-                            # 3. The string is enclosed in backticks (e.g., `Translatable Text`) or quotes or Chinese quotes.
-                            # Note: This is a heuristic and may not cover all cases. Further refinement may be needed based on actual game data.
-                            if (
-                                not operand_value or      # Skip empty strings
-                                operand_value[0] == '$' # Skip variable references like $gameVariables.value(1)
-                            ):
-                                continue 
-                            elif start_id==end_id and (
-                                operand_value.startswith("`") and operand_value.endswith("`") or
-                                operand_value.startswith('"') and operand_value.endswith('"') or
-                                operand_value.startswith("'") and operand_value.endswith("'") or
-                                operand_value.startswith('「') and operand_value.endswith('」')
-                            ):
-                                out.append(TextUnit(
-                                    file=path.stem,
-                                    key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 4)),
-                                    original=operand_value,
-                                    other_attrs={"attribute":f"CMD:{cmd_type}",}
-                                ))
-                            else:
-                                pass
-                        case _:
-                            pass
-                else:
-                    for param, current_path, parent in walk_json(params):
-                        if isinstance(param, str) and param.strip():
-                            out.append(TextUnit(
-                                file=path.stem,
-                                key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', *current_path)),
-                                original=param,
-                                other_attrs={"attribute":f"CMD:{cmd_type}",}
-                            ))
+            elif (command_list := item.get("list")):
+                cmd_extractor = CmdExtractor(path, json_prefix=(*json_prefix, i, 'list'))
+                out.extend(cmd_extractor.extract_cmds(command_list))
         return out
     
     @override
