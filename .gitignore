@@ -1,12 +1,15 @@
 # Ignore Visual Studio Code settings and backup files
 .vscode/
 .backup/
+COMMIT.MD # This is just a tmp file for drafting.
 # Ignore AI agents documentation files
 AGENTS.MD
 CLAUDE.MD
 GEMINI.MD
+
+
 # Ignore environment variables and JSON files that may contain sensitive information or are not necessary to track
-.venv/
+.venv*/
 .env
 *.json
 # Cache/Compiled files
@@ -16,3 +19,7 @@ resources_rc.py
 
 # Exclude translations from being ignored
 !src/app/.translations/*.json
+
+# Build files
+build/
+dist/
