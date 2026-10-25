@@ -52,7 +52,7 @@ pip install -r requirements-dev.txt
 
 ### Compile Qt Resources
 ```bash
-pyside6-rcc src/app/resources.qrc -o src/app/resources_rc.py
+pyside6-rcc resources.qrc -o src/app/resources_rc.py
 ```
 or 
 ```python

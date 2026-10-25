@@ -8,7 +8,7 @@ import argparse
 from dotenv import load_dotenv
 from PySide6.QtWidgets import QApplication, QMessageBox, QTextEdit
 
-import resources_rc
+from app import resources_rc # load the Qt resources
 from app.gui.main_window import TranslationApp
 from app.models.session import TranslationSession
 from app.presenter import TranslationAppPresenter
