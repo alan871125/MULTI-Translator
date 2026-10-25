@@ -13,13 +13,15 @@ Supports:
 
     path.parts -> list[str | int]
 """
-
+from __future__ import annotations
 import re
-from typing import Any, Hashable, Iterable, Iterator, Union, Literal, Sequence, Protocol, runtime_checkable
+from typing import Optional, TypeVar, Generic, Iterable, Hashable, Union, Literal, Sequence, Protocol, runtime_checkable
 
+K = TypeVar("K", bound=Hashable, contravariant=True)
+V = TypeVar("V", covariant=True)
 @runtime_checkable
-class DictLike(Protocol):
-    def __getitem__(self, key: Hashable): ...
+class DictLike(Protocol, Generic[K,V]):
+    def __getitem__(self, key: K, /)->V: ...
     
 PathLike = Union["JsonPath", str, Sequence[Union[str, int]]]  # A type hint for anything that can be converted to a JsonPath
 
@@ -49,6 +51,7 @@ class JsonPath:
     __slots__ = ("_parts", "_parts_list_cache","__str_cache" )
 
     def __init__(self, source: PathLike = ()) -> None:
+        self._parts: tuple[Union[str, int], ...]
         if isinstance(source, JsonPath):
             self._parts = source._parts
         elif isinstance(source, (list, tuple)):
@@ -59,12 +62,12 @@ class JsonPath:
             raise TypeError(
                 f"JsonPath() accepts JsonPath | list | tuple | str, got {type(source)!r}"
             )
-        self.__str_cache = None
-        self._parts_list_cache = None
+        self.__str_cache: Optional[str] = None
+        self._parts_list_cache: Optional[list[int|str]] = None
     
     # -- fast internal constructor, skips validation/parsing entirely -------
     @classmethod
-    def _from_parts(cls, parts: tuple, str_type: Literal["property", "array"]= "property") -> "JsonPath":
+    def _from_parts(cls, parts: tuple) -> JsonPath:
         obj = object.__new__(cls)
         obj._parts = parts
         obj.__str_cache = None
@@ -73,15 +76,15 @@ class JsonPath:
 
     # -- public API -----------------------------------------------------
     @property
-    def parts(self) -> list:
+    def parts(self) -> list[int|str]:
         """Materialize and cache the parts as a list (the tuple stays canonical)."""
-        cached = self._parts_list_cache
+        cached: Optional[list[int|str]] = self._parts_list_cache
         if cached is None:
             cached = list(self._parts)
             self._parts_list_cache = cached
         return cached
 
-    def __add__(self, other: PathLike) -> "JsonPath":
+    def __add__(self, other: PathLike) -> JsonPath:
         if isinstance(other, JsonPath):
             other_parts = other._parts
         elif isinstance(other, (list, tuple)):
@@ -92,7 +95,7 @@ class JsonPath:
             return NotImplemented
         return JsonPath._from_parts(self._parts + other_parts)
 
-    def __radd__(self, other: PathLike) -> "JsonPath":
+    def __radd__(self, other: PathLike) -> JsonPath:
         if isinstance(other, (list, tuple)):
             return JsonPath._from_parts(tuple(_validate_part(p) for p in other) + self._parts)
         if isinstance(other, str):
@@ -145,15 +148,15 @@ class JsonPath:
     def __str__(self) -> str:
         return self.as_property_str()
 
-    def fetch(self, data: DictLike)-> Any:
+    def fetch(self, data: DictLike[int|str, V]) -> Optional[DictLike[int|str, V]|V]:
         """fetch the value at this path from a dict-like object, or return None if any part is missing."""
-        current = data
+        current: object = data
         for part in self._parts:
             if isinstance(current, DictLike):
                 current = current[part]
             else:
                 return None
-        return current
+        return current  # type: ignore[return-value]
 
 def _render(parts: Iterable[Union[str, int]], str_type: str) -> str:
     if str_type == 'array':
@@ -190,7 +193,8 @@ def _quote(s: str) -> str:
 def _is_int(s: str) -> bool:
     return s.lstrip("-").isdigit() and s not in ("", "-")
 
-def _parse(s: str) -> tuple:
+def _parse(s: str) -> tuple[Union[str, int], ...]:
+    
     s = s.strip()
     if s in ("", "$"):
         return ()
