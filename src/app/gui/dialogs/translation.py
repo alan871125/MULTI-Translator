@@ -1,5 +1,3 @@
-from app.settings import L, Settings
-
 from PySide6.QtWidgets import QLabel, QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit
 from PySide6.QtGui import QShortcut, QKeySequence
 
