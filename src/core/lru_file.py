@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import Iterable
+
 class FileNode(Path):
     def __init__(self, path: str):
         super().__init__(path)
@@ -6,18 +8,13 @@ class FileNode(Path):
         self.prev: FileNode | None = None # prev is more recent
 
 class LeastRecentlyUsedFiles:
-    def __init__(self, max_files: int = 10):
+    def __init__(self, file_list: Iterable[str]|None = None, /, max_files: int = 10):
         self.max_files = max_files
         self.head: FileNode | None = None  # Least recently used file
         self.tail: FileNode | None = None  # Most recently used file
-        self.file_map = {}  # Map file paths to their corresponding nodes for O(1) access
-
-    @staticmethod
-    def from_list(file_list: list[str], max_files: int = 10) -> "LeastRecentlyUsedFiles":
-        lru = LeastRecentlyUsedFiles(max_files=max_files)
-        for file_path in file_list:
-            lru.add_recent_file(file_path)
-        return lru
+        self.file_map:dict[str, FileNode] = {}  # Map file paths to their corresponding nodes for O(1) access
+        for file_path in (file_list or []):
+            self.add_recent_file(file_path)
     
     def _move_to_tail(self, node: FileNode):
         if node is self.tail:
@@ -66,7 +63,10 @@ class LeastRecentlyUsedFiles:
         while current:
             yield current
             current = current.prev if reverse else current.next
-
+    
+    def __iter__(self):
+        return self.iter()        
+    
     def to_list(self) -> list[str]:
-        return [node.as_posix() for node in self.iter()]
+        return [node.as_posix() for node in self]
         
