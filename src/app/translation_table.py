@@ -14,7 +14,7 @@ from qt_extensions.core import TypedSignal
 from iod import IndexedOrderedDict
 from core.translation import TranslationLevel
 from core.translation.dictionary import TranslationDictionary
-from .language import LanguagePack
+from .locales import LanguagePack
 from .models.translation_table_model import TranslationTableModel
 from .typing import IndexLikeSequence
 logger = logging.getLogger(__name__)

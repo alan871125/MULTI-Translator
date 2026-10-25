@@ -4,7 +4,8 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QDialogButtonBox, Q
 
 from app.settings import L, Settings
 from core.translation import Language, get_supported_languages, providers
-
+from app.locales import LanguagePack
+L = LanguagePack()
 
 class PathSettingsLayout(QHBoxLayout):
     def __init__(self, default_path:str|Path, browse_type: str = "dir"):

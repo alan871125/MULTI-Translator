@@ -11,10 +11,9 @@ from qt_extensions.core import TypedSignal
 
 from core.json_utils import JSONWithCommentsDecoder
 from core.lru_file import LeastRecentlyUsedFiles
-from .language import LanguagePack
 
 logger = logging.getLogger(__name__)
-L = LanguagePack()
+
 
 WORKSPACE_FILE_EXTENSION = ".translation-workspace"
 DEFAULT_GLOBAL_WORKSPACE_FILE = "./default.translation-workspace"

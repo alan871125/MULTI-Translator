@@ -3,6 +3,10 @@ from app.settings import L, Settings
 from PySide6.QtWidgets import QLabel, QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit
 from PySide6.QtGui import QShortcut, QKeySequence
 
+from app.settings import Settings
+from app.locales import LanguagePack
+L = LanguagePack()
+
 class TranslationDialog(QDialog):
     """Translation dialog window"""
     def __init__(self, settings: Settings, original:str = "", translation:str = "", parent=None):

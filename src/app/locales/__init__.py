@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 logger = logging.getLogger(__name__)
 
-_TRANSLATIONS_DIR = Path(__file__).parent / ".translations"
+_TRANSLATIONS_DIR = Path(__file__).parent.resolve()
 class LanguagePack:
     """
     Use with
@@ -14,6 +14,7 @@ class LanguagePack:
     ```
     """
     
+    qt_translator = QTranslator()
     lang_data = {}
     LANGUAGE = "en"
     def __init__(self, LANGUAGE=None):
@@ -40,7 +41,11 @@ class LanguagePack:
     def load_translations(cls, lang, force=False):
         if not force and lang in cls.lang_data:
             return
-        with open(Path(__file__).parent/f".translations/{lang}.json", "r", encoding="utf-8") as f:
+        if not _TRANSLATIONS_DIR.exists():
+            logger.error(f"Translations directory '{_TRANSLATIONS_DIR}' does not exist. No translations loaded.")
+            cls.lang_data[lang] = {}
+            return
+        with open(_TRANSLATIONS_DIR / f"{lang}.json", "r", encoding="utf-8") as f:
             cls.lang_data[lang] = json.load(f)
     
     @classmethod

@@ -13,7 +13,7 @@ from plugins import plugin_list
 from core.translation import TranslationLevel
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from ..theme import ThemeManager
 
 logger = logging.getLogger(__name__)

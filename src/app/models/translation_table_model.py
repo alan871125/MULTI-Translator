@@ -13,7 +13,7 @@ from app.models.filters import ColumnFilter, build_mask
 from app.settings import Settings
 from app.gui.dialogs.search import TableFilters
 from app.gui.theme import ThemeManager
-from app.language import LanguagePack
+from app.locales import LanguagePack
 from plugins import BaseExtractor
 from core.text_unit import TextUnit
 from core.translation import TranslationLevel, batch_chinese_convertion
