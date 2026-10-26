@@ -1,11 +1,12 @@
 import logging
-from typing import Union, Sequence, Optional
-from dataclasses import dataclass, field, asdict
+from typing import Optional
+from dataclasses import dataclass, field
 
 from .json_path import JsonPath, PathLike
 from .translation.level import TranslationLevel
-
 logger = logging.getLogger(__name__)
+
+__all__ = ["TextUnit"]
 
 @dataclass(slots=True)
 class TextUnit:
@@ -44,6 +45,14 @@ class TextUnit:
         self.level = level
         self.other_attrs = other_attrs if other_attrs is not None else {}
         self.key = JsonPath(key)
-            
+    
     def asdict(self):
-        return asdict(self)
+        # the asdict is slow internally
+        return {
+            "file": self.file,
+            "key": self.key,
+            "original": self.original,
+            "translation": self.translation,
+            "level": self.level.value,
+            **self.other_attrs
+        }

@@ -27,15 +27,17 @@ L = LanguagePack()
 class TranslationTableModel(QAbstractTableModel):
     _COLUMNS = ["file", "key", "original", "translation", "comments"]
     _HIDDEN_COLUMNS = ["level"]  # Columns that are not displayed but used for internal logic, such as translation level
-    
-    def __init__(self, data=None, settings:Optional[Settings] = None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
+    def __init__(self, data:pd.DataFrame|Sequence[TextUnit]|None=None, settings:Optional[Settings] = None, filters:Optional[TableFilters] = None, file_path: Optional[Path|str] = None, engine:Optional[BaseExtractor] = None, undo_stack: Optional[QUndoStack] = None):
         super().__init__()
         self.file_path = Path(file_path) if file_path else None
         self.engine = engine
         self.undo_stack = undo_stack
-        self.df:pd.DataFrame = pd.DataFrame(
-            data or [], columns=self._COLUMNS+self._HIDDEN_COLUMNS
-        ).set_index('key', drop=False)
+        self._in_progress_keys: set = set()  # row keys currently being translated
+        cols = self._COLUMNS+self._HIDDEN_COLUMNS
+        if isinstance(data, pd.DataFrame):
+            self.df = data.set_index('key', drop=False)
+        else:
+            self.df = pd.DataFrame((u.asdict() for u in data or []), columns=cols).set_index('key', drop=False)
         self.sort(0) # Initialize order with (file, key)
         self.filters = filters if filters is not None else TableFilters(self)
         self._mask_cache: Optional[pd.Series] = None  # Cache for the current filter mask
