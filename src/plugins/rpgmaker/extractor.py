@@ -138,6 +138,9 @@ class RPGMakerMVExtractor(BaseExtractor):
                     plugin, method, _, method_kwargs = params[:4]
                     if (translatable_path := PLUGIN_HANDLERS.get((plugin, method))) is not None:
                         v = translatable_path.fetch(method_kwargs)
+                        if not isinstance(v, str):
+                            logging.error(f"Expected a string at path {translatable_path} in plugin command {plugin}.{method}, but got {type(v).__name__}. Skipping.")
+                            continue
                         out.append(TextUnit(
                             file=path.stem,
                             key = JsonPath._from_parts((path.stem, *json_prefix, i, 'list', j, 'parameters', 3, *translatable_path._parts)),
