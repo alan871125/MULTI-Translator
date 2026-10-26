@@ -3,8 +3,16 @@ import pkgutil
 import importlib
 import logging
 from pathlib import Path
-from ._registry import extractors, engine_modules
-from ._base import BaseExtractor
+from ._registry import registered_extractor, extractors, engine_modules
+from ._base import (
+    BaseExtractor, 
+    SupportedDirType, SupportedDirInvalidType, SubDirCheckType,
+    UnsupportedDirectoryError
+)
+__all__ = [
+    "registered_extractor", "extractors", "engine_modules",
+    "BaseExtractor", "SupportedDirType", "SupportedDirInvalidType", "SubDirCheckType", "UnsupportedDirectoryError"
+]
 
 logger = logging.getLogger(__name__)
 
