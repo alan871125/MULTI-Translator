@@ -25,13 +25,21 @@ class TranslatorProtocol(Protocol):
         ...
     def _translate_batch(self, batch: list[str], **kwargs) -> Sequence[str|None]:
         ...
-    
-class TranslatorSettings(Protocol):
-    SOURCE_LANG: str
-    TARGET_LANG: str
-    API: str
-    CUSTOM_API_MODEL:str
-    CUSTOM_API_URL:str
+
+class TranslatorSettings(Protocol): 
+    # use properties since everything here is read-only+prevents static type checkers complaining about variable!=property
+    @property
+    def source_lang(self)-> str: ...
+    @property
+    def target_lang(self)-> str: ...
+    @property
+    def api_provider(self)-> str: ...
+    @property
+    def custom_api_model(self)-> str: ...
+    @property
+    def custom_api_url(self)-> str: ...
+    @property
+    def api_key(self)-> str|None: ...
 
 class Translator:
     """A wrapper class to unify the interface of different translation providers.
@@ -53,23 +61,25 @@ class Translator:
     def translate(self, text: str):
         return translate(
             text,
-            source_lang=self.settings.SOURCE_LANG,
-            target_lang=self.settings.TARGET_LANG,
-            provider=self.settings.API,
-            model=self.settings.CUSTOM_API_MODEL,
-            base_url=self.settings.CUSTOM_API_URL
+            source_lang=self.settings.source_lang,
+            target_lang=self.settings.target_lang,
+            provider=self.settings.api_provider,
+            model=self.settings.custom_api_model,
+            base_url=self.settings.custom_api_url
         )
+    
     def batch_translate(self, batch: list[str]) -> Sequence[str|None]:
         return batch_translate(
             batch,
-            source_lang=self.settings.SOURCE_LANG,
-            target_lang=self.settings.TARGET_LANG,
-            provider=self.settings.API,
-            model=self.settings.CUSTOM_API_MODEL,
-            base_url=self.settings.CUSTOM_API_URL
+            source_lang=self.settings.source_lang,
+            target_lang=self.settings.target_lang,
+            provider=self.settings.api_provider,
+            model=self.settings.custom_api_model,
+            base_url=self.settings.custom_api_url
         )
+        
     def get_supported_languages(self) -> list[Language]:
-        return list(get_supported_languages(self.settings.API))
+        return list(get_supported_languages(self.settings.api_provider))
     
     def line_batch_translate(self, lines:list[str]):
         """(EXPERIMENTAL) Translate a sequence of lines as a whole, yet preserving formatting, decided by the llm model"""
@@ -83,19 +93,19 @@ class Translator:
         )
         
         translation_prompt =  "Source JSON:\n{text}\nTranslated JSON:\n"
-        if self.settings.API!= "Custom API (LLM)":
-            logger.error(f"line_batch_translate is designed for Custom API (LLM) provider. Current provider is {self.settings.API}.")
+        if self.settings.api_provider!= "Custom API (LLM)":
+            logger.error(f"line_batch_translate is designed for Custom API (LLM) provider. Current provider is {self.settings.api_provider}.")
             return None
         
         # translator = get_translator(source_lang, target_lang, self.settings.API, api_key=os.getenv("CUSTOM_API_KEY"), model=self.settings.CUSTOM_API_MODEL, base_url=self.settings.CUSTOM_API_URL)
         translator = OpenAITranslator(
-            model=self.settings.CUSTOM_API_MODEL, 
-            api_key=os.getenv("CUSTOM_API_KEY"), 
-            base_url=self.settings.CUSTOM_API_URL,
-            source=self.settings.SOURCE_LANG, target=self.settings.TARGET_LANG
+            model=self.settings.custom_api_model, 
+            api_key=self.settings.api_key, 
+            base_url=self.settings.custom_api_url,
+            source=self.settings.source_lang, target=self.settings.target_lang
         )
         if not translator:
-            logger.error(f"Failed to get translator for provider {self.settings.API}.")
+            logger.error(f"Failed to get translator for provider {self.settings.api_provider}.")
             return None
         try:
             translated_json = translator.translate(json.dumps(lines, ensure_ascii=False, indent=2), system_prompt=system_prompt, main_prompt=translation_prompt)
@@ -188,6 +198,7 @@ def batch_translate(sources: list[str], source_lang:str="auto", target_lang:str=
         logger.error(f"Translation API error: {e}")
         return []
     return translated
+
 ChineseType = Literal['s', 't', 'tw', 'zh-cn', 'zh-tw', 'zh-hans', 'zh-hant', 'simplified', 'traditional', 'chs', 'cht']
 def batch_chinese_convertion(texts: Iterable[str], target:ChineseType='tw')-> Sequence[str]:
     """Batch convert a sequence of Chinese texts between Simplified and Traditional variants using OpenCC.  

@@ -55,8 +55,8 @@ class TranslationSession(QObject):
             # Create a new dictionary if it doesn't exist
             dictionary = TranslationDictionary(
                 df = model.df.copy(),
-                source_lang=self.settings.SOURCE_LANG,
-                target_lang=self.settings.TARGET_LANG
+                source_lang=self.settings.translation.source_lang,
+                target_lang=self.settings.translation.target_lang
             )
         if save_path is None:
             if Path(key).is_dir(): # This prevents the dir path having a dot in its name being truncated by the method `with_suffix`
@@ -108,7 +108,7 @@ class TranslationSession(QObject):
         try:
             key = dir_path.as_posix()
             model = TranslationTableModel(
-                data=extractor.extract_dir(dir_path, source_lang=self.settings.SOURCE_LANG, target_lang=self.settings.TARGET_LANG), 
+                data=extractor.extract_dir(dir_path, source_lang=self.settings.translation.source_lang, target_lang=self.settings.translation.target_lang), 
                 settings=self.settings,
                 # filters=TableFilters(), # each model has its own filters, instead of sharing one instance.
                 file_path=dir_path,

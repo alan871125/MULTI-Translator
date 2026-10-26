@@ -60,17 +60,17 @@ class TestLRUFiles:
         assert [node.as_posix() for node in lru.iter()] == ["file2.txt", "file3.txt", "file4.txt"]
     
     def test_settings_integration(self):
-        from app.settings import SettingsData
+        from app.settings import AppSettings
         
         # 1. Test that when loading settings with recent files being empty, it initializes correctly
-        settings = SettingsData(**{"recent_files":[]}) # Test __init__ typing
+        settings = AppSettings(**{"recent_files":[]}) # Test __init__ typing
         (lru:=settings.recent_files).add_recent_file("file1.txt")
         lru.add_recent_file("file1.txt")
         assert ((lru.head is not None and lru.tail is not None) and 
                 lru.head.as_posix() == lru.tail.as_posix() == "file1.txt"), "After adding the first file, head and tail should point to the same file."
         
         # 2. Test that when loading settings with recent files, it initializes correctly
-        settings = SettingsData.model_validate({"recent_files":["file1.txt", "file2.txt", "file3.txt"]})
+        settings = AppSettings.model_validate({"recent_files":["file1.txt", "file2.txt", "file3.txt"]})
         (lru:=settings.recent_files).add_recent_file("file1.txt")
         assert lru.to_list() == ["file2.txt", "file3.txt", "file1.txt"], "After accessing file1.txt, it should move to the end of the list."
         lru.add_recent_file("file2.txt")

@@ -1,330 +1,428 @@
-import os
-import json
-import logging  
-import inspect
-from pathlib import Path
-from dataclasses import dataclass, asdict, field
+"""
+This module defines the application settings and workspace management for the RPG Translator application.
 
-from typing import Any, Optional, overload, Literal
+We use Pydantic's BaseModel & BaseSettings instead of Qt's QSettings to provide:
+1. type safety during development(static type checking) and
+2. runtime setting value type validation
+"""
+
+from __future__ import annotations
+import os
+import re
+import json
+import logging
+from pathlib import Path
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Annotated, ClassVar, TypeVar
+from pydantic import BaseModel, model_validator, ConfigDict, Field, BeforeValidator, PlainSerializer
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from PySide6.QtCore import QObject
 from qt_extensions.core import TypedSignal
 
-from core.json_utils import JSONWithCommentsDecoder
+from core.setting_space import SettingSpace, SettingScope
 from core.lru_file import LeastRecentlyUsedFiles
 
 logger = logging.getLogger(__name__)
 
-
+    
 WORKSPACE_FILE_EXTENSION = ".translation-workspace"
-DEFAULT_GLOBAL_WORKSPACE_FILE = "./default.translation-workspace"
 DEFAULT_LOCAL_WORKSPACE_FILE= "./workspace.translation-workspace"
+
+DEFAULT_WORKSPACE_NAME = "Default"
+DEFAULT_WORKSPACE_DIR = "%CWD%"
 DEFAULT_SETTINGS_FILE = "settings.json"
 DEFAULT_GAME_DATA_DIR = "%WORKSPACE_DIR%/data"
 DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
 DEFAULT_OUTPUT_DIR = "%WORKSPACE_DIR%/output"
 DEFAULT_DB_PATH = "%WORKSPACE_DIR%/user_dict.db"
-DEFAULT_PLUGIN = "RPG Maker MV"
+DEFAULT_PLUGIN = "Simple Json"
+
+SupportedLanguages = Literal["en", 'zh-tw']
+# Matches either %VAR% (group 1) OR $VAR / ${VAR} (group 2)
+_VARPATTERN = re.compile(r'%(\w+|\{[^}]*\}?)%|\$(\w+|\{[^}]*\}?)')
+
 @dataclass
 class Confirmations:
     share_translation: bool = False
 
-@dataclass(slots=True)
-class SettingsData:
-    SOURCE_LANG: str = "auto" # should be saved as language code, but can be displayed as language name in the UI
-    TARGET_LANG: str = "en"   # should be saved as language code, but can be displayed as language name in the UI
-    API: str = "Google"
-    DEEPL_API_KEY: str = ""
-    CUSTOM_API_KEY: str = ""
-    CUSTOM_API_URL: str = "https://openrouter.ai/api/v1" # This is used for custom API, ignored for built-in APIs like Google Translate
-    CUSTOM_API_MODEL: str = "openrouter/free"
+class AppSettings(SettingSpace):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    if TYPE_CHECKING:
+        # A workaround to make the type checker understand that recent_files can be initialized with LeastRecentlyUsedFiles|list[str],
+        # while at runtime it will always be a LeastRecentlyUsedFiles instance.
+        def __init__( 
+            self, *,
+            recent_files: LeastRecentlyUsedFiles | Iterable[str] = ...,
+            **kwargs: Any,
+        ) -> None: ...
+    class TranslationSettings(SettingSpace, BaseSettings):
+        # use BaseSettings to load api keys from .env file
+        model_config = SettingsConfigDict(extra="ignore", env_file=".env", env_file_encoding="utf-8")
+        api_provider:     str = "Google"
+        custom_api_url:   str = "https://openrouter.ai/api/v1" 
+        custom_api_model: str = "openrouter/free"
+        custom_api_key: str|None = None
+        deepl_api_key:  str|None = None
+        source_lang: str = "auto"
+        target_lang: str = "en"
+        
+        @property
+        def api_key(self) -> str|None:
+            """Return the API key for the selected provider."""
+            if self.api_provider.lower() == "deepl":
+                return self.deepl_api_key
+            elif self.api_provider.lower() == "custom":
+                return self.custom_api_key
+            return None
+        
+        @api_key.setter
+        def api_key(self, value: str|None)->None:
+            """Set the API key for the selected provider."""
+            if self.api_provider.lower() == "deepl":
+                self.deepl_api_key = value
+            elif self.api_provider.lower() == "custom":
+                self.custom_api_key = value
+        
+    class UISettings(SettingSpace):
+        # Theme and UI
+        language: SupportedLanguages = "en"
+        dark_mode: bool = False
+        theme: str = "default"
+        font_size: int = 11
+
+    ui: UISettings = Field(default_factory=UISettings)
+    translation: TranslationSettings = Field(default_factory=TranslationSettings)
+    confirmations: Confirmations = Field(default_factory=Confirmations)
+    plugin_settings:dict[str, object] = Field(default_factory=dict)
     max_workers: int = 4
     
-    # Theme and UI
-    language: str = "en"
-    dark_mode: bool = False
-    theme: str = "default"
-    font_size: int = 11
-    
-    # Recent files and session
+    # Recent Files and Session
     restore_last_session: bool = True
-    recent_files: LeastRecentlyUsedFiles = field(init = False, default_factory=LeastRecentlyUsedFiles)
-    last_open_workspace: Optional[str] = None  # Path to the last opened workspace, used for restoring session on startup
+    recent_files: Annotated[
+        LeastRecentlyUsedFiles, 
+            BeforeValidator(LeastRecentlyUsedFiles),
+            PlainSerializer(lambda v: v.to_list())
+    ] = Field(default_factory=LeastRecentlyUsedFiles)
+    last_open_workspace: str|None = None  # Path to the last opened workspace, used for restoring session on startup
+    last_open_tabs: list[str] = Field(default_factory=list)  # List of paths to the last opened tabs, used for restoring session on startup
     
-    confirmations: Confirmations = field(default_factory=Confirmations)
-    
-    def to_dict(self) -> dict:
-        d = asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if (v is not None and not k.startswith("_"))})
-        d["recent_files"] = self.recent_files.to_list()
-        d["confirmations"] = asdict(self.confirmations)
-        return d
-    
-    @classmethod
-    def from_dict(cls,data: dict) -> "SettingsData":
-        valid_fields = inspect.signature(cls).parameters
-        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
-        settings = cls(**filtered_data)
-        settings.recent_files = LeastRecentlyUsedFiles.from_list(data.get("recent_files", []))
-        settings.confirmations = Confirmations(**data.get("confirmations", {}))
-        return settings
-    
-    @classmethod    
-    def load(cls, path: str|Path) -> "SettingsData":
-        try:
-            with open(path, "r") as f:
-                data = json.load(f, cls=JSONWithCommentsDecoder)
-            settings = cls.from_dict(data)
-        except FileNotFoundError:
-            logger.info("Initializing new settings with default values.")
-            settings=cls()  # Return default settings if file not found
-        except Exception as e:
-            logger.error(f"Failed to load settings from {path}: {e}")
-            settings=cls()  # Return default settings on failure
-        settings.DEEPL_API_KEY = os.getenv("DEEPL_API_KEY", settings.DEEPL_API_KEY)
-        settings.CUSTOM_API_KEY = os.getenv("CUSTOM_API_KEY", settings.CUSTOM_API_KEY)
-        # if workspace_path and Path(workspace_path).exists():
-        #     settings._workspace = WorkspaceSettings.load(workspace_path)
-        # else:
-        #     settings._workspace = WorkspaceSettings(**data.get("workspace", {}))
-        return settings
-    
-    def load_update(self, path: str|Path):
-        """Load settings from a file and update the current settings. This is useful for loading a different settings file without affecting the workspace settings."""
-        new = self.load(path)
-        for k,v in new.to_dict().items():
-            if v is not None:
-                setattr(self, k, v)
-    
-    def save(self, path: str|Path="settings.json"):
-        settings = self.to_dict()
-        DEEPL_API_KEY =settings.pop("DEEPL_API_KEY", "")
-        CUSTOM_API_KEY = settings.pop("CUSTOM_API_KEY", "")
-        # if self._workspace.workspace_dir is not None:
-        #     self._workspace.save(path=None)  # Save workspace settings to its own file in the workspace directory
-        # else:
-        #     self._workspace.save(path="./default.translation-workspace")  # Save workspace settings to a separate file with the same name but .translation-workspace extension
-        if DEEPL_API_KEY or CUSTOM_API_KEY:  # Remove CUSTOM_API_KEY from the settings to be save in .env file
-            import dotenv
-            dotenv.set_key(".env", "DEEPL_API_KEY", DEEPL_API_KEY)
-            dotenv.set_key(".env", "CUSTOM_API_KEY", CUSTOM_API_KEY)
-        try:
-            with open(path, "w") as f:
-                json.dump(settings,  f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            logger.error(f"Failed to save settings to {path}: {e}")
-
-@dataclass(slots=True)
-class WorkspaceData:
-    workspace_dir: Optional[str] = None  # None means the global default workspace
+    plugin:        str = DEFAULT_PLUGIN
+    workspace_dir: str = DEFAULT_WORKSPACE_DIR
     game_data_dir: str = DEFAULT_GAME_DATA_DIR
     user_dict_dir: str = DEFAULT_USER_DICT_DIR
-    output_dir: str = DEFAULT_OUTPUT_DIR
-    plugin: str = DEFAULT_PLUGIN
-    db_path: str = DEFAULT_DB_PATH
-    last_open_tabs: list[str] = field(default_factory=list)
+    output_dir:    str = DEFAULT_OUTPUT_DIR
+    db_path:       str = DEFAULT_DB_PATH
     
-    def asdict(self) -> dict:
-        return asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
+    def save(self, path: str|Path=DEFAULT_SETTINGS_FILE, *, save_api_keys: bool = True):
+        """Save the settings to a JSON file."""
+        path = Path(path)
+        settings_dict = self.model_dump(mode="json")
+        api_keys = {}
+        for k, v in settings_dict.items():
+            if k.lower().endswith("_api_key"):
+                api_keys[k] = v
+        for k in api_keys:
+            settings_dict.pop(k)
+        if api_keys and save_api_keys:
+            # TODO: Increase security by encrypting or using keyring
+            env_path = path.parent/'.env'
+            import dotenv
+            for k, v in api_keys.items():
+                dotenv.set_key(env_path, k.upper(), v)
+            logger.info(f"API keys saved to {env_path}. Please ensure this file is secured.")
+        try:
+            with open(path, "w") as f:
+                json.dump(settings_dict,  f, ensure_ascii=False, indent=4)
+            logger.info(f"Settings saved to {path}")
+        except Exception as e:
+            logger.error(f"Failed to save settings to {path}: {e}")
+        
+    @classmethod
+    def load(cls, path: str|Path):
+        """Load settings from a JSON file."""
+        path = Path(path)
+        return cls.model_validate_json(path.read_text(encoding="utf-8"))
+    
+class Workspace(BaseModel):
+    FILE_EXTENSION: ClassVar[str] = ".multi-workspace"
+    name: str | None = None
+    settings: dict = Field(default_factory=dict)
+    _workspace_file: Path|None = None  # Path to the workspace file, used for saving local settings
+    
+    @model_validator(mode="after")
+    def validate_settings(self):
+        if self.settings.get("restore_last_session"):
+            # initialize last_open_tabs, so that the local settings can intercept it when saving the workspace
+            self.settings.setdefault("last_open_tabs", [])
+        else:
+            self.settings.pop("last_open_tabs", None)
+        return self
     
     @classmethod
-    def load(cls, dir_path: str|Path=DEFAULT_GLOBAL_WORKSPACE_FILE) -> 'WorkspaceData':
-        """ 
-        Load workspace settings from a workspace file or a folder containing a workspace file. 
-        
+    def load(cls, path: str|Path):
+        """Load workspace from a JSON file."""
+        path = Path(path)
+        if path.is_dir():
+            name = path.name
+            # If the path is a directory, look for a workspace file inside it
+            workspace_file = path / f"{name}{cls.FILE_EXTENSION}"
+            if workspace_file.is_file():
+                path = workspace_file
+            else:
+                logger.warning(
+                    f"Workspace directory {path} does not contain a workspace file named {name}{cls.FILE_EXTENSION}. "
+                    "Loading with default settings."
+                )
+                return cls(name=name, settings={"workspace_dir": path.as_posix()}, _workspace_file=workspace_file)
+        if not path.suffix == cls.FILE_EXTENSION:
+            logger.warning(
+                f"Workspace file {path} does not have the expected extension {cls.FILE_EXTENSION}."
+                "Loading anyway"
+            )
+        obj =  cls.model_validate_json(path.read_text(encoding="utf-8"))
+        obj._workspace_file = path
+        return obj
+    
+    def save(self, path: str|Path):
+        """Save workspace to a JSON file."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.model_dump_json(indent=4, ensure_ascii=False))
+        logger.info(f"Workspace saved to {path}")
+    
+# The typing inheritance trick: `SettingsData if TYPE_CHECKING else object`
+# tricks the type checker into thinking that Settings inherits from SettingsData, 
+# while at runtime it inherits from QObject. 
+# This allows us to use Settings as if it were a subclass of SettingsData for type checking purposes.
+class Settings(QObject, AppSettings if TYPE_CHECKING else object):
+    """A wrapper around SettingsData that provides signal support for PySide6."""
+    setting_changed:   TypedSignal[str] = TypedSignal(str)
+    workspace_changed: TypedSignal[str] = TypedSignal(str)
+    _workspace_path: Path|None = None  # Path to the current workspace file, used for saving local settings
+    _workspace_name: str|None = None  # Name of the current workspace, used for saving local settings
+    def __init__(self, global_settings:AppSettings|dict[str,Any]|None=None, *, local_settings:dict[str, Any]|None=None, parent:QObject|None=None, **overrides):
+        """
         Arguments:
-            dir_path (str | Path): The path to the workspace file or directory. If a directory is provided, it will look for the default workspace file name in that directory.
+            global_settings (SettingsData|dict[str,Any]|None): The global settings to use. If None, defaults will be used.
+            local_settings (dict[str, Any]|None): Local settings that override global settings.
+            parent (QObject|None): The parent object.
+            **overrides: Field values that take precedence over `global_settings`. Updates the global settings with these values.
         """
         
-        dir_path = Path(dir_path)
-        if dir_path.is_dir(): # if dir given, use default workspace file name in that dir
-            if (dir_path / DEFAULT_LOCAL_WORKSPACE_FILE).exists():
-                dir_path = dir_path / DEFAULT_LOCAL_WORKSPACE_FILE
-            else: 
-                logging.info(f"No workspace settings file found in {dir_path}. Initializing with default settings.")
-                return cls(workspace_dir=dir_path.as_posix())
-        if dir_path.suffix!=".translation-workspace":
-            logger.warning(f"Loading workspace settings from a file with unexpected extension: {dir_path}. Expecting '.translation-workspace' but loading anyway.")
-        with open(dir_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return cls(**data)
+        super().__init__(parent)
+        if isinstance(global_settings, AppSettings):
+            self._space:AppSettings = global_settings
+            self._space.update(**overrides)
+        else:
+            self._space:AppSettings = AppSettings(**global_settings or {}, **overrides)
+        if local_settings:
+            self._space.update(**local_settings, scope=SettingScope.LOCAL)
+
+    if not TYPE_CHECKING: # A typing trick to make the type checker understand that accessing unrecognized attributes will raise an AttributeError
+        def __getattr__(self, name: str):
+            if name.startswith("_"):
+                raise AttributeError(name)
+            if name in type(self._space).model_fields or hasattr(self._space, name):
+                value = getattr(self._space, name)
+                if name.endswith("_dir") or name.endswith("_path"):
+                    return self._translate_path(value)
+                return value
+            raise AttributeError(f"{type(self).__name__} object has no attribute '{name}'")
+    
+    @classmethod
+    def load(cls, path: str|Path):
+        """Load settings from a JSON file."""
+        path = Path(path)
+        return cls(global_settings=AppSettings.load(path))
+
+    def _translate_path(self, path: str) -> str:
+        """Translate a path that may contain placeholders 
+        - %WORKSPACE_DIR%: Directory of the current local workspace (cwd if None)
+        - %CWD%: Current working directory (where the app is launched from)
+        """
+        cwd = os.getcwd()
         
-    def load_update(self, path: str|Path=DEFAULT_LOCAL_WORKSPACE_FILE):
-        """Load workspace settings from a file and update the current settings. This is useful for loading a workspace without affecting the global settings."""
-        new = self.load(path)
-        for k,v in new.asdict().items():
-            if v is not None:
-                setattr(self, k, v)
-                
-    def save(self, path: Optional[str|Path] = None):
-        workspace_dir = self.workspace_dir or "."
-        if path is None:
-            path = Path(workspace_dir) / DEFAULT_LOCAL_WORKSPACE_FILE
-        else:
-            path = Path(path)
-        if path.suffix != ".translation-workspace":
-            logger.warning(f"Saving workspace settings to a file with unexpected extension: {path}. Expecting '.translation-workspace'.")
-        try: # prevent breaking the existing workspace settings if saving fails
-            dumps = json.dumps(self.asdict(), indent=4, ensure_ascii=False) 
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(dumps)
-        except Exception as e:
-            logger.error(f"Error saving workspace settings to {path}: {e}")
+        # 1. Safely resolve workspace_dir first using only CWD (prevents recursion)
+        raw_ws_dir = self.get_raw("workspace_dir", DEFAULT_WORKSPACE_DIR)
+        
+        ws_var_map = {"CWD": cwd}
+        def replace_ws_var(match: re.Match[str]) -> str:
+            var_name = (match.group(1) or match.group(2)).upper()
+            if var_name.startswith("{") and var_name.endswith("}"):
+                var_name = var_name[1:-1]
+            return ws_var_map.get(var_name, match.group(0))
+            
+        resolved_ws_dir = os.path.expandvars(raw_ws_dir)
+        resolved_ws_dir = re.sub(_VARPATTERN, replace_ws_var, resolved_ws_dir)
+        resolved_ws_dir = Path(resolved_ws_dir).as_posix()
 
+        # 2. Build the full variable map using the resolved workspace directory
+        var_map = ws_var_map.copy()|{"WORKSPACE_DIR": resolved_ws_dir}
+        
+        def replace_var(match: re.Match[str]) -> str:
+            # Group 1 is for %var%, Group 2 is for $var / ${var}
+            var_name = match.group(1) or match.group(2)
+            if var_name.startswith("{") and var_name.endswith("}"):
+                var_name = var_name[1:-1]
+            var_name = var_name.upper()
+            return var_map.get(var_name, match.group(0))
+            
+        path = os.path.expandvars(path)  # Expand environment variables if any
+        path = re.sub(_VARPATTERN, replace_var, path)
+        return Path(path).as_posix()
     
-    
-StringSettings = Literal["SOURCE_LANG", "TARGET_LANG", "API", "DEEPL_API_KEY", "CUSTOM_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_MODEL", "language", "theme", "last_open_workspace"]
-BoolSettings = Literal["dark_mode", "restore_last_session"]
-IntSettings = Literal["max_workers", "font_size"]
-StringWorkspaceSettings = Literal["workspace_dir", "game_data_dir", "user_dict_dir", "output_dir", "plugin"]
-
-
-class Settings(QObject):
-    setting_changed = TypedSignal(str)
-    workspace_changed = TypedSignal(str)
-    data: SettingsData
-    workspace_data: WorkspaceData
-    # type hint for static analysis, actual attributes are stored in self.data
-    SOURCE_LANG: str 
-    TARGET_LANG: str
-    API: str
-    CUSTOM_API_MODEL:str
-    CUSTOM_API_URL:str
-    
-    def __init__(self, settings: Optional[SettingsData|str|Path]=None, workspace: Optional[WorkspaceData|str|Path]=None):
-        if isinstance(settings, (str, Path)):
-            self.data: SettingsData = SettingsData.load(settings)
-        else:
-            self.data: SettingsData = settings or SettingsData()
-
-        if isinstance(workspace, WorkspaceData):
-            self.workspace_data: WorkspaceData = workspace
-        elif isinstance(workspace, (str, Path)):
-            self.workspace_data: WorkspaceData = WorkspaceData.load(workspace)
-        elif self.data.restore_last_session and self.data.last_open_workspace:
-            self.workspace_data: WorkspaceData = WorkspaceData.load(self.data.last_open_workspace)
-        else:
-            self.workspace_data: WorkspaceData = WorkspaceData()
-        super().__init__()
-    # We look up the attribute string on the dataclass
-    def __getitem__(self, item: str) -> Any:
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith("_") or name in ["data", "settings_changed"]:
+            return super().__setattr__(name, value)
         try:
-            return getattr(self, item)
+            self.set_val(name, value)
+            self.setting_changed.emit(name)
+            if name == "workspace_dir":
+                self.workspace_changed.emit(name)
+        except:
+            raise AttributeError(f"'Settings' object has no attribute '{name}'")
+        
+    def __setitem__(self, name: str, value: Any) -> None:
+        """Allow dict-like access to settings."""
+        try:
+            self.set_val(name, value)
         except AttributeError:
-            raise KeyError(f"{item} not found in SettingsData or WorkspaceData.")
+            raise KeyError(f"{name} not found in Settings.")
         
-    def translate_dir(self, d:str)->str:
-        d = d.replace('%WORKSPACE_DIR%', self.workspace_dir or os.getcwd())
-        d = d.replace('%CWD%', os.getcwd())
-        return Path(d).as_posix() # normalized dir
-    @property
-    def game_data_dir(self) -> str:
-        return self.translate_dir(self.workspace_data.game_data_dir or DEFAULT_GAME_DATA_DIR)
-    @property
-    def output_dir(self) -> str:
-        return self.translate_dir(self.workspace_data.output_dir)
-    @property
-    def user_dict_dir(self) -> str:
-        return self.translate_dir(self.workspace_data.user_dict_dir or DEFAULT_USER_DICT_DIR)
-    @property
-    def db_path(self) -> str:
-        return self.translate_dir(self.workspace_data.db_path or "./user_dict.db")
-    @property
-    def confirmations(self) -> Confirmations:
-        return self.data.confirmations
-    @overload
-    def __getattr__(self, item: StringSettings|StringWorkspaceSettings) -> str: ...
-    @overload
-    def __getattr__(self, item: BoolSettings) -> bool: ...
-    @overload
-    def __getattr__(self, item: IntSettings) -> int: ...
-    @overload
-    def __getattr__(self, item: Literal["last_open_tabs"]) -> list: ...
-    @overload
-    def __getattr__(self, item: Literal["recent_files"]) -> LeastRecentlyUsedFiles: ...
-    def __getattr__(self, item: str) -> Any:
-        if item in ('data', 'workspace_data'):
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
-            
-        data = self.__dict__.get('data')
-        workspace_data = self.__dict__.get('workspace_data')
-        
-        if data and item in data.__dataclass_fields__:
-            return getattr(data, item)
-        elif workspace_data and item in workspace_data.__dataclass_fields__:
-            return getattr(workspace_data, item)
-        else:
-            raise AttributeError(f"{item} not found in SettingsData or WorkspaceData.")
-        
-    def __setitem__(self, key: str, value: Any) -> None:
-        data = self.__dict__.get('data')
-        workspace_data = self.__dict__.get('workspace_data')
-        
-        if data:
-            if hasattr(data, key):
-                setattr(data, key, value)
-                self.setting_changed.emit(key)  # Emit a signal when a setting is changed
-                return
-            elif (
-                len(splits:=key.split(".")) == 2 and
-                splits[0] == "confirmations" and
-                hasattr(data.confirmations, splits[-1])
-            ):
-                setattr(data.confirmations, splits[-1], value)
-                self.setting_changed.emit(key)  # Emit a signal when a setting is changed
-                return
-            
-        if workspace_data and hasattr(workspace_data, key):
-            setattr(workspace_data, key, value)
-            self.workspace_changed.emit(key)  # Emit a signal when a workspace setting is changed
-            return
-        
-        raise KeyError(f"{key} not found in wrapped data.")
-        
-    def __setattr__(self, key: str, value: Any) -> None:
-        if key in ("data", "workspace_data") or hasattr(type(self), key):
-            super().__setattr__(key, value)
-        else:
-            data = self.__dict__.get('data')
-            workspace_data = self.__dict__.get('workspace_data')
-            
-            if data and hasattr(data, key):
-                setattr(data, key, value)
-                self.setting_changed.emit(key)  # Emit a signal when a setting is changed
-            elif workspace_data and hasattr(workspace_data, key):
-                setattr(workspace_data, key, value)
-                self.workspace_changed.emit(key)  # Emit a signal when a workspace setting is changed
-            else:
-                raise AttributeError(f"{key} not found in SettingsData or WorkspaceData.")
-    
-    def update_workspace(self, workspace: WorkspaceData|str|Path):
-        if isinstance(workspace, WorkspaceData):
-            self.workspace_data = workspace
-            workspace_path = workspace.workspace_dir or DEFAULT_GLOBAL_WORKSPACE_FILE
-        elif isinstance(workspace, (str, Path)):
-            workspace_path = Path(workspace)
-            self.workspace_data.load_update(workspace_path)
-        else:
-            raise ValueError("Invalid workspace type. Must be WorkspaceData or path to workspace file.")
-        self.add_recent_file(workspace_path)  # Add the loaded workspace to recent files
-        self.workspace_changed.emit("all")  # Emit a signal indicating all workspace settings may have changed
-    
-    def load_last_open_workspace(self):
-        last_open_workspace = self.last_open_workspace
-        if last_open_workspace and Path(last_open_workspace).exists():
-            logger.debug(f"Loading last open workspace from {last_open_workspace}")
-            self.update_workspace(last_open_workspace)
+    def __getitem__(self, name: str) -> Any:
+        """Allow dict-like access to settings."""
+        space = self._space
+        try:
+            for part in name.split("."): # traverse to the target SettingSpace
+                space = getattr(space, part)
+            return space
+        except AttributeError:
+            raise KeyError(f"{name} not found in Settings.")
 
-    def load(self, path: str|Path, workspace_path: Optional[str|Path]=None):
-        self.data.load_update(path)
-        self.setting_changed.emit("all")  # Emit a signal indicating all settings may have changed
-        if workspace_path:
-            self.workspace_data.load_update(workspace_path)
-            self.workspace_changed.emit("all")  # Emit a signal indicating all workspace settings may have changed
+    T = TypeVar("T")
+    def get_raw(self, key: str,/, default: T|None = None, scope:SettingScope|None=None) -> Any|T:
+        """
+        Get the raw value of a setting without post-processing (e.g., path translation).
+        """
+        *parts, last_part = key.split(".")
+        space = self._space
+        for part in parts: # traverse to the target SettingSpace
+            space = getattr(space, part)
+        if scope == SettingScope.LOCAL:
+            return space.get_local(last_part, default)
+        elif scope == SettingScope.GLOBAL:
+            return getattr(space, last_part, default)
+        return space.get(last_part, default)
     
-    def save(self, path: Optional[str|Path] = None):
-        path = Path(path) if path else Path(DEFAULT_SETTINGS_FILE)
-        self.data.save(path)
-        self.workspace_data.save()
+    def set_val(self, key, value: Any, scope:SettingScope|None=None):
+        """Set the value of a setting, either globally or locally."""
+        *parts, last_part = key.split(".")
+        space = self._space
+        for part in parts: # traverse to the target SettingSpace
+            space = space.get(part)
+        space.update_val(last_part, value, scope=scope)
+        self.setting_changed.emit(key)
             
+    @property
+    def workspace_name(self):
+        if self._workspace_name is not None:
+            return self._workspace_name
+        return Path(self.workspace_dir).name
+    
+    @property
+    def workspace_path(self):
+        return self._workspace_path or Path(self.workspace_dir)/f"{self.workspace_name}{Workspace.FILE_EXTENSION}"
+    
+    def save(self, path: str|Path=DEFAULT_SETTINGS_FILE, *, save_api_keys: bool = True):
+        """Save the global settings to a JSON file."""
+        self._space.save(path, save_api_keys=save_api_keys)
+        Workspace(name=self.workspace_name, settings=self.get_local_settings()).save(self.workspace_path)
+        
+    def update(self, **overrides):
+        self._space.update(**overrides)
+        self.setting_changed.emit("*")  # Emit a signal indicating that all settings have changed
+
+    def update_local(self, **overrides):
+        """Update local settings with new values."""
+        for key, value in overrides.items():
+            if key in AppSettings.model_fields:
+                self._local[key] = value
+                self.setting_changed.emit(key)
+            else:
+                logger.warning(f"Attempted to update unknown local setting '{key}'.")
+
+    def load_workspace(self, path: str|Path):
+        """Load local settings from a JSON file."""
+        path = Path(path)
+        if path.is_file():
+            self._workspace_path = path
+        if path.is_dir() and (path / f"{path.name}{Workspace.FILE_EXTENSION}").is_file():
+            path = path / f"{path.name}{Workspace.FILE_EXTENSION}"
+        workspace = Workspace.load(path)
+        self._workspace_name = workspace.name
+        self._space.update(**workspace.settings, scope=SettingScope.LOCAL)
+        self.setting_changed.emit("*")
+        self.workspace_changed.emit("*")
+            
+    def load_update(self, path: str|Path):
+        """Load settings from a JSON file and update the current settings."""
+        updates = AppSettings.load(path).model_dump()
+        new = self._space.model_validate({**self._space.model_dump(), **updates})
+        self._space = new
+        self.setting_changed.emit("*")  # Emit a signal indicating that all settings have changed
+    
     def add_recent_file(self, file_path: str|Path):
-        self.data.recent_files.add_recent_file(file_path)
-        self.setting_changed.emit("recent_files")  # Emit a signal indicating recent files have changed
+        """Add a file to the recent files list."""
+        self._space.recent_files.add_recent_file(file_path)
+        self.setting_changed.emit("recent_files")
+    
+    def reset(self, name: str|None=None):
+        """Reset a specific setting or all settings to their default values."""
+        raise NotImplementedError("Resetting settings is not implemented yet.")
+    
+    def is_local(self, key:str) -> bool:
+        """Check if a setting is defined in the local settings."""
+        *parts, last_part = key.split(".")
+        space = self._space
+        for part in parts: # traverse to the target SettingSpace
+            space = getattr(space, part)
+        return last_part in space._local
+    
+    def get_local_keys(self) -> set[str]:
+        """Return a set of all local setting keys."""
+        local_keys = set()
+        def collect_local_keys(space: SettingSpace, prefix: tuple = ()):
+            for key in space._local.keys():
+                local_keys.add(".".join(prefix + (key,)))
+            for key, value in space:
+                if isinstance(value, SettingSpace):
+                    collect_local_keys(value, prefix=prefix + (key,))
+        collect_local_keys(self._space)
+        return local_keys
+    
+    def get_local_settings(self, flatten = False) -> dict[str, Any]:
+        """Return a dictionary of all local settings."""
+        local_settings = {}
+        def collect_local_settings_flat(space: SettingSpace, prefix: tuple = ()):
+            for key, value in space._local.items():
+                local_settings[".".join(prefix + (key,))] = value
+            for key, value in space:
+                if isinstance(value, SettingSpace):
+                    collect_local_settings_flat(value, prefix=prefix + (key,))
+        def collect_local_settings_nested(space: SettingSpace) -> dict[str, Any]:
+            result = {}
+            for key, value in space._local.items():
+                result[key] = value
+            for key, value in space:
+                if not isinstance(value, SettingSpace):
+                    continue
+                if nested:=collect_local_settings_nested(value):
+                    result[key] = nested
+            return result
+        if flatten:
+            collect_local_settings_flat(self._space)
+        else:
+            local_settings = collect_local_settings_nested(self._space)
+        return local_settings
