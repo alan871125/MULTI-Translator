@@ -4,7 +4,7 @@ from deep_translator.deepl import DeeplTranslator
 from deep_translator.openai import OpenAITranslator
 
 providers:dict[str, type[BaseTranslator]] = {
-    "Google": GoogleTranslator,
-    "DeepL": DeeplTranslator,
-    "Custom API (LLM)": OpenAITranslator,
+    "google": GoogleTranslator,
+    "deepl": DeeplTranslator,
+    "custom": OpenAITranslator,
 }

@@ -93,7 +93,7 @@ class Translator:
         )
         
         translation_prompt =  "Source JSON:\n{text}\nTranslated JSON:\n"
-        if self.settings.api_provider!= "Custom API (LLM)":
+        if self.settings.api_provider!= "custom":
             logger.error(f"line_batch_translate is designed for Custom API (LLM) provider. Current provider is {self.settings.api_provider}.")
             return None
         
@@ -144,10 +144,11 @@ def get_translator(source_lang: str, target_lang: str, provider: str, api_key: s
     including mapping language names to codes based on the provider's supported languages."""
     # Map language names to codes based on the provider's supported languages
     # Safe if the input is already a code.
+    provider = provider.lower()
     if provider in providers:
-        if provider == 'DeepL' and not api_key:
+        if provider == 'deepl' and not api_key:
             api_key = os.getenv("DEEPL_API_KEY")
-        elif provider == 'Custom API (LLM)' and not api_key: 
+        elif provider == 'custom' and not api_key: 
             api_key = os.getenv("CUSTOM_API_KEY")
         else:
             kwargs.pop("base_url", None)  # Remove base_url from kwargs to avoid passing it twice

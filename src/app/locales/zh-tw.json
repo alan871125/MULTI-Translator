@@ -1,7 +1,7 @@
 {
-    "Google": "Google",
-    "DeepL": "DeepL",
-    "Custom API (LLM)": "自定義 API (LLM)",
+    "google": "Google",
+    "deepl": "DeepL",
+    "custom": "自定義 API (LLM)",
     "settings": "設定",
     "settings.ui": "使用者介面",
     "settings.ui.language": "語言",

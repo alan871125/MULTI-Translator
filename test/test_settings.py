@@ -6,7 +6,7 @@ WORKSPACE_EXAMPLE = """{
     "name": "Example Workspace",
     "settings":{
         "translation": {
-            "api_provider": "DeepL",
+            "api_provider": "deepl",
             "source_lang": "jp",
             "target_lang": "zh-TW"
         },
@@ -31,9 +31,9 @@ class TestSettings:
         assert settings.plugin == "Simple JSON"  # Local settings should override global settings
 
     def test_attribute_get(self):
-        settings = Settings(api_provider="Google", source_lang="auto", plugin="RPG Maker MV")
+        settings = Settings(api_provider="google", source_lang="auto", plugin="RPG Maker MV")
         # Test access to SettingsData attributes through Settings
-        assert settings.translation.api_provider == "Google"
+        assert settings.translation.api_provider == "google"
         assert settings.translation.source_lang == "auto"
         assert settings.plugin == "RPG Maker MV"
         assert settings._space.output_dir == "%WORKSPACE_DIR%/output" # this is the raw value
@@ -43,13 +43,13 @@ class TestSettings:
     def test_attribute_set(self):
         settings = Settings({
             "translation":{
-                "api_provider":"DeepL", 
+                "api_provider":"deepl", 
                 "plugin":"RPG Maker MZ"
             }
         })
-        assert settings.translation.api_provider == "DeepL"
-        settings.set_val("translation.api_provider", "Google")
-        assert settings.translation.api_provider == "Google"
+        assert settings.translation.api_provider == "deepl"
+        settings.set_val("translation.api_provider", "google")
+        assert settings.translation.api_provider == "google"
 
     def test_signals(self):
         settings = Settings()
@@ -59,7 +59,7 @@ class TestSettings:
             emitted_settings.append(v)
         settings.setting_changed.connect(foo)
         
-        settings.set_val("translation.api_provider", "DeepL")
+        settings.set_val("translation.api_provider", "deepl")
         settings.set_val("plugin", "Simple JSON")
         assert emitted_settings == ["translation.api_provider", "plugin"], "Signals should be emitted for each setting change."
 
@@ -75,11 +75,11 @@ class TestSettings:
         settings = Settings()
         
         # getitem
-        assert settings["translation.api_provider"] == "Google"
+        assert settings["translation.api_provider"] == "google"
         
         # setitem
-        settings["translation.api_provider"] = "DeepL"
-        assert settings.translation.api_provider == "DeepL"
+        settings["translation.api_provider"] = "deepl"
+        assert settings.translation.api_provider == "deepl"
         
         with pytest.raises(KeyError):
             _ = settings["non_existent"]
@@ -93,7 +93,7 @@ class TestSettings:
         settings = Settings()
         assert settings.workspace_name == Path.cwd().name  # default workspace name
         assert settings.plugin == "Simple Json"  # default plugin
-        assert settings.translation.api_provider == "Google"  # default translation provider
+        assert settings.translation.api_provider == "google"  # default translation provider
         assert settings.translation.source_lang == "auto"  # default source language
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.json') as tmpfile:
             tmpfile.write(WORKSPACE_EXAMPLE)
@@ -101,7 +101,7 @@ class TestSettings:
         settings.load_workspace(tmpfile_path)
         assert settings.workspace_name == "Example Workspace"
         assert settings.plugin == "RPG Maker MV"
-        assert settings.translation.api_provider == "DeepL"
+        assert settings.translation.api_provider == "deepl"
         assert settings.translation.source_lang == "jp"
 
         assert settings.get_local_keys() == {

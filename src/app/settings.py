@@ -59,7 +59,7 @@ class AppSettings(SettingSpace):
     class TranslationSettings(SettingSpace, BaseSettings):
         # use BaseSettings to load api keys from .env file
         model_config = SettingsConfigDict(extra="ignore", env_file=".env", env_file_encoding="utf-8")
-        api_provider:     str = "Google"
+        api_provider:     str = "google"
         custom_api_url:   str = "https://openrouter.ai/api/v1" 
         custom_api_model: str = "openrouter/free"
         custom_api_key: str|None = None
