@@ -4,14 +4,14 @@ from itertools import cycle, islice
 from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
-
-from app.gui.main_window import TranslationApp
 from core.translation import Translator
+from .typing import IndexLikeSequence
+from .gui.main_window import TranslationApp
 from .models.session import TranslationSession
 from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel, TranslationTableModel
 from .translation_table import EditType, TranslationRequest, TranslationTabWidget
+from .workers.translation_worker import TranslationWorker
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
-from .typing import IndexLikeSequence
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ class TranslationAppPresenter:
         self.main_window:TranslationApp = main_window
         self.bottom_panel = main_window.bottom_panel
         self._current_model: Optional[TranslationTableModel] = None  # Keep track of the current model for the active tab
+        self._active_workers: dict[str, TranslationWorker] = {}
+        self.translation_request_handler = TranslationRequestHandler(self)
         self.connect_signals()
         self.register_console_commands()
         if self.settings.restore_last_session:
@@ -43,6 +45,7 @@ class TranslationAppPresenter:
         self.main_window.save_current_file_requested.connect(self.handle_save_current_file_request)
         self.main_window.edit_current_file_requested.connect(self.handle_edit_current_file_request)
         self.main_window.batch_operation_requested.connect(self.handle_batch_operations_request)
+        self.main_window.cancel_translation_button.clicked.connect(self.translation_request_handler.cancel)
         self.translation_tab_widget.tabCloseRequested.connect(self.handle_close_file_request)
         self.translation_tab_widget.open_dropped_file_request.connect(self.handle_open_file_request)
         self.translation_tab_widget.currentChanged.connect(self.on_tab_selection_changed)
@@ -127,6 +130,14 @@ class TranslationAppPresenter:
             # TODO: This case should ideally never happen because the edit action should be disabled when no file is open
             logger.warning("No file is currently open to edit.")
             return
+        key = Path(file_path).absolute().as_posix()
+        if key in self.translation_request_handler._active_workers:
+            self.main_window.show_msg_box(
+                "translation.in_progress.title",
+                "translation.in_progress.msg.edit",
+                level="warning"
+            )
+            return
         match edit_type:
             case EditType.CHS2CHT:
                 self.session.chs2cht(file_path)
@@ -178,32 +189,9 @@ class TranslationAppPresenter:
                         levels.append(lv)
                 
             case EditType.API:
-                # Drop text with duplicated original values to avoid sending the same text wasting API calls/tokens and overwriting
-                idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index
-                current_text = model.df.loc[idxs, 'translation']
-                translations = self.translator.batch_translate(current_text.tolist())
-                _idxs = idxs
-                idxs, translations = map(list, zip(*[
-                    (i, trans) for i, trans in zip(idxs, translations) 
-                    if trans is not None
-                ]))
-                
-                levels=TranslationLevel.API
-                failed_count = len(_idxs) - len(idxs)
-                if failed_count > 0:
-                    logger.warning(f"API translation failed for {failed_count} out of {len(_idxs)} selected rows.")
+                return self.api_translation_handler.api_translate(key, idxs, model)      
             case EditType.API_BATCH:
-                current_text = model.df.loc[idxs, 'translation']
-                translations = self.translator.line_batch_translate(current_text.tolist())
-                if translations is None:
-                    logger.warning("Batch API translation failed. No translations returned.")
-                    return
-                _idxs = idxs
-                idxs, translations = map(list, zip(*[
-                    (i, trans) for i, trans in zip(idxs, translations) 
-                    if trans is not None
-                ]))
-                levels=TranslationLevel.API
+                return self.api_translation_handler.api_translate(key, idxs, model, as_batch=True)
             case EditType.RESET:
                 translations = model.df.loc[idxs,'original'].astype(str)
                 levels = TranslationLevel.UNTRANSLATED
@@ -282,6 +270,14 @@ class TranslationAppPresenter:
         # Open a file dialog to select the YAML file containing the batch operations
         if (current_file_path :=self.translation_tab_widget.get_current_file_path()) is None:
             logger.warning("Current translation tab has no associated file path to generate default save path.")
+            return
+        key = Path(current_file_path).absolute().as_posix()
+        if key in self.translation_request_handler._active_workers:
+            self.main_window.show_msg_box(
+                "translation.in_progress.title",
+                "translation.in_progress.msg.batch", 
+                level="warning"
+            )
             return
         if file_path.suffix in ['.yaml', '.yml']:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -415,4 +411,85 @@ class TranslationAppPresenter:
             self.session.db.unload_csv(file_path)
         else:
             logger.warning(f"Received an unexpected check state {state} for file {file_path}. No action taken.")
+
+class TranslationRequestHandler:
+    def __init__(self, presenter: TranslationAppPresenter):
+        self.presenter = presenter
+        self._active_workers: dict[str, TranslationWorker] = {}
+    @property
+    def settings(self) -> Settings:
+        return self.presenter.settings
+    
+    def api_translate(self, key: str, idxs: IndexLikeSequence, model: TranslationTableModel, as_batch: bool=False):
+        if key in self._active_workers:
+            self._show_busy_message()
+            return
+        provider = self.settings.translation.api_provider
+        delay = self.settings.translation.request_delay.get(provider, 0.0)
+        worker = TranslationWorker(
+            translator=self.presenter.translator, 
+            idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index,
+            texts = model.df.loc[idxs, 'translation'].tolist(),
+            delay=delay,
+            max_concurrency=self.settings.translation.request_concurrency.get(provider, 5),
+            as_batch=as_batch
+        )
+        self._start_worker(key, model, idxs, worker)
+        return
         
+    def _start_worker(self, key, model: TranslationTableModel, idxs, worker: TranslationWorker):
+        model.lock_rows(idxs)
+        self._active_workers[key] = worker
+        self._update_cancel_button(True)
+        worker.work_finished.connect(
+            lambda idxs, translations, k=key, org=idxs:
+                self._on_finished(k, org, idxs, translations)
+        )
+        worker.progress.connect(self._on_progress)
+        worker.error.connect(
+            lambda msg, k=key, m=model, org=idxs:
+                self._on_error(k, m, org, msg)
+        )
+        worker.start()
+
+    def _on_finished(self, key, orig_idxs, idxs, translations):
+        model = self.presenter.session.models.get(key)
+        if model:
+            model.unlock_rows(orig_idxs)
+        self._active_workers.pop(key, None)
+        self._update_cancel_button(bool(self._active_workers))
+        pairs = [(i, t) for i, t in zip(idxs, translations) if t is not None]
+        if not pairs:
+            logger.warning("All translations failed for %s.", key)
+            return
+        idxs_ok, trans_ok = map(list, zip(*pairs))
+        failed = len(orig_idxs) - len(idxs_ok)
+        if failed > 0:
+            logger.warning("%d/%d translations failed.", failed, len(orig_idxs))
+        share = self.presenter.main_window.show_share_translation_confirmation()
+        self.presenter.session.set_translations(
+            key, idxs_ok, translations=trans_ok,
+            levels=TranslationLevel.API, share=share
+        )
+
+    def _on_error(self, key:str, model: TranslationTableModel, idxs:list[int], msg:str):
+        self._active_workers.pop(key, None)
+        self._update_cancel_button(bool(self._active_workers))
+        model.unlock_rows(idxs)
+        logger.error("Translation worker failed: %s", msg)
+
+    def _on_progress(self, done: int, total: int):
+        # Update bottom bar: "Translating 3/10…"
+        self.presenter.main_window.bottom_bar.setText(f"Translating {done}/{total}…")
+
+    def _show_busy_message(self):
+        self.presenter.main_window.bottom_bar.setText(
+            "Translation already in progress. Please wait or cancel."
+        )
+
+    def _update_cancel_button(self, active: bool):
+        self.presenter.main_window.cancel_translation_button.setVisible(active)
+
+    def cancel(self):
+        for worker in self._active_workers.values():
+            worker.cancel()

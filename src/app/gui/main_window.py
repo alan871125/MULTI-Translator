@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QCloseEvent, QAction, QShortcut, QUndoStack
 from PySide6.QtWidgets import (
     QLabel, QCheckBox, QFileDialog, QMainWindow, QWidget, 
-    QVBoxLayout, QSplitter, 
+    QVBoxLayout, QHBoxLayout, QSplitter, QPushButton,
     QMessageBox, QDialog, 
 )
 from qt_extensions.core import TypedSignal
@@ -101,12 +101,25 @@ class TranslationApp(QMainWindow):
         # 4. Bottom Panel
         self.bottom_panel = BottomPanel(L, self.settings, self)
         
-        # 5. Bottom Bar (show the current file full path)
+        # 5. Bottom Bar (show the current file full path and cancel action)
+        self.bottom_bar_widget = QWidget()
+        bottom_bar_layout = QHBoxLayout(self.bottom_bar_widget)
+        bottom_bar_layout.setContentsMargins(4, 0, 4, 0)
+        bottom_bar_layout.setSpacing(8)
+
         self.bottom_bar = QLabel()
         self.bottom_bar.setFixedHeight(20)
         self.bottom_bar.setObjectName("ButtonBar")  # Set the object name for styling
         self.bottom_bar.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        
+
+        self.cancel_translation_button = QPushButton(L["cancel"])
+        self.cancel_translation_button.setFixedHeight(20)
+        self.cancel_translation_button.setVisible(False)
+        self.cancel_translation_button.setToolTip(L["cancel_translation.tooltip"])
+
+        bottom_bar_layout.addWidget(self.bottom_bar, 1)
+        bottom_bar_layout.addWidget(self.cancel_translation_button)
+
         # --- Add Widgets to the main layout --- 
         # 1. Top Bar                                      # 1. Top Bar
         self.main_layout.addWidget(self.top_bar)          
@@ -117,7 +130,7 @@ class TranslationApp(QMainWindow):
         self.main_layout.addWidget(splitter, 1)
         # 3. Bottom Bar                                   # 3. Bottom Bar
         self.main_layout.addStretch()  # Add stretch to push the bottom bar to the bottom
-        self.main_layout.addWidget(self.bottom_bar)
+        self.main_layout.addWidget(self.bottom_bar_widget)
         
         # Register shortcuts to show/hide the bottom panel (ctrl+`)
         self.toggle_console_shortcut = QShortcut(QKeySequence("Ctrl+`"), self)

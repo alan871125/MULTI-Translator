@@ -57,6 +57,14 @@ class AppSettings(SettingSpace):
             **kwargs: Any,
         ) -> None: ...
     class TranslationSettings(SettingSpace, BaseSettings):
+        class RequestDelay(SettingSpace):
+            google:  float = 0.3
+            deepl:   float = 0.0
+            custom:  float = 0.0
+        class RequestConcurrency(SettingSpace):
+            google:  int = 1
+            deepl:   int = 5
+            custom:  int = 5
         # use BaseSettings to load api keys from .env file
         model_config = SettingsConfigDict(extra="ignore", env_file=".env", env_file_encoding="utf-8")
         api_provider:     str = "google"
@@ -66,6 +74,8 @@ class AppSettings(SettingSpace):
         deepl_api_key:  str|None = None
         source_lang: str = "auto"
         target_lang: str = "en"
+        request_delay: RequestDelay = Field(default_factory=RequestDelay)
+        request_concurrency: RequestConcurrency = Field(default_factory=RequestConcurrency)
         
         @property
         def api_key(self) -> str|None:

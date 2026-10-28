@@ -201,7 +201,18 @@ class SettingsDialog(QDialog):
         self.widgets["translation"]["deepl_api_key"]    = QLineEdit(self.settings.translation.deepl_api_key)
         self.widgets["translation"]["deepl_api_key"].setPlaceholderText(L["settings.translation.deepl_api_key.hint"])
         self.widgets["translation"]["custom_api_key"].setPlaceholderText(L["settings.translation.custom_api_key.hint"])
+        
+        # Advanced Settings: Request Delay for each provider
+        current_delays = self.settings.translation.request_delay
+        for provider in ("google", "deepl", "custom"):
+            self.widgets["translation"][f"request_delay.{provider}"] = QDoubleSpinBox(
+                minimum=0.0, maximum=5.0, 
+                singleStep=0.05, suffix="s",
+                value=current_delays.get(provider, 0.0)
+            )
+        
         self.tabs.addTab(translation_tab, L["settings.translation"])
+    
     def init_ui_settings_tab(self):
         languages = L.get_available_languages()
         # UI Settings Tab

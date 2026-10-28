@@ -132,6 +132,8 @@ class TranslationTableModel(QAbstractTableModel):
         if ((role == Qt.ItemDataRole.BackgroundRole and theme.USE_COLOR_LEVEL_BACKGROUND) or
             (role == Qt.ItemDataRole.ForegroundRole and not theme.USE_COLOR_LEVEL_BACKGROUND) ):
             level = self._level_from_value(self.df.iloc[r]['level'])
+            if self.df.index[r] in self._in_progress_keys:
+                return QColor("lightgray")  # In-progress rows are visually distinct
             return QColor(ThemeManager.theme.get_level_color(level))
 
         # value = self.df.iat[r, c] # this will break if the column order changes, so we use the column name instead
@@ -186,11 +188,13 @@ class TranslationTableModel(QAbstractTableModel):
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemFlag.ItemIsEnabled
-        # make items selectable and enabled; only the Translation column is editable
-        col = index.column()
         flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         try:
-            if self._COLUMNS[col] == "translation":
+            # lock the row if its in API translation progress
+            row_key = self.df.index[index.row()]
+            if row_key in self._in_progress_keys:
+                return flags   # locked: selectable but not editable
+            if self._COLUMNS[index.column()] == "translation":
                 flags |= Qt.ItemFlag.ItemIsEditable
         except Exception:
             pass
@@ -426,6 +430,18 @@ class TranslationTableModel(QAbstractTableModel):
         self.clear_filter_mask()
 
         self.layoutChanged.emit()
+        
+    def lock_rows(self, idxs:IndexLikeSequence) -> None:
+        """Mark rows as in-progress (read-only, visually distinct)."""
+        self._in_progress_keys |= set(idxs)
+        # Emit dataChanged so the view repaints (color + flags)
+        self.emit_df_row_changed(pd.Index(idxs))
+
+    def unlock_rows(self, idxs: IndexLikeSequence) -> None:
+        """Clear in-progress flag for the given rows."""
+        keys = set(idxs)
+        self._in_progress_keys -= keys
+        self.emit_df_row_changed(pd.Index(idxs))
 
 class TranslationTableProxyModel(QSortFilterProxyModel):
     """A proxy model for the TranslationTableModel to support sorting and filtering in the view."""
