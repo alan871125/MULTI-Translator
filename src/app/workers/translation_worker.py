@@ -32,7 +32,7 @@ class TranslationWorker(QThread):
         texts: list[str],
         delay: float = 0.0,
         max_concurrency: int = 5,
-        parent:QObject|None=None,
+        parent: QObject | None = None,
         as_batch: bool = False,
     ):
         """
@@ -72,7 +72,7 @@ class TranslationWorker(QThread):
         """Emit the translated signal for a single item."""
         logger.debug("Translated idx %d: %s", idx, translation)
         self.progress_count += 1
-        # self.progress.emit(self.progress_count)
+        self.progress.emit(self.progress_count, len(self.texts))
         
     async def _translate(self, text: str, idx: int) -> str | None:
         """Translate a single text item asynchronously."""
@@ -101,14 +101,20 @@ class TranslationWorker(QThread):
                 )
                 if results is None:
                     self.error.emit("line_batch_translate returned None")
-                    return
-                for idx, translation in zip(self.idxs, results):
-                    self.translated.emit(idx, translation)
+                    self.work_finished.emit(self.idxs, [None] * len(self.texts))
+                else:
+                    for idx, translation in zip(self.idxs, results):
+                        self.translated.emit(idx, translation)
+                    self.work_finished.emit(self.idxs, list(results))
             else:
-                tasks = [self._translate(text, idx) for text, idx in zip(self.texts, self.idxs)]
-                results = asyncio.run(asyncio.gather(*tasks))
+                self.semaphore = asyncio.Semaphore(self.max_concurrency)
+
+                async def _run_all() -> list[str | None]:
+                    tasks = [self._translate(text, idx) for text, idx in zip(self.texts, self.idxs)]
+                    return await asyncio.gather(*tasks)
+
+                results = asyncio.run(_run_all())
                 self.work_finished.emit(self.idxs, results)
         except Exception as e:
             logger.error("%s encountered an error: %s", type(self).__name__, e)
             self.error.emit(str(e))
-
