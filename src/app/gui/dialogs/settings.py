@@ -163,7 +163,7 @@ class SettingsDialog(QDialog):
             v = self.settings.get_raw(key, scope=SettingScope.GLOBAL)
         widget = self.widgets[layout_key][k]
         if isinstance(widget, QComboBox,):
-            widget.setCurrentText(v or "")
+            widget.setCurrentText(L[v]or "")
         elif isinstance(widget, (QLineEdit, PathSettingsWidget)):
             widget.setText(v or "")
         elif isinstance(widget, QSpinBox):
@@ -188,7 +188,7 @@ class SettingsDialog(QDialog):
         self.widgets["translation"]["target_lang"] = QComboBox()
         self.widgets["translation"]["api_provider"] = QComboBox()
         self.widgets["translation"]["api_provider"].addItems([L[p] for p in providers.keys()])
-        self.widgets["translation"]["api_provider"].setCurrentText(self.settings.translation.api_provider)
+        self.widgets["translation"]["api_provider"].setCurrentText(L[self.settings.translation.api_provider.lower()])
         self.widgets["translation"]["api_provider"].currentTextChanged.connect(self.on_api_changed)
         # Update language combo boxes based on the current API setting
         self.update_lang_combobox(self.widgets["translation"]["source_lang"], self.settings.translation.source_lang, role='source')

@@ -24,7 +24,7 @@ class SettingSpace(BaseModel):
                     local = None          # during __init__, before private attrs exist
                 if local and name in local:
                     return local[name]
-            return super().__getattribute__(name)
+            return super().__getattribute__(name) #@IgnoreException
         
     def set_local(self, /, clear: bool = False, **overrides:Any, ) -> None:
         """Set a local setting value."""
@@ -38,13 +38,14 @@ class SettingSpace(BaseModel):
             
     def get(self, name: str, default: Any = None) -> Any:
         """Get a setting value, checking local overrides first."""
-        if name in self._local:
-            return self._local[name]
         return getattr(self, name, default)
     
     def get_local(self, name: str, default: Any = None) -> Any:
         """Get a local setting value, or default if not set."""
         return self._local.get(name, default)
+    
+    def get_global(self, name: str, default: Any = None) -> Any:
+        return self.__dict__.get(name, default)
     
     def __setattr__(self, name: str, value: Any) -> None:
         if name.startswith("_"):

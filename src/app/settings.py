@@ -36,7 +36,7 @@ DEFAULT_GAME_DATA_DIR = "%WORKSPACE_DIR%/data"
 DEFAULT_USER_DICT_DIR = "%WORKSPACE_DIR%/dictionary"
 DEFAULT_OUTPUT_DIR = "%WORKSPACE_DIR%/output"
 DEFAULT_DB_PATH = "%WORKSPACE_DIR%/user_dict.db"
-DEFAULT_PLUGIN = "Simple Json"
+DEFAULT_PLUGIN = "Simple JSON"
 
 SupportedLanguages = Literal["en", 'zh-tw']
 # Matches either %VAR% (group 1) OR $VAR / ${VAR} (group 2)
@@ -323,7 +323,7 @@ class Settings(QObject, AppSettings if TYPE_CHECKING else object):
         if scope == SettingScope.LOCAL:
             return space.get_local(last_part, default)
         elif scope == SettingScope.GLOBAL:
-            return getattr(space, last_part, default)
+            return space.get_global(last_part, default)
         return space.get(last_part, default)
     
     def set_val(self, key, value: Any, scope:SettingScope|None=None):
