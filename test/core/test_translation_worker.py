@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock
 from PySide6.QtCore import QCoreApplication
 
-from app.translation_worker import TranslationWorker
+from app.workers import TranslationWorker
 
 
 @pytest.fixture(scope="session")

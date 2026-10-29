@@ -10,7 +10,7 @@ from .gui.main_window import TranslationApp
 from .models.session import TranslationSession
 from .models.translation_table_model import TranslationLevel, TranslationTableProxyModel, TranslationTableModel
 from .translation_table import EditType, TranslationRequest, TranslationTabWidget
-from .workers.translation_worker import TranslationWorker
+from .workers import TranslationWorker
 from .settings import WORKSPACE_FILE_EXTENSION, Settings
 
 logger = logging.getLogger(__name__)
