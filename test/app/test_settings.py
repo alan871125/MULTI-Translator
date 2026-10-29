@@ -92,7 +92,7 @@ class TestSettings:
         import tempfile
         settings = Settings()
         assert settings.workspace_name == Path.cwd().name  # default workspace name
-        assert settings.plugin == "Simple Json"  # default plugin
+        assert settings.plugin == "Simple JSON"  # default plugin
         assert settings.translation.api_provider == "google"  # default translation provider
         assert settings.translation.source_lang == "auto"  # default source language
         with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.json') as tmpfile:
@@ -104,6 +104,10 @@ class TestSettings:
         assert settings.translation.api_provider == "deepl"
         assert settings.translation.source_lang == "jp"
 
+        assert settings.get_global("plugin") == "Simple JSON"  # default plugin
+        assert settings.translation.get_global("api_provider") == "google"  # default translation provider
+        assert settings.translation.get_global("source_lang") == "auto"  # default source language
+        
         assert settings.get_local_keys() == {
             "translation.api_provider",
             "translation.source_lang",
@@ -111,5 +115,6 @@ class TestSettings:
             "ui.language",
             "plugin"
         }
+        
 if __name__ == "__main__":
     pytest.main([__file__])
