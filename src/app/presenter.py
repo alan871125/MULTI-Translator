@@ -112,16 +112,16 @@ class TranslationAppPresenter:
         if model is not None:
             self._current_model = model
             self._current_model.dataChanged.connect(self._update_progress_chart)
-            self.main_window.top_bar.progress_chart._sum = len(model.df) # this allows the pie chart to display in completness percentage 
         # TODO: add an additional level_changed signal to the model if the dataChanged triggers too often and hinders the performance
-        self._update_progress_chart()  # Update the progress chart based on the new model's data
         
     def _update_progress_chart(self):
         if self._current_model is not None:
-            level_counts = self._current_model.df.level.value_counts().to_dict()
-            self.main_window.top_bar.progress_chart.update_values(level_counts)
+            self.main_window.update_progress_chart(
+                level_counts=self._current_model.df.level.value_counts().to_dict(),
+                total_count=len(self._current_model.df)
+            )
         else:
-            self.main_window.top_bar.progress_chart.update_values({})
+            self.main_window.update_progress_chart(level_counts={}, total_count=0)
             
     def handle_edit_current_file_request(self, edit_type: EditType):
         """Handles a request to edit a file."""
@@ -170,24 +170,8 @@ class TranslationAppPresenter:
                     return
                 levels = TranslationLevel.VERIFIED
             case EditType.HEURISTIC:
-                idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index
-                current_text = model.df.loc[idxs, 'translation']
-                _idxs, translations,  levels = [], [], []
-                for i, text in zip(idxs, current_text):
-                    matches = self.session.db.get_fuzzy_matches(text, self.settings.translation.target_lang, th=80, limit=1)
-                    if matches:
-                        match matches[0]:
-                            case (org, tran, 100, _):
-                                lv = TranslationLevel.DICTIONARY
-                            case (org, tran, _, _):
-                                lv = TranslationLevel.HEURISTIC
-                            case _:
-                                logger.warning(f"Unexpected match format: {matches[0]}")
-                                continue
-                        _idxs.append(i)
-                        translations.append(tran)
-                        levels.append(lv)
-                
+                share = self.main_window.show_share_translation_confirmation()
+                return self.session.heuristic_translate(file_path, idxs, th=80, limit=1, min_lv=0, share=share)
             case EditType.API:
                 return self.translation_request_handler.api_translate(key, idxs, model)      
             case EditType.API_BATCH:
@@ -266,7 +250,6 @@ class TranslationAppPresenter:
         """Given a file path to a YAML or JSON file containing batch operations, 
         this method reads the file and applies the operations to the current translation table.
         """
-        from core import batch_operation
         # Open a file dialog to select the YAML file containing the batch operations
         if (current_file_path :=self.translation_tab_widget.get_current_file_path()) is None:
             logger.warning("Current translation tab has no associated file path to generate default save path.")
@@ -279,17 +262,11 @@ class TranslationAppPresenter:
                 level="warning"
             )
             return
-        if file_path.suffix in ['.yaml', '.yml']:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                yaml_content = f.read()
-            self.session.apply_batch_operation(current_file_path, *batch_operation.load_yaml(yaml_content))
-        elif file_path.suffix == '.json':
-            with open(file_path, 'r', encoding='utf-8') as f:
-                json_content = f.read()
-            self.session.apply_batch_operation(current_file_path, *batch_operation.load_json(json_content))
-        else:
-            logger.error(f"Unsupported batch file extension: {file_path.suffix}. Only 'yaml' and 'json' are currently supported.")
-
+        
+        self.session.apply_batch_operations_from_file(
+            target=current_file_path, batch_file=file_path
+        )
+        
     def create_translation_tab(self, path: str|Path):
         path = Path(path).absolute()
         # Create tab in the TranslationTabWidget
@@ -422,13 +399,13 @@ class TranslationRequestHandler:
     
     def api_translate(self, key: str, idxs: IndexLikeSequence, model: TranslationTableModel, as_batch: bool=False):
         if key in self._active_workers:
-            self._show_busy_message()
+            self.presenter.main_window.show_busy_translating()
             return
         provider = self.settings.translation.api_provider
         delay = self.settings.translation.request_delay.get(provider, 0.0)
         worker = TranslationWorker(
             translator=self.presenter.translator, 
-            idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index,
+            idxs = model.uniquified_idxs(idxs),
             texts = model.df.loc[idxs, 'translation'].tolist(),
             delay=delay,
             max_concurrency=self.settings.translation.request_concurrency.get(provider, 5),
@@ -481,11 +458,6 @@ class TranslationRequestHandler:
     def _on_progress(self, done: int, total: int):
         # Update bottom bar: "Translating 3/10…"
         self.presenter.main_window.bottom_bar.setText(f"Translating {done}/{total}…")
-
-    def _show_busy_message(self):
-        self.presenter.main_window.bottom_bar.setText(
-            "Translation already in progress. Please wait or cancel."
-        )
 
     def _update_cancel_button(self, active: bool):
         self.presenter.main_window.cancel_translation_button.setVisible(active)

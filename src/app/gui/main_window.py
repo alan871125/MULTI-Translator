@@ -381,3 +381,25 @@ class TranslationApp(QMainWindow):
             ThemeManager().set_theme(dark = self.settings.ui.dark_mode, FONT_SIZE = f"{self.settings.ui.font_size}pt")  # Apply theme based on settings
         else:
             logger.debug("Settings dialog cancelled")
+
+    def show_msg_box(
+        self, title: str, text, level: Literal['info', 'warning', 'critical'] = 'info', **kwargs
+    ):
+        """A wrapper function for the presenter.
+        
+        title and text are auto translated using the LanguagePack.
+        """
+        if level == 'info':
+            QMessageBox.information(self, L[title], L[text], **kwargs)
+        elif level == 'warning':
+            QMessageBox.warning(self, L[title], L[text], **kwargs)
+        elif level == 'critical':
+            QMessageBox.critical(self, L[title], L[text], **kwargs)
+    
+    def update_progress_chart(self, level_counts: dict, total_count: Optional[int] = None):
+        """Update the progress pie chart based on the provided level counts and total count."""
+        self.top_bar.progress_chart.set_sum_proportion(total_count)
+        self.top_bar.progress_chart.update_values(level_counts)
+
+    def show_busy_translating(self):
+        self.bottom_bar.setText("Translation already in progress. Please wait or cancel.")

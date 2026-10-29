@@ -63,6 +63,10 @@ class TranslationTableModel(QAbstractTableModel):
             logger.warning("The following duplicate keys were dropped: \n    %s", '\n    '.join(map(str, dup[dup].keys())))
             self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount()-1, self.columnCount()-1))  # Emit dataChanged for the entire model
     
+    def uniquified_idxs(self, idxs: IndexLikeSequence, keep:Literal["last", "first", False]='last') -> pd.Index:
+        """Return a unique set of indexes based on the 'original' text, keeping the last occurrence."""
+        return self.df.loc[idxs].drop_duplicates(subset='original', keep=keep).index
+    
     def _level_from_value(self, value):
         if isinstance(value, TranslationLevel):
             return value

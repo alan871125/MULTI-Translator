@@ -273,5 +273,42 @@ class TranslationSession(QObject):
             translations=translations[idxs],
             levels=TranslationLevel.PARTIAL,
         ))
-            
-
+        
+    def apply_batch_operations_from_file(self, target: str|Path, batch_file: str|Path):
+        """Apply batch operations from a JSON file. The JSON file should contain a list of operations to be applied to the target translation table."""
+        from core import batch_operation
+        batch_file = Path(batch_file).absolute()
+        if batch_file.suffix in ['.yaml', '.yml']:
+            with open(batch_file, 'r', encoding='utf-8') as f:
+                yaml_content = f.read()
+            self.apply_batch_operation(target, *batch_operation.load_yaml(yaml_content))
+        elif batch_file.suffix == '.json':
+            with open(batch_file, 'r', encoding='utf-8') as f:
+                json_content = f.read()
+            self.apply_batch_operation(target, *batch_operation.load_json(json_content))
+        else:
+            logger.error(f"Unsupported batch file extension: {batch_file.suffix}. Only 'yaml' and 'json' are currently supported.")
+    
+    def heuristic_translate(self, file_path:str|Path, idxs:IndexLikeSequence, th:int=70, limit:int=10, min_lv:int=0, share:bool=False):
+        model = self.models.get(Path(file_path).absolute().as_posix())
+        if model is None:
+            raise ValueError(f"Attempted to get fuzzy matches for a file that is not open: {file_path}")
+        idxs = model.df.loc[idxs].drop_duplicates('original', keep='last').index
+        current_translations = model.df.loc[idxs, "translation"]
+        _idxs, translations,  levels = [], [], []
+        for i, text in zip(idxs, current_translations):
+            matches = self.db.get_fuzzy_matches(text, self.settings.translation.target_lang, th, limit, min_lv)
+            if not matches:
+                continue
+            match matches[0]:
+                case (org, tran, 100, _):
+                    lv = TranslationLevel.DICTIONARY
+                case (org, tran, _, _):
+                    lv = TranslationLevel.HEURISTIC
+                case _:
+                    logger.warning(f"Unexpected match format: {matches[0]}")
+                    continue
+            _idxs.append(i)
+            translations.append(tran)
+            levels.append(lv)
+        self.set_translations(file_path, _idxs, translations, levels, share=share)
