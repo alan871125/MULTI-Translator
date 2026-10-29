@@ -189,9 +189,9 @@ class TranslationAppPresenter:
                         levels.append(lv)
                 
             case EditType.API:
-                return self.api_translation_handler.api_translate(key, idxs, model)      
+                return self.translation_request_handler.api_translate(key, idxs, model)      
             case EditType.API_BATCH:
-                return self.api_translation_handler.api_translate(key, idxs, model, as_batch=True)
+                return self.translation_request_handler.api_translate(key, idxs, model, as_batch=True)
             case EditType.RESET:
                 translations = model.df.loc[idxs,'original'].astype(str)
                 levels = TranslationLevel.UNTRANSLATED
